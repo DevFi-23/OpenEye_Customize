@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: SHL-2.1
 # For more details, see the LICENSE file in the root directory of this project.
 import os
+import re
 import warnings
 from subprocess import Popen, PIPE
 
@@ -15,16 +16,69 @@ from docstring_parser import parse_documentation
 from moduledef_parser import parse_module_def
 
 
-def generate_rst(doc, module_def):
+BULLET_RE = re.compile(r'^\s*([-*+•]|\d+[.)])\s')
+
+
+def escape_rst(text):
+    """
+    Escape characters that reStructuredText would interpret as markup.
+
+    "|" starts a substitution reference in RST, so ASCII timing diagrams such as
+    "clk : __|‾‾|__" in the Verilog comments would produce
+    "Undefined substitution referenced" errors.
+    """
+    return text.replace("|", r"\|")
+
+
+def separate_bullet_lists(text):
+    """
+    Insert blank lines where a bullet list starts or ends.
+
+    The docstring parser strips the indentation of every comment line, so a bullet
+    list is often directly followed by a normal text line, and nested lists
+    ("- Group:" followed by "* item") end up on the same level with a different
+    bullet character. RST requires a blank line in both cases and otherwise warns
+    "Bullet list ends without a blank line".
+    """
+    lines = []
+    prev_kind = None  # None: previous line was blank (or there is none)
+    for line in text.split("\n"):
+        if not line.strip():
+            lines.append(line)
+            prev_kind = None
+            continue
+        match = BULLET_RE.match(line)
+        # "text" for normal lines, the bullet marker (or "enum") for list items
+        if match is None:
+            kind = "text"
+        elif match.group(1)[0].isdigit():
+            kind = "enum"
+        else:
+            kind = match.group(1)
+        if prev_kind is not None and prev_kind != kind:
+            lines.append("")
+        lines.append(line)
+        prev_kind = kind
+    return "\n".join(lines)
+
+
+def format_description(text):
+    return separate_bullet_lists(escape_rst(text))
+
+
+def generate_rst(doc, module_def, image_name=None):
     """
     Generate RST documentation for a Verilog module.
 
-    Safely handles missing parameters/ports that may be referenced in docstrings
-    but not actually defined in the module.
+    The module signature and the parameter/port lists are taken from the actual
+    module definition, so undocumented ports (or a missing "Ports:" section) still
+    produce a valid page. Descriptions are taken from the docstring when present;
+    documented names that do not exist in the module are skipped.
 
     Args:
         doc: ModuleDocumentation object from parse_documentation()
         module_def: ModuleDefinition object from parse_module_def()
+        image_name: Filename of the module symbol image, or None if there is no image
 
     Returns:
         String containing the RST documentation
@@ -35,34 +89,36 @@ def generate_rst(doc, module_def):
     docstring += title + "\n"
     docstring += "=" * len(title) + "\n\n"
 
-    docstring += f".. verilog:module:: module {doc.module_name}("
-    for port, desc in doc.ports.items():
-        docstring += f"{port}, "
-    docstring = docstring[:-2] + ")\n\n"
+    docstring += f".. verilog:module:: module {doc.module_name}"
+    if module_def.ports:
+        docstring += "(" + ", ".join(module_def.ports) + ")"
+    docstring += "\n\n"
 
-    indented_description = indent(doc.description, "    ")
+    indented_description = indent(format_description(doc.description), "    ")
 
     docstring += f"{indented_description}\n\n"
 
-    image_name = f"__{doc.module_name}.png"
-    docstring += f"    .. image:: {image_name} \n\n"
+    if image_name:
+        docstring += f"    .. image:: {image_name} \n\n"
 
-    # Add parameters - skip any that don't exist in module_def
-    for param, desc in doc.parameters.items():
+    for param in doc.parameters:
         if param not in module_def.parameters:
             logger.debug(f"Parameter {param} documented but not found in module definition for {doc.module_name}")
-            continue
+    for port in doc.ports:
+        if port not in module_def.ports:
+            logger.debug(f"Port {port} documented but not found in module definition for {doc.module_name}")
 
+    # Add parameters in declaration order
+    for param in module_def.parameters:
+        desc = indent(format_description(doc.parameters.get(param, "")), "        ")
         param_type = module_def.parameters[param].ptype
         param_default = module_def.parameters[param].default_value
         docstring += f"    .. verilog:parameter:: parameter {param_type} {param} = {param_default}\n\n"
-        docstring += f"        {desc}\n\n"
+        docstring += f"{desc}\n\n"
 
-    # Add ports - skip any that don't exist in module_def
-    for port, desc in doc.ports.items():
-        if port not in module_def.ports:
-            logger.debug(f"Port {port} documented but not found in module definition for {doc.module_name}")
-            continue
+    # Add ports in declaration order
+    for port in module_def.ports:
+        desc = indent(format_description(doc.ports.get(port, "")), "        ")
 
         port_direction = module_def.ports[port].direction
         port_sign = module_def.ports[port].sign
@@ -85,9 +141,14 @@ def generate_rst_file(input_filename):
         text = f_input.read()
         doc = parse_documentation(text)
         module_def = parse_module_def(text)
-        rst = generate_rst(doc, module_def)
         doc_dir = __file__.split("/")[:-2]
         doc_dir.extend(["source", "verilog"])
+        # Only reference the symbol image if symbolator actually created it,
+        # otherwise Sphinx warns "image file not readable".
+        image_name = f"__{doc.module_name}.png"
+        if not os.path.exists("/".join(doc_dir) + f"/{image_name}"):
+            image_name = None
+        rst = generate_rst(doc, module_def, image_name)
         output_filename = "/".join(doc_dir) + f"/{doc.module_name}.rst"
         os.makedirs(os.path.dirname(output_filename), exist_ok=True)
         with open(output_filename, "w") as f_output:
@@ -96,6 +157,7 @@ def generate_rst_file(input_filename):
 def generate_svg_file(input_filename):
     doc_dir = __file__.split("/")[:-2]
     doc_dir.extend(["source", "verilog"])
+    os.makedirs("/".join(doc_dir), exist_ok=True)
 
     cmd = [
         'symbolator',
@@ -149,7 +211,14 @@ if __name__ == "__main__":
     for root, dirs, files in os.walk(hdl_dir):
         for filename in sorted(files):
             if filename.endswith(".v"):
-                # Try to generate RST (this is critical - file must be generated)
+                # Generate the symbol image first, so that generate_rst_file() can
+                # check whether it exists. This is optional - don't fail if it doesn't work.
+                try:
+                    generate_svg_file(os.path.join(root, filename))
+                except Exception as e:
+                    logger.debug(f"Could not generate SVG for {filename}: {e}")
+
+                # Generate RST (this is critical - file must be generated)
                 try:
                     generate_rst_file(os.path.join(root, filename))
                     generated_doc_files.append(filename)
@@ -157,14 +226,6 @@ if __name__ == "__main__":
                     warnings.warn(f"Error processing {filename}: {e}")
                     logger.debug(f"{e}")
                     continue
-
-                # Try to generate SVG diagram (this is optional - don't fail if it doesn't work)
-                try:
-                    generate_svg_file(os.path.join(root, filename))
-                except Exception as e:
-                    # SVG generation is optional, just log it
-                    logger.debug(f"Could not generate SVG for {filename}: {e}")
-                    # Don't warn or continue - we still want to add to index
 
     # Always generate index with the files that were successfully processed
     generate_index_rst(generated_doc_files)

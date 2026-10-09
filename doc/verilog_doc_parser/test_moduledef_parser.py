@@ -560,6 +560,54 @@ endmodule
         parse = ports.parse_string(text)
         assert len(parse.ports) == 57
 
+    def test_parse_comments_in_declaration(self):
+        text="""
+module commented
+#(
+  parameter integer DEPTH = 16, // depth of the memory
+  /* parameter integer OLD = 4, */
+  parameter integer WIDTH = 8   /// data width
+)(
+  input  clk_i,                 // clock
+  /* input  unused_i, */
+  input  [WIDTH-1:0] data_i,    //! data input
+  output [WIDTH-1:0] data_o
+);
+endmodule
+"""
+        module = parse_module_def(text)
+        assert module.module_name == "commented"
+        assert list(module.parameters) == ["DEPTH", "WIDTH"]
+        assert module.parameters["DEPTH"].default_value == "16"
+        assert module.parameters["WIDTH"].default_value == "8"
+        assert list(module.ports) == ["clk_i", "data_i", "data_o"]
+
+    def test_parse_expression_parameter_values(self):
+        text="""
+module expressions
+#(
+  parameter SERIAL = 1,
+  parameter PARALLEL_MACS = 2,
+  parameter integer MACS = (SERIAL ? 1 : PARALLEL_MACS),
+  parameter integer ALIGNED = 10 - (10 % 4),
+  parameter real RATIO = 1.5,
+  localparam integer DEPTH = $rtoi($ceil(10 / 4)),
+  parameter [3:0] MASK = 4'b1010
+)(
+  input clk_i
+);
+endmodule
+"""
+        module = parse_module_def(text)
+        assert list(module.parameters) == ["SERIAL", "PARALLEL_MACS", "MACS", "ALIGNED", "RATIO", "DEPTH", "MASK"]
+        assert module.parameters["SERIAL"].ptype == "integer"
+        assert module.parameters["MACS"].default_value == "(SERIAL ? 1 : PARALLEL_MACS)"
+        assert module.parameters["ALIGNED"].default_value == "10 - (10 % 4)"
+        assert module.parameters["RATIO"].ptype == "real"
+        assert module.parameters["RATIO"].default_value == "1.5"
+        assert module.parameters["DEPTH"].default_value == "$rtoi($ceil(10 / 4))"
+        assert module.parameters["MASK"].default_value == "4'b1010"
+
     def parse_and_compare_module_name_from_moduledef(self, module_file):
         """This simple test parses the module name from the docstring of the
         given module file and compares it with the module file name.
