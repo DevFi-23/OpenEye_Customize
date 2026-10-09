@@ -84,7 +84,8 @@ NUM_GLB_WGHT  = 3
 def _run_conv_const(layer_mode, const_value, cluster_rows, num_glb_iact,
                     input_channels, request, ramp_iacts=False,
                     psum_width=20, trans_words=8, bias_step=0,
-                    input_height=INPUT_SIZE_Y, asymmetric_kernel=False):
+                    input_height=INPUT_SIZE_Y, asymmetric_kernel=False,
+                    quant_amount=1024, dma_bitwidth=None):
     """Build and simulate one constant-operand conv configuration."""
     # OpenEyeParameters and parameters.vh read these from the environment at
     # generation time, so they have to be set before create_vh_file_from_envvars.
@@ -99,7 +100,9 @@ def _run_conv_const(layer_mode, const_value, cluster_rows, num_glb_iact,
     # 640 DMA words, matching GET_QUANTIZE's derived transfer count.
     os.environ["BRANCHES"]        = "1"
     os.environ["BUFFER_WIDTH"]    = "12"
-    os.environ["QUANT_AMOUNT"]    = "1024"
+    os.environ["QUANT_AMOUNT"]    = str(quant_amount)
+    if dma_bitwidth is not None:
+        os.environ["DMA_BITWIDTH"] = str(dma_bitwidth)
     os.environ["RAM_CELLS"]       = "32"
     os.environ["CLUSTER_COLUMNS"] = "2"
 

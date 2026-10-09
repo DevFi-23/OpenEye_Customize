@@ -19,6 +19,7 @@ architecture and supports both parallel and serial modes of operation.
 """
 
 import os
+import json
 import logging
 import math
 import cocotb
@@ -901,6 +902,119 @@ def report_iact_handoff(oep=None):
                 parts.append("cl%d[%s]" % (cl, ",".join(sel) if sel else "none"))
             line += " -> " + " ".join(parts)
         logger.error(line)
+
+
+# Main-FSM states of OpenEye_FPGA.v, grouped into the phases a layer goes through.
+PROFILE_PHASES = {
+    0: "idle", 1: "load_config", 2: "load_config", 3: "load_iact", 4: "load_wght",
+    5: "load_bias", 6: "load_quant", 7: "convert_iact", 8: "convert_iact",
+    9: "convert_iact", 10: "compute", 11: "writeback", 12: "pooling",
+    13: "pooling", 14: "pooling",
+}
+PSUM_SEND_RESULTS_STATE = 5  # psum_pipeline.v: streaming results to data_dma_o
+
+
+async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
+    """Cycle and DMA-beat profile of the FPGA top level (opt-in: OPENEYE_PROFILE=1).
+
+    Samples every rising clock edge and attributes the cycle to a phase: the
+    main FSM state (see PROFILE_PHASES), or "readout" while the psum FSM is in
+    PSUM_SEND_RESULTS. Per phase it counts cycles, DMA input words offered by
+    the host (enable_dma_i_reg), DMA input words accepted (enable_dma_i_reg and
+    ready_dma_o) and DMA output words (enable_dma_o and ready_dma_i). Offered
+    but not accepted words are refused by the DUT; the host in send_stream
+    repeats its last word for one cycle, which shows up as one refused word.
+
+    The measured window runs from the first accepted input word to the last
+    output word, so idle time before the stream and after the result is not
+    counted. The result is rewritten to `path` (relative to the sim directory)
+    on every phase change and result word, so it survives a failing or
+    hanging test.
+    Summarise it with `python -m open_eye.profile_report`.
+    """
+    try:
+        psum_state_sig = dut.psum_pipeline_inst.fsm_psum_current_state
+    except AttributeError:
+        psum_state_sig = dut.fsm_psum_current_state
+
+    def bit(sig):
+        try:
+            return int(sig.value)
+        except ValueError:  # X/Z counts as inactive
+            return 0
+
+    config = {name: os.environ.get(name) for name in (
+        "LAYER", "NUM_FILTERS", "KERNEL_SIZE_X", "KERNEL_SIZE_Y", "INPUT_SIZE_X",
+        "INPUT_SIZE_Y", "INPUT_CHANNELS", "STRIDE")}
+    config.update({
+        "DMA_BITWIDTH": oep.DMA_BITWIDTH, "DATA_PSUM_BITWIDTH": oep.DATA_PSUM_BITWIDTH,
+        "CLUSTER_ROWS": oep.Clusters_Y, "CLUSTER_COLUMNS": oep.Clusters_X,
+        "NUM_GLB_IACT": oep.NUM_GLB_IACT, "NUM_GLB_WGHT": oep.NUM_GLB_WGHT,
+        "NUM_GLB_PSUM": oep.NUM_GLB_PSUM, "QUANT_AMOUNT": os.environ.get("QUANT_AMOUNT"),
+        "CLOCK_NS": ptp.clk_cycle,
+    })
+
+    def empty():
+        return {"cycles": 0, "in_offered": 0, "in_accepted": 0, "out_words": 0}
+
+    phases = {}         # phase -> counters, up to the last output word
+    pending = {}        # counters after the last output word, merged on the next one
+    layer_starts = []   # cycle (relative to start) of every GET_PARAMETERS entry
+    started = False
+    cycle = 0
+    last_main = None
+    last_phase = None
+
+    def dump():
+        result = {"config": config, "total_cycles": sum(p["cycles"] for p in phases.values()),
+                  "layer_starts": layer_starts, "phases": phases}
+        try:
+            with open(path, "w") as f:
+                json.dump(result, f, indent=1)
+        except OSError as exc:
+            logger.error("profile_dma_phases: cannot write %s (%s)", path, exc)
+
+    while True:
+        await RisingEdge(dut.clk_i)
+        offered = bit(dut.enable_dma_i_reg)
+        accepted = offered & bit(dut.ready_dma_o)
+        out_word = bit(dut.enable_dma_o) & bit(dut.ready_dma_i)
+        if not started:
+            if not accepted:
+                continue
+            started = True
+        try:
+            main = int(dut.fsm_current_state.value)
+            psum = int(psum_state_sig.value)
+        except ValueError:
+            main, psum = last_main, None
+        # enable_dma_o is registered, so the last result word is still on the
+        # bus one cycle after the psum FSM has left PSUM_SEND_RESULTS.
+        if psum == PSUM_SEND_RESULTS_STATE or out_word:
+            phase = "readout"
+        else:
+            phase = PROFILE_PHASES.get(main, "state_%s" % main)
+        if main == 1 and last_main != 1:
+            layer_starts.append(cycle)
+        last_main = main
+
+        counters = pending.setdefault(phase, empty())
+        counters["cycles"] += 1
+        counters["in_offered"] += offered
+        counters["in_accepted"] += accepted
+        counters["out_words"] += out_word
+        cycle += 1
+        if out_word:
+            for name, add in pending.items():
+                total = phases.setdefault(name, empty())
+                for key in total:
+                    total[key] += add[key]
+            pending = {}
+        # The testbench may end the simulation right after the last result
+        # word, so write after every result word as well as on phase changes.
+        if out_word or phase != last_phase:
+            dump()
+        last_phase = phase
 
 
 async def probe_fsm_states(ptp, dut, stall_report_after=20000, oep=None):
