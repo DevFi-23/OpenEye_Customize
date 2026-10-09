@@ -584,10 +584,12 @@ def calculate_conv_serial(params, layer_params, calculated_results, file_dma_ref
                     for _ in range(0, params.Psum_Routers, words_per_transmission) :
                         temp_string = ""
                         for _ in range(words_per_transmission) :
-                                array.append((x_cor,y_cor,filter))
+                                # [filter, x, y] of this DMA word, or None for padding
+                                position = None
                                 if (cl_y%layer_params.used_Y_cluster == 0):
                                     if (kernel_counter < layer_params.different_kernels_per_calculation) :
                                         if((x_cor < layer_params.psum_size_x) & (y_cor < layer_params.psum_size_y)) :
+                                            position = [filter, x_cor, y_cor]
                                             try:
                                                 temp_string =gtu.to_twos_complement_string(calculated_results[filter][x_cor][y_cor],params.DATA_PSUM_BITWIDTH) +  temp_string
                                             except:
@@ -598,6 +600,7 @@ def calculate_conv_serial(params, layer_params, calculated_results, file_dma_ref
                                         x_cor = x_cor + 1
                                 else:
                                     temp_string =gtu.to_twos_complement_string(0,params.DATA_PSUM_BITWIDTH) +  temp_string
+                                array.append(position)
                         file_dma_ref.write(temp_string.zfill(params.DMA_BITWIDTH) + "\n")
             filter = filter + 1
         if ((filter >= layer_params.filters)) :
@@ -605,6 +608,9 @@ def calculate_conv_serial(params, layer_params, calculated_results, file_dma_ref
                 les.x_start = 0
             else :
                 les.x_start = x_cor
+    # Output position of every psum word in dma_stream_ref.txt, in stream order.
+    # compare_stream_Conv decodes the DUT stream with it.
+    return array
 
 def calculate_conv_parallel(params, layer_params, calculated_results, cluster_order, layer_repetition, file_dma_ref):
     coordinates = []
@@ -683,8 +689,7 @@ def calculate_conv_parallel(params, layer_params, calculated_results, cluster_or
 def calculate_conv_output_stream_mp(layer_repetition, layer_number, params, layer_params, cluster_order, calculated_results, return_dict):
     file_dma_ref = gtu.open_or_create_file('demo/layer_' + str(layer_number) + '_' + str(layer_repetition) + '/dma_stream_ref.txt')
     if (params.SERIAL):
-        calculate_conv_serial(params, layer_params, calculated_results, file_dma_ref)
-        return_dict[layer_repetition] = []
+        return_dict[layer_repetition] = calculate_conv_serial(params, layer_params, calculated_results, file_dma_ref)
     else:
         return_dict[layer_repetition] = calculate_conv_parallel(params, layer_params, calculated_results, cluster_order, layer_repetition, file_dma_ref)
     file_dma_ref.close()

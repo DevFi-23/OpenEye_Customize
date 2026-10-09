@@ -1634,15 +1634,17 @@ async def compare_stream_Conv(ptp, dut, layer_number, layer_repetition, layer_pa
         """
         words = oep.DMA_BITWIDTH // 32
         dut._log.info("Output Stream started")
-        used_clusters_per_calc = math.ceil(layer_parameters.iact_size_x / 4) * 4
-        values_per_transmission = math.ceil(layer_parameters.different_kernels_per_calculation*used_clusters_per_calc/2)
-        transmissions_per_cycle = (oep.Clusters_Y * oep.Clusters_X * oep.PEs_X)//2
-        current_cycle = 0
+        # calculate_conv_serial() records the [filter, x, y] of every psum word
+        # while it writes dma_stream_ref.txt (None for padding words). Decoding
+        # the DUT stream with the same list keeps both checks consistent instead
+        # of re-deriving the stream order with separate counters here.
+        try:
+            stream_order = output_order[layer_repetition]
+        except (IndexError, TypeError):
+            stream_order = []
+        word_index = 0
         read_data = 1
         chance = 100
-        x_repetitions = layer_parameters.iact_x_line_repetitions
-        x_block_width = layer_parameters.iact_x_add_up // max(x_repetitions, 1)
-        x_block_base = 0
         while (dut.enable_dma_o.value == 1):
             if (read_data):
                 if(logging.DEBUG >= login_level):
@@ -1653,52 +1655,22 @@ async def compare_stream_Conv(ptp, dut, layer_number, layer_repetition, layer_pa
                         storage_file.close()
                         logger.error("Error writing output txt-file")
                         raise Exception("X detected.")
-                if (current_cycle < values_per_transmission):
-                    for i in range(words):
-                        if(logging.DEBUG >= login_level):
-                            storage_file.write("f: " + str(f) + " x: " + str(x) + " y: " + str(y) + "\n")
-                        
-                        try:
-                            dram.fmap[layer_number + 1][f][x][y] = int(dut.data_dma_o.value[oep.DATA_PSUM_BITWIDTH*(i+1)-1:oep.DATA_PSUM_BITWIDTH*i])
-                            if (dram.fmap[layer_number + 1][f][x][y] >= 2**(oep.DATA_PSUM_BITWIDTH-1)):
-                                dram.fmap[layer_number + 1][f][x][y] = dram.fmap[layer_number + 1][f][x][y] - 2**oep.DATA_PSUM_BITWIDTH
-                        except:
-                            pass
-                        x = x + 1
-                    if x_repetitions > 1:
-                        # A row wider than one repetition is read out as
-                        # x_block_width-pixel blocks: every filter for
-                        # repetition 0, then every filter for repetition 1...
-                        # (the psum buffer address is filter + filters * repetition).
-                        if (x - x_block_base >= x_block_width):
-                            f = f + 1
-                            x = x_block_base
-                            if(f == layer_parameters.filters):
-                                f = 0
-                                x_block_base = x_block_base + x_block_width
-                                x = x_block_base
-                                if(x_block_base >= layer_parameters.iact_x_add_up):
-                                    x_block_base = 0
-                                    x = 0
-                                    y = y + 1
-                                    if(y >= layer_parameters.iact_size_y):
-                                        y = 0
-                    elif (current_cycle % math.ceil(oep.PEs_X/words) == math.ceil(oep.PEs_X/words) - 1):
-                        if(x >= layer_parameters.iact_size_x):
-                            x = 0
-                            f = f + 1
-                            if(f == layer_parameters.filters):
-                                f = 0
-                                y = y + 1
-                                if(y >= layer_parameters.iact_size_y):
-                                    y = 0
-                else:
-                    for i in range(words):
+                for i in range(words):
+                    position = stream_order[word_index] if word_index < len(stream_order) else None
+                    word_index = word_index + 1
+                    if (position is None):
                         if(logging.DEBUG >= login_level):
                             storage_file.write("Empty storage line." + "\n")
-                current_cycle = current_cycle + 1
-                if (current_cycle == transmissions_per_cycle):
-                    current_cycle = 0
+                        continue
+                    f, x, y = position
+                    if(logging.DEBUG >= login_level):
+                        storage_file.write("f: " + str(f) + " x: " + str(x) + " y: " + str(y) + "\n")
+                    try:
+                        dram.fmap[layer_number + 1][f][x][y] = int(dut.data_dma_o.value[oep.DATA_PSUM_BITWIDTH*(i+1)-1:oep.DATA_PSUM_BITWIDTH*i])
+                        if (dram.fmap[layer_number + 1][f][x][y] >= 2**(oep.DATA_PSUM_BITWIDTH-1)):
+                            dram.fmap[layer_number + 1][f][x][y] = dram.fmap[layer_number + 1][f][x][y] - 2**oep.DATA_PSUM_BITWIDTH
+                    except:
+                        pass
 
             if random.randint(1, 100) <= chance:
                 read_data = 1
