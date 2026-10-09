@@ -60,6 +60,24 @@ class Port:
         except:
             self.range_lower = range[0][1]
 
+def split_top_level(text, separator):
+    """Split text at separator, ignoring separators nested in (), [] or {}."""
+    parts = []
+    depth = 0
+    current = ""
+    for char in text:
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+        if char == separator and depth == 0:
+            parts.append(current)
+            current = ""
+        else:
+            current += char
+    parts.append(current)
+    return parts
+
 def parse_module_def(text):
     # Define basic elements
     identifier = Regex(r"[a-zA-Z_][a-zA-Z0-9_\$]*")
@@ -69,6 +87,13 @@ def parse_module_def(text):
     # Strategy: Use a simple approach to extract module name, parameters, and ports
     # Match: module NAME [#(...)] (...) ;
     import re
+
+    # Step 0: Remove comments so they cannot break the declaration parsing.
+    # Block comments (/* ... */) may appear inside the port list, e.g. in SPad_DP.v.
+    # They are replaced by the same number of newlines to keep line numbers stable.
+    text = re.sub(r'/\*.*?\*/', lambda m: '\n' * m.group(0).count('\n'), text, flags=re.DOTALL)
+    # Line comments (//, ///, //!) are not part of the declaration either.
+    text = re.sub(r'//[^\n]*', '', text)
 
     # Step 1: Find module name - ensure "module" is a keyword, not part of a comment
     # Look for "module" at the beginning of a line (after optional whitespace)
@@ -130,14 +155,6 @@ def parse_module_def(text):
     ports_str = text[port_paren_start + 1:port_paren_end]
 
     # Now parse the parameter and port strings separately
-    # Parameter definition: parameter name and value
-    ptype     = Optional( oneOf('integer real realtime time'), default='integer')
-    param_def = Group((Suppress("parameter") | Suppress("localparam")) + ptype("p_type") + identifier("p_name") + Optional(Suppress("=")) + Optional(Combine(number)("p_value"), default=None) + Optional(Suppress(",")))
-
-    parameters_parser = Group(
-        OneOrMore(param_def, stopOn = ")")
-    )("parameters")
-
     # Port direction: input, output, inout
     port_dir = Literal("input") | Literal("output") | Literal("inout")
 
@@ -154,29 +171,35 @@ def parse_module_def(text):
     )("ports")
     ports_parser.ignore(dbl_slash_comment)
 
-    # Parse parameters if present
+    # Parse parameters if present.
+    # Default values can be arbitrary expressions, e.g. "(SERIAL ? 1 : PARALLEL_MACS)",
+    # "A - (A % B)" or "$rtoi($ceil(X / Y))". Instead of a pyparsing grammar (which
+    # truncated such values), split the list at top-level commas and take everything
+    # after "=" as the value.
     parsed_params = {}
     if params_str:
-        try:
-            params_results = parameters_parser.parseString(params_str, parseAll=False)
-            param_list = params_results.get("parameters") or []
-            parsed_params = {p["p_name"]: Parameter(p["p_name"], p["p_type"], p["p_value"]) for p in param_list}
-        except Exception:
-            # If parameter parsing fails, continue without parameters
-            pass
+        param_re = re.compile(
+            r'^(?:(?:parameter|localparam)\s+)?'
+            r'(?:(integer|real|realtime|time)\s+)?'
+            r'(?:(?:signed|unsigned)\s+)?'
+            r'(?:\[[^\]]*\]\s*)?'
+            r'([a-zA-Z_][a-zA-Z0-9_\$]*)'
+            r'\s*(?:=\s*(.*))?$',
+            re.DOTALL
+        )
+        for item in split_top_level(params_str, ','):
+            item = ' '.join(item.split())
+            if not item:
+                continue
+            match = param_re.match(item)
+            if not match:
+                continue
+            p_type, p_name, p_value = match.groups()
+            parsed_params[p_name] = Parameter(p_name, p_type or 'integer', p_value)
 
     # Parse ports - add the parentheses and semicolon to make it complete
-    # First, remove inline documentation comments (/// or //!) from ports_str
-    ports_lines = ports_str.split('\n')
-    filtered_ports_lines = []
-    for line in ports_lines:
-        # Remove everything after // or /// comments
-        if '//' in line:
-            line = line[:line.index('//')]
-        filtered_ports_lines.append(line)
-    ports_str_cleaned = '\n'.join(filtered_ports_lines)
-
-    ports_text = "(" + ports_str_cleaned + ");"
+    # (comments were already removed in step 0)
+    ports_text = "(" + ports_str + ");"
     ports_results = ports_parser.parseString(ports_text, parseAll=False)
     port_list = ports_results.get("ports") or []
     parsed_ports = {p["name"]: Port(p["name"], p["direction"], p["sign"], p["type"], p["range"]) for p in port_list}
