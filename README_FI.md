@@ -19,7 +19,7 @@ README.md gốc của OpenEye vẫn giữ nguyên: đó là tài liệu của nh
 | Tên | Trỏ tới | Vai trò |
 |---|---|---|
 | remote `upstream` | `github.com/Learning-Chips-Lab/OpenEye` | Repo gốc, **chỉ đọc** (fetch) |
-| remote `origin` | `github.com/DevFi-23/<tên repo>` | Repo của bạn, nơi push mọi thay đổi |
+| remote `origin` | [`github.com/DevFi-23/OpenEye`](https://github.com/DevFi-23/OpenEye) (private) | Repo của bạn, nơi push mọi thay đổi. Branch mặc định: `dev` |
 | branch `main` | bản sao của `upstream/main` | Không commit vào đây; dùng để so sánh |
 | branch `dev` | `main` cộng các thay đổi của bạn | **Branch làm việc chính** |
 
@@ -250,3 +250,8 @@ Conv1 có 25.088 output, gấp khoảng 16 lần cấu hình lớn nhất ở tr
 - `profile_dma_phases` (profiler), `open_eye.profile_report` (báo cáo), `test_profile.py` (6 cấu hình),
   `test/test_profile_report.py` (unit test), `doc/perf/baseline.md` và CSV (baseline).
 - Helper `_run_conv_const` thêm 2 tham số tuỳ chọn `quant_amount` và `dma_bitwidth` (giá trị mặc định không đổi).
+
+**Đưa lên GitHub riêng**
+- Remote repo gốc đổi tên thành `upstream` và đã khoá chiều push. `origin` = `github.com/DevFi-23/OpenEye` (private, đăng nhập bằng SSH key `~/.ssh/id_ed25519`).
+- Đã push `dev` (branch mặc định) và `main` (bản sao upstream `c4bd562`).
+- Không push 3 branch sửa lỗi riêng lẻ vì chúng đã được gộp vào `dev`; chúng vẫn còn trên máy local.
