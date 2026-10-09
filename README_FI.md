@@ -58,6 +58,13 @@ Mẹo:
 - Khi phát triển, dùng `QUANT_AMOUNT=32`: mỗi test chỉ mất khoảng 15 giây, so với khoảng 4 phút khi `QUANT_AMOUNT=1024` (xem mục 5.6).
 - Kết quả simulation nằm ở `test/.temp/<tên test>/` (log `cocotb_sim.log`, `profile.json`, file tham chiếu `demo/`).
 - `/tmp` bị xoá khi WSL khởi động lại. Thứ gì cần giữ thì phải nằm trong repo.
+- Verilator 5.020 (đúng phiên bản CI dùng) đã được build từ source vào `~/tools/verilator-5.020`
+  (công cụ build lấy qua micromamba ở `~/tools/vbuild`, không cần sudo). Chạy lint giống CI:
+
+```bash
+~/tools/verilator-5.020/bin/verilator --lint-only -Wall -Ihdl/ +define+USE_INTERNAL_PARAMS_PE \
+  +define+USE_INTERNAL_PARAMS_PE_cluster hdl/lint_waivers.vlt hdl/OpenEye_Parallel.v
+```
 
 ## 4. Cấu trúc project (những phần liên quan tới hướng nghiên cứu)
 
@@ -110,6 +117,19 @@ không có trạng thái riêng cho việc này.
   chu kỳ), nên burst dài và ít thì hiệu quả hơn burst ngắn và nhiều.
   Testbench hiện tại **không mô phỏng burst hay độ trễ bộ nhớ**: host luôn sẵn sàng và gửi liên tục.
   Vì vậy số liệu hiện tại là trường hợp tốt nhất về phía bộ nhớ.
+
+**Một burst gồm nhiều beat liên tiếp.** Ví dụ: chuyển 100 beat trong 1 burst tốn khoảng 100 + 1 × độ trễ; chia thành 100 burst
+thì tốn khoảng 100 + 100 × độ trễ.
+
+**DMA trong project:**
+- Trên FPGA thật (`fpga/`): dùng **Xilinx AXI DMA IP ở chế độ Simple** (không có Scatter-Gather), tắt ngắt và chờ bằng polling
+  (`fpga/sw/runtime/hal_xaxidma.c`). Có 2 kênh: MM2S (DDR → bộ tăng tốc) và S2MM (bộ tăng tốc → DDR).
+  Phía bộ tăng tốc là **AXI4-Stream** (`tvalid/tready/tdata/tlast`, không có địa chỉ); cấu hình qua AXI4-Lite
+  (`fpga/hdl/open_eye_axi_v1_0.v`). Runtime gửi **toàn bộ stream của một layer bằng một lệnh `XAxiDma_SimpleTransfer`**
+  (`openeye_runtime.c`). Chính IP AXI DMA mới chia lệnh đó thành các burst AXI4 tới DDR; độ dài burst do cấu hình IP
+  trong Vivado quyết định, và cấu hình này không nằm trong repo. Input `tlast` bị bỏ qua; output `tlast` = `last_data_o`.
+- Trong simulation (cocotb): **không có AXI DMA**. Testbench đẩy thẳng mỗi chu kỳ một word vào cổng stream, luôn sẵn sàng,
+  nên chưa mô phỏng burst và độ trễ DDR.
 
 ### 5.3 Payload tối thiểu và hiệu suất bus
 
@@ -242,7 +262,23 @@ Conv1 có 25.088 output, gấp khoảng 16 lần cấu hình lớn nhất ở tr
 - `model_test` (chạy cả model) bị tắt trong testbench.
 - **CI "Lint" (GitHub Actions) fail** trên `dev` vì bước `verilator --lint-only -Wall` trên `hdl/` fail.
   Lỗi kế thừa từ upstream: CI của repo gốc fail ở mọi commit gần đây, kể cả `c4bd562`; `hdl/` và `.github/` của `dev` giống hệt upstream.
-  Muốn xem chi tiết lỗi thì cần Verilator 5 (Ubuntu 22.04 chỉ có 4.038, không đọc được file waiver), hoặc mở log của workflow trên GitHub.
+  Chi tiết từng warning: mục 9b.
+
+## 9b. Kết quả lint RTL (Verilator 5.020, 2026-10-10)
+
+Output đầy đủ: `doc/lint/verilator-5.020_2026-10-10.txt`. `hdl/` của `dev` giống hệt upstream, nên đây cũng là lỗi của upstream.
+CI fail vì `-Wall` biến warning thành lỗi ("Exiting due to 38 warning(s)"). **Không có lỗi cú pháp.**
+Lưu ý: lint của CI chỉ kiểm tra cây module dưới `OpenEye_Parallel.v`, **không kiểm tra `OpenEye_FPGA.v` và `psum_pipeline.v`**.
+
+| Loại | Số | Vị trí | Đánh giá |
+|---|---:|---|---|
+| WIDTHEXPAND | 26 | `data_pipeline_wght.v` (20), `PE.v` (4 + 2 cổng) | Toán hạng hẹp được mở rộng bằng 0. Theo chuẩn Verilog là đúng, **vô hại** |
+| WIDTHTRUNC | 4 | `data_pipeline_wght.v:376, 394, 396, 424` | Bị cắt bit. 376 (`filters_w` 7 bit) vô hại vì đầu vào tối đa 63. **394/396**: tổng overhead của các sub-word bị gói vào 4 bit, có thể tràn ở chế độ sparse với `PARALLEL_MACS>1`. **Cần kiểm tra** |
+| (cổng) | trong 26 ở trên | `PE.v:2210` | Output 7 bit `first_spad_words_o` nối vào dây 5 bit: **mất 2 bit cao** nếu số word lớn hơn 31. **Cần kiểm tra** (liên quan tới việc nạp weight) |
+| SELRANGE | 2 | `PE.v:820` | Nhánh `SERIAL==0` lấy 40 bit từ số 20 bit. Luồng FPGA dùng `SERIAL=1` nên không bị ảnh hưởng; là **lỗi tiềm ẩn** ở chế độ song song |
+| UNOPTFLAT | 2 | `PE.v:566`, `data_pipeline_wght.v:392` | Mảng nối tiếp kiểu `a[i+1] = f(a[i])` bị Verilator xem như vòng lặp tổ hợp. **Vòng lặp giả**, chỉ làm Verilator mô phỏng chậm hơn |
+| UNDRIVEN | 2 | `OpenEye_Parallel.v:260-261` (`mem_addr_iact/psum`) | Có bit không được gán trong nhánh generate đang dùng. Ít khả năng ảnh hưởng, nên xem lại |
+| PINMISSING | 2 | `GLB_cluster.v:187, 213` (`wr_mask_i`) | `RAM_SP.v` ghi chú rằng chân này được phép để trống. **Vô hại** |
 
 ---
 
@@ -277,3 +313,8 @@ Conv1 có 25.088 output, gấp khoảng 16 lần cấu hình lớn nhất ở tr
 **Kiểm tra lỗi**
 - CI Lint fail trên `dev` (`ea4f774`): lỗi kế thừa từ upstream, không do thay đổi của mình (mục 9).
 - Quét số channel vào 1–4 × `NUM_GLB_IACT` 1/3: chỉ 2 và 4 channel với `NUM_GLB_IACT=1` là đúng (mục 9).
+
+### 2026-10-10
+
+- Build Verilator 5.020 từ source (`~/tools`), chạy đúng lệnh lint của CI: 38 warning, chi tiết ở mục 9b. **Chưa sửa RTL.**
+- Ghi lại cách project dùng DMA (AXI DMA Simple mode + AXI4-Stream) ở mục 5.2.

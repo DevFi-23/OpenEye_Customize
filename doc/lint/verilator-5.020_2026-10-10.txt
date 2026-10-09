@@ -1,0 +1,290 @@
+%Warning-PINMISSING: hdl/GLB_cluster.v:187:9: Cell has missing pin: 'wr_mask_i'
+  187 |       ) iact_glb (
+      |         ^~~~~~~~
+                     hdl/OpenEye_Cluster.v:381:1: ... note: In file included from 'OpenEye_Cluster.v'
+                     hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+                     ... For warning description see https://verilator.org/warn/PINMISSING?v=5.020
+                     ... Use "/* verilator lint_off PINMISSING */" and lint_on around source to disable this message.
+%Warning-PINMISSING: hdl/GLB_cluster.v:213:9: Cell has missing pin: 'wr_mask_i'
+  213 |       ) psum_glb (
+      |         ^~~~~~~~
+                     hdl/OpenEye_Cluster.v:381:1: ... note: In file included from 'OpenEye_Cluster.v'
+                     hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHTRUNC: hdl/data_pipeline_wght.v:376:20: Operator ASSIGNW expects 7 bits on the Assign RHS, but Assign RHS's COND generates 32 or 8 bits.
+                                                    : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  376 |   assign filters_w = first_spad_max_i == 0 ? 16 : first_spad_max_i;
+      |                    ^
+                     hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                     hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                     hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                     hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:381:73: Operator ADD expects 32 or 8 bits on the RHS, but RHS's VARREF 'overhead_w' generates 4 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  381 |   assign next_channel_counter = first_spad_data_o + ((temp_acc_overhead + overhead_w)/PARALLEL_MACS) - data_storage_1 - filters_w;
+      |                                                                         ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:386:33: Operator ASSIGNW expects 24 bits on the Assign RHS, but Assign RHS's SEL generates 12 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  386 |     assign input_words_w[w_gen] = data_i[((SECOND_PAYLOAD_WIDTH+4*SPARSITY_EN)*w_gen)+:(SECOND_PAYLOAD_WIDTH+4*SPARSITY_EN)];
+      |                                 ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHTRUNC: hdl/data_pipeline_wght.v:394:29: Operator ASSIGNW expects 4 bits on the Assign RHS, but Assign RHS's SEL generates 16 bits.
+                                                    : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  394 |     assign overhead_temp[0] = input_words_w[0][SECOND_PAYLOAD_WIDTH+:SECOND_OVERHEAD_WIDTH];
+      |                             ^
+                     hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                     hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                     hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                     hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:396:107: Operator ADD expects 16 bits on the RHS, but RHS's ARRAYSEL generates 4 bits.
+                                                      : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  396 |       assign overhead_temp[w_gen+1] = input_words_w[w_gen+1][SECOND_PAYLOAD_WIDTH+:SECOND_OVERHEAD_WIDTH] + overhead_temp[w_gen];
+      |                                                                                                           ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHTRUNC: hdl/data_pipeline_wght.v:396:37: Operator ASSIGNW expects 4 bits on the Assign RHS, but Assign RHS's ADD generates 16 bits.
+                                                    : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  396 |       assign overhead_temp[w_gen+1] = input_words_w[w_gen+1][SECOND_PAYLOAD_WIDTH+:SECOND_OVERHEAD_WIDTH] + overhead_temp[w_gen];
+      |                                     ^
+                     hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                     hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                     hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                     hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:424:119: Operator ADD expects 17 bits on the RHS, but RHS's SEL generates 4 bits.
+                                                      : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  424 |   assign overhead_output = !SPARSITY_EN ? 0: (data_storage_2[SPARSITY_EN*11:SPARSITY_EN*8] != 0) & overhead_delay_reg + data_storage_2[SPARSITY_EN*11:SPARSITY_EN*8] >= filters_w
+      |                                                                                                                       ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:424:166: Operator GTE expects 17 bits on the RHS, but RHS's VARREF 'filters_w' generates 7 bits.
+                                                      : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  424 |   assign overhead_output = !SPARSITY_EN ? 0: (data_storage_2[SPARSITY_EN*11:SPARSITY_EN*8] != 0) & overhead_delay_reg + data_storage_2[SPARSITY_EN*11:SPARSITY_EN*8] >= filters_w
+      |                                                                                                                                                                      ^~
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:425:73: Operator ADD expects 32 or 17 bits on the LHS, but LHS's SEL generates 4 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  425 |                          ? data_storage_2[SPARSITY_EN*11:SPARSITY_EN*8] + overhead_delay_reg - filters_w - over_ending
+      |                                                                         ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:425:94: Operator SUB expects 32 or 17 bits on the RHS, but RHS's VARREF 'filters_w' generates 7 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  425 |                          ? data_storage_2[SPARSITY_EN*11:SPARSITY_EN*8] + overhead_delay_reg - filters_w - over_ending
+      |                                                                                              ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:425:106: Operator SUB expects 32 or 17 bits on the RHS, but RHS's VARREF 'over_ending' generates 1 bits.
+                                                      : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  425 |                          ? data_storage_2[SPARSITY_EN*11:SPARSITY_EN*8] + overhead_delay_reg - filters_w - over_ending
+      |                                                                                                          ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:425:26: Operator COND expects 32 or 17 bits on the Conditional False, but Conditional False's SEL generates 4 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  425 |                          ? data_storage_2[SPARSITY_EN*11:SPARSITY_EN*8] + overhead_delay_reg - filters_w - over_ending
+      |                          ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHTRUNC: hdl/data_pipeline_wght.v:424:26: Operator ASSIGNW expects 4 bits on the Assign RHS, but Assign RHS's COND generates 32 or 17 bits.
+                                                    : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  424 |   assign overhead_output = !SPARSITY_EN ? 0: (data_storage_2[SPARSITY_EN*11:SPARSITY_EN*8] != 0) & overhead_delay_reg + data_storage_2[SPARSITY_EN*11:SPARSITY_EN*8] >= filters_w
+      |                          ^
+                     hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                     hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                     hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                     hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:515:35: Operator GTE expects 17 bits on the RHS, but RHS's VARREF 'filters_w' generates 7 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  515 |         if (overhead_new_calc_reg >= filters_w) begin
+      |                                   ^~
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:589:63: Operator ADD expects 32 or 17 bits on the RHS, but RHS's VARREF 'overhead_w' generates 4 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  589 |         overhead_reg          <= overhead_reg + PARALLEL_MACS + overhead_w;
+      |                                                               ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:593:56: Operator ADD expects 32 or 17 bits on the RHS, but RHS's VARREF 'overhead_w' generates 4 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  593 |           overhead_reg <= PARALLEL_MACS + overhead_reg + overhead_w - filters_w;
+      |                                                        ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:593:69: Operator SUB expects 32 or 17 bits on the RHS, but RHS's VARREF 'filters_w' generates 7 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  593 |           overhead_reg <= PARALLEL_MACS + overhead_reg + overhead_w - filters_w;
+      |                                                                     ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:596:58: Operator ADD expects 32 or 17 bits on the RHS, but RHS's VARREF 'overhead_w' generates 4 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  596 |             overhead_reg <= PARALLEL_MACS + overhead_reg + overhead_w - filters_w - 1;
+      |                                                          ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:596:71: Operator SUB expects 32 or 17 bits on the RHS, but RHS's VARREF 'filters_w' generates 7 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  596 |             overhead_reg <= PARALLEL_MACS + overhead_reg + overhead_w - filters_w - 1;
+      |                                                                       ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:594:41: Operator ADD expects 32 or 17 bits on the LHS, but LHS's VARREF 'filters_w' generates 7 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  594 |           if (overhead_reg == filters_w + 1) begin
+      |                                         ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:601:67: Operator ADD expects 32 or 17 bits on the RHS, but RHS's VARREF 'overhead_next_word' generates 4 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  601 |             overhead_new_calc_reg <= overhead_reg + PARALLEL_MACS + overhead_next_word;
+      |                                                                   ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:599:28: Operator LT expects 17 bits on the RHS, but RHS's VARREF 'filters_w' generates 7 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  599 |           if (overhead_reg < filters_w) begin
+      |                            ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:591:26: Operator ADD expects 17 bits on the RHS, but RHS's VARREF 'overhead_next_word' generates 4 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  591 |         if (overhead_reg + overhead_next_word >= filters_w) begin
+      |                          ^
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/data_pipeline_wght.v:591:47: Operator GTE expects 17 bits on the RHS, but RHS's VARREF 'filters_w' generates 7 bits.
+                                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler'
+  591 |         if (overhead_reg + overhead_next_word >= filters_w) begin
+      |                                               ^~
+                      hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-SELRANGE: hdl/PE.v:820:117: Extracting 40 bits from only 20 bit number
+                                   : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe'
+  820 |   assign psum_data_o = SERIAL == 1 ? {{(TRANS_BITWIDTH_PSUM-DATA_PSUM_BITWIDTH){1'd0}}, adder_tree_o} : output_adder[TRANS_BITWIDTH_PSUM-1:0];
+      |                                                                                                                     ^
+                   hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                   hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                   hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-SELRANGE: hdl/PE.v:820:117: Selection index out of range: 39:0 outside 19:0
+                                   : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe'
+  820 |   assign psum_data_o = SERIAL == 1 ? {{(TRANS_BITWIDTH_PSUM-DATA_PSUM_BITWIDTH){1'd0}}, adder_tree_o} : output_adder[TRANS_BITWIDTH_PSUM-1:0];
+      |                                                                                                                     ^
+                   hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                   hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                   hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/PE.v:829:151: Operator SUB expects 32 or 6 bits on the LHS, but LHS's VARREF 'iact_data_spad_oh' generates 4 bits.
+                                      : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe'
+  829 |       assign wght_addr_SPad_addr = gen_sparse_fsm.wght_addr_use_vec ? gen_sparse_fsm.wght_addr_vec : (iact_data_spad_oh == 0 ? 0 : (iact_data_spad_oh - 1));
+      |                                                                                                                                                       ^
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/PE.v:1287:54: Operator SUB expects 32 or 6 bits on the LHS, but LHS's VARREF 'iact_data_spad_oh' generates 4 bits.
+                                      : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe'
+ 1287 |             wght_addr_vec       <= iact_data_spad_oh - 1;
+      |                                                      ^
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/PE.v:1367:33: Operator ASSIGNDLY expects 6 bits on the Assign RHS, but Assign RHS's VARREF 'iact_oh_delay_1' generates 4 bits.
+                                      : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe'
+ 1367 |                   wght_addr_vec <= iact_oh_delay_1;  
+      |                                 ^~
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/PE.v:1409:52: Operator ADD expects 32 or 6 bits on the LHS, but LHS's VARREF 'iact_oh_delay_1' generates 4 bits.
+                                      : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe'
+ 1409 |                   wght_addr_vec <= iact_oh_delay_1 + 1;
+      |                                                    ^
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/PE.v:2210:8: Output port connection 'first_spad_words_o' expects 7 bits on the pin connection, but pin connection's VARREF 'first_spad_words_wght' generates 5 bits.
+                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe'
+ 2210 |       .first_spad_words_o (first_spad_words_wght),
+      |        ^~~~~~~~~~~~~~~~~~
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-WIDTHEXPAND: hdl/PE.v:2211:8: Input port connection 'first_spad_max_i' expects 8 bits on the pin connection, but pin connection's VARREF 'filters_reg_M0' generates 6 bits.
+                                     : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe'
+ 2211 |       .first_spad_max_i   (filters_reg_M0),
+      |        ^~~~~~~~~~~~~~~~
+                      hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                      hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                      hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+%Warning-UNDRIVEN: hdl/OpenEye_Parallel.v:260:56: Signal is not driven: 'mem_addr_iact'
+                                                : ... note: In instance 'OpenEye_Parallel'
+  260 |   wire [ IACT_MEM_ADDR_BITS*CLUSTERS*NUM_GLB_IACT-1:0] mem_addr_iact;
+      |                                                        ^~~~~~~~~~~~~
+%Warning-UNDRIVEN: hdl/OpenEye_Parallel.v:261:56: Signal is not driven: 'mem_addr_psum'
+                                                : ... note: In instance 'OpenEye_Parallel'
+  261 |   wire [ PSUM_MEM_ADDR_BITS*CLUSTERS*NUM_GLB_PSUM-1:0] mem_addr_psum;
+      |                                                        ^~~~~~~~~~~~~
+%Warning-UNOPTFLAT: hdl/PE.v:566:41: Signal unoptimizable: Circular combinational logic: 'OpenEye_Parallel.gen_x[0].gen_y[1].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_spad_oh_acc'
+                                   : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[1].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe'
+  566 |   wire [    DATA_WGHT_IGNORE_ZEROS-1:0] wght_data_spad_oh_acc [PARALLEL_MACS-1 : 0];    
+      |                                         ^~~~~~~~~~~~~~~~~~~~~
+                    hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                    hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                    hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+                    hdl/PE.v:566:41:      Example path: OpenEye_Parallel.gen_x[0].gen_y[1].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_spad_oh_acc
+                    hdl/PE.v:882:45:      Example path: ASSIGNW
+                    hdl/PE.v:566:41:      Example path: OpenEye_Parallel.gen_x[0].gen_y[1].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_spad_oh_acc
+%Warning-UNOPTFLAT: hdl/data_pipeline_wght.v:392:14: Signal unoptimizable: Circular combinational logic: 'OpenEye_Parallel.gen_x[0].gen_y[1].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler.overhead_temp'
+                                                   : ... note: In instance 'OpenEye_Parallel.gen_x[0].gen_y[1].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe'
+  392 |   wire [3:0] overhead_temp [PARALLEL_MACS-1:0];
+      |              ^~~~~~~~~~~~~
+                    hdl/PE.v:2204:1: ... note: In file included from 'PE.v'
+                    hdl/PE_cluster.v:330:1: ... note: In file included from 'PE_cluster.v'
+                    hdl/OpenEye_Cluster.v:299:1: ... note: In file included from 'OpenEye_Cluster.v'
+                    hdl/OpenEye_Parallel.v:677:1: ... note: In file included from 'OpenEye_Parallel.v'
+                    hdl/data_pipeline_wght.v:392:14:      Example path: OpenEye_Parallel.gen_x[0].gen_y[1].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler.overhead_temp
+                    hdl/data_pipeline_wght.v:396:37:      Example path: ASSIGNW
+                    hdl/data_pipeline_wght.v:392:14:      Example path: OpenEye_Parallel.gen_x[0].gen_y[1].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler.overhead_temp
+%Error: Exiting due to 38 warning(s)
