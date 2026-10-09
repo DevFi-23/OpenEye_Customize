@@ -222,9 +222,27 @@ Conv1 có 25.088 output, gấp khoảng 16 lần cấu hình lớn nhất ở tr
 
 ## 9. Các lỗi upstream đã biết (ảnh hưởng tới việc đo)
 
-- Input 1 channel (và một số cấu hình `NUM_GLB_IACT=3`): phần cứng trả về toàn bias.
+**Số channel vào và `NUM_GLB_IACT`** (đo ngày 2026-10-09: một layer Conv, input 8×1, 4 filter, ramp, 2×2 cluster, `QUANT_AMOUNT=32`):
+
+| Channel vào | `NUM_GLB_IACT=1` | `NUM_GLB_IACT=3` |
+|---|---|---|
+| 1 | FAIL: ra toàn bias (giá trị 1) | FAIL: giá trị sai |
+| 2 | **PASS** | FAIL: giá trị sai |
+| 3 | FAIL: giá trị sai (dạng dốc lệch so với tham chiếu) | FAIL: giá trị sai |
+| 4 | **PASS** | FAIL: giá trị sai |
+
+- Chỉ có **2 hoặc 4 channel với `NUM_GLB_IACT=1`** là chạy đúng.
+- Giả thuyết, **chưa kiểm chứng**: RTL đóng gói `CHANNELS_PER_WORD = 4` channel vào một word, nên số channel không chia hết cho 4
+  (như 3) bị lệch dữ liệu, còn 1 channel đi theo một đường xử lý khác và hỏng theo kiểu khác (chỉ ra bias).
+- `NUM_GLB_IACT=3` sai với mọi số channel đã thử.
+- MNIST Conv1 có 1 channel vào, nên chưa chạy được trên RTL hiện tại.
+
+**Khác:**
 - `CLUSTER_ROWS=1`: có cấu hình bị treo FSM (theo `doc/test_status_handover.md`).
 - `model_test` (chạy cả model) bị tắt trong testbench.
+- **CI "Lint" (GitHub Actions) fail** trên `dev` vì bước `verilator --lint-only -Wall` trên `hdl/` fail.
+  Lỗi kế thừa từ upstream: CI của repo gốc fail ở mọi commit gần đây, kể cả `c4bd562`; `hdl/` và `.github/` của `dev` giống hệt upstream.
+  Muốn xem chi tiết lỗi thì cần Verilator 5 (Ubuntu 22.04 chỉ có 4.038, không đọc được file waiver), hoặc mở log của workflow trên GitHub.
 
 ---
 
@@ -255,3 +273,7 @@ Conv1 có 25.088 output, gấp khoảng 16 lần cấu hình lớn nhất ở tr
 - Remote repo gốc đổi tên thành `upstream` và đã khoá chiều push. `origin` = `github.com/DevFi-23/OpenEye` (private, đăng nhập bằng SSH key `~/.ssh/id_ed25519`).
 - Đã push `dev` (branch mặc định) và `main` (bản sao upstream `c4bd562`).
 - Không push 3 branch sửa lỗi riêng lẻ vì chúng đã được gộp vào `dev`; chúng vẫn còn trên máy local.
+
+**Kiểm tra lỗi**
+- CI Lint fail trên `dev` (`ea4f774`): lỗi kế thừa từ upstream, không do thay đổi của mình (mục 9).
+- Quét số channel vào 1–4 × `NUM_GLB_IACT` 1/3: chỉ 2 và 4 channel với `NUM_GLB_IACT=1` là đúng (mục 9).
