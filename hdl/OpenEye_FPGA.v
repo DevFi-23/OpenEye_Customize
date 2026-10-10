@@ -1971,7 +1971,11 @@ end
           wght_buffer_en_w      <= 0;
           overhang              <= 0;
           overhang_delay        <= 0;
-          if (fsm_psum_cycle == trans_cycles_psum - 1) begin
+          // Leave only in the cycle that delivers the last bias word, as the
+          // other GET_* states do: psum_pipeline counts fsm_psum_cycle only on
+          // enable_dma_i_reg, so without this check a stream gap right before
+          // the last bias word moved that word into GET_QUANTIZE.
+          if ((fsm_psum_cycle == trans_cycles_psum - 1) & enable_dma_i_reg) begin
             fsm_last_state         <= GET_BIAS;
             fsm_current_state      <= GET_QUANTIZE;
             fsm_cycle              <= 0;
