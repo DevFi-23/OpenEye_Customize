@@ -813,3 +813,7 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
 - **Sửa RTL `GET_BIAS`** (`hdl/OpenEye_FPGA.v`, 1 điều kiện `& enable_dma_i_reg`, được bạn đồng ý). Kiểm chứng: 15/15 kịch bản khoảng trống PASS,
   `--mem slow` 8/8 PASS, baseline 9 case 0 chu kỳ chênh lệch, Conv 16 test và GEMM/Dense 63 test không có hồi quy (các FAIL đều có sẵn trên RTL gốc),
   lint 0 warning mới. Tài nguyên: 0 flip-flop, LUT không tăng (Yosys `synth_xilinx`). Chi tiết mục 9.
+- **Báo cáo tiến độ** (Word) cho giáo viên hướng dẫn: `doc/reports/BaoCao_TienDo_OpenEye_2026-10-10.docx`, tạo bằng
+  `~/tools/docenv/bin/python tools/report/make_progress_report.py` (đọc số liệu từ `doc/perf/`; môi trường `~/tools/docenv` có python-docx,
+  matplotlib, nodejs, cài qua micromamba để không động vào venv của project).
+- README: mục 5.8 (độ rộng DMA), 8b (tổng hợp lỗi), 8c (kế hoạch gần).
