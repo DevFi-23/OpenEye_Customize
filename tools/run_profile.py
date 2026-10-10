@@ -18,6 +18,13 @@ Usage (from the repository root, with the project venv):
   venv/bin/python tools/run_profile.py --compare doc/perf/baseline_2026-10-09
   venv/bin/python tools/run_profile.py -k q32 --jobs 4 --compare doc/perf/baseline_2026-10-09
   venv/bin/python tools/run_profile.py --save doc/perf/after_bias_fix --report doc/perf/after_bias_fix.md
+  venv/bin/python tools/run_profile.py --mem typical --compare doc/perf/baseline_2026-10-09
+  venv/bin/python tools/run_profile.py --mem typical --mem-set latency=60 --mem-set outstanding=1
+
+--mem selects a memory model preset (open_eye.memory_model.PRESETS: ideal,
+typical, slow) and --mem-set overrides single parameters (latency,
+burst_beats, outstanding, bandwidth, fifo_beats, setup, jitter, seed).
+Without them the testbench uses its original ideal stream driver.
 """
 
 import argparse
@@ -40,8 +47,24 @@ TEST_FILE = "test_profile.py"
 
 sys.path.insert(0, os.path.join(REPO, "src"))
 from open_eye import profile_report  # noqa: E402
+from open_eye import memory_model  # noqa: E402
 
 ENV = dict(os.environ, PYTEST_DISABLE_PLUGIN_AUTOLOAD="1")
+
+
+def memory_env(preset, settings):
+    """OPENEYE_MEM* variables for a preset and KEY=VALUE overrides."""
+    env = {}
+    if preset:
+        if preset not in memory_model.PRESETS:
+            raise SystemExit(f"unknown --mem {preset!r}; presets: {sorted(memory_model.PRESETS)}")
+        env["OPENEYE_MEM"] = preset
+    for setting in settings or []:
+        key, _, value = setting.partition("=")
+        if key not in memory_model.ENV_KEYS or not value:
+            raise SystemExit(f"bad --mem-set {setting!r}; keys: {sorted(memory_model.ENV_KEYS)}")
+        env[memory_model.ENV_KEYS[key]] = value
+    return env
 
 
 def collect(keyword):
@@ -85,7 +108,19 @@ def main(argv=None):
                         help="baseline profile file or directory to compare with (repeatable)")
     parser.add_argument("--save", metavar="DIR", help="copy the new profiles to DIR/<case>.json")
     parser.add_argument("--report", metavar="FILE", help="also write the report (markdown) to FILE")
+    parser.add_argument("--mem", metavar="PRESET", help="memory model preset (ideal, typical, slow)")
+    parser.add_argument("--mem-set", action="append", metavar="KEY=VALUE",
+                        help="override one memory model parameter (repeatable)")
     args = parser.parse_args(argv)
+
+    # The memory model is configured through the environment of the test processes;
+    # clear inherited OPENEYE_MEM* so a run is defined by its command line only.
+    for name in ["OPENEYE_MEM"] + list(memory_model.ENV_KEYS.values()):
+        ENV.pop(name, None)
+    ENV.update(memory_env(args.mem, args.mem_set))
+    if args.mem or args.mem_set:
+        print("memory model: " + ", ".join(f"{k}={v}" for k, v in sorted(ENV.items())
+                                           if k.startswith("OPENEYE_MEM")))
 
     ids = collect(args.keyword)
     if not ids:

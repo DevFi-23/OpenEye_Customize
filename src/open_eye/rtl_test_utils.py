@@ -27,6 +27,7 @@ import numpy as np
 import open_eye.iact_stream_mapper as iact_stream_mapper
 from cocotb.triggers import FallingEdge, RisingEdge, Timer
 import open_eye.stream_dicts as strdic
+import open_eye.memory_model as memory_model
 import random
 
 logger = logging.getLogger("cocotb")
@@ -167,6 +168,42 @@ async def reset_all_signals(ptp, dut, serial):
     for _ in range(3):
         await Timer(ptp.clk_cycle, ptp.clk_cycle_unit)
 
+_PS_PER_UNIT = {"fs": 1e-3, "ps": 1.0, "ns": 1e3, "us": 1e6, "ms": 1e9}
+
+
+async def send_words_through_memory(ptp, dut, words, mem_config):
+    """Send one DMA transfer (all words of a layer) through the memory model.
+
+    Opt-in with OPENEYE_MEM / OPENEYE_MEM_* (see open_eye.memory_model).
+    Unlike the original serial driver, which put one word on the bus every
+    cycle and ignored ready_dma_o, this is an AXI-Stream master: in each
+    cycle it drives valid (enable_dma_i) only if the memory model has a word
+    in its FIFO, and a word counts as sent when valid and ready_dma_o are
+    both high at the clock edge (ready_dma_o is a register, so its value
+    just after the previous edge is the one the next edge sees). Inputs
+    change clk_delay_in after the edge, as in set_input.
+    """
+    clk_ps = ptp.clk_cycle * _PS_PER_UNIT[ptp.clk_cycle_unit]
+    delay_ps = ptp.clk_delay_in * _PS_PER_UNIT[ptp.clk_delay_unit_in]
+    channel = memory_model.ReadChannel(mem_config, len(words))
+    logger.info("Memory model %s: %d words, %d burst(s)", mem_config.as_dict(), len(words),
+                memory_model.bursts_needed(len(words), mem_config))
+    index = 0
+    while index < len(words):
+        await Timer(delay_ps, unit="ps")
+        valid = channel.word_available()
+        dut.data_dma_i.value = words[index]
+        dut.enable_dma_i.value = int(valid)
+        accepted = valid and int(dut.ready_dma_o.value) == 1
+        channel.end_cycle(accepted)
+        index += accepted
+        await Timer(clk_ps - delay_ps, unit="ps")
+    await Timer(delay_ps, unit="ps")
+    dut.enable_dma_i.value = 0
+    await Timer(clk_ps - delay_ps, unit="ps")
+    logger.info("Memory model: transfer done, %d stall cycle(s) without data", channel.stall_cycles)
+
+
 async def send_stream(ptp, dut, stream, oep, lp, layer_repetition):
     """ Send the stream to the DUT. 
     
@@ -293,6 +330,14 @@ async def send_stream(ptp, dut, stream, oep, lp, layer_repetition):
         # sent so a section-count mismatch with the DUT is visible.
         logger.info("DMA stream sections (words each): %s",
                     [len(section) for section in stream])
+        mem_config = memory_model.MemoryConfig.from_env(beat_bytes=oep.DMA_BITWIDTH // 8)
+        if mem_config is not None:
+            words = []
+            for name in ("status", "iact", "wght", "psum", "quantize"):
+                words += list(stream[strdic.stream_parallel_dict[name]])
+            await send_words_through_memory(ptp, dut, words, mem_config)
+            cocotb.start_soon(set_input(ptp,(dut.ready_dma_i), 1))
+            return
         for name in ("trans_cycles_iact", "trans_cycles_wght", "trans_cycles_psum"):
             try:
                 logger.info("DUT expects %s = %d", name, int(getattr(dut, name).value))
@@ -921,15 +966,18 @@ async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
     main FSM state (see PROFILE_PHASES), or "readout" while the psum FSM is in
     PSUM_SEND_RESULTS. Per phase it counts cycles, DMA input words offered by
     the host (enable_dma_i_reg), DMA input words accepted (enable_dma_i_reg and
-    ready_dma_o) and DMA output words (enable_dma_o and ready_dma_i). Offered
+    ready_dma_o), DMA output words (enable_dma_o and ready_dma_i), and memory
+    stalls: in_stall = cycles of a load_* phase in which the DUT was ready but
+    no word arrived, out_stall = cycles with a result word waiting while
+    ready_dma_i was low (both stay 0 with the ideal driver). Offered
     but not accepted words are refused by the DUT; the host in send_stream
     repeats its last word for one cycle, which shows up as one refused word.
 
     The measured window runs from the first accepted input word to the last
     output word, so idle time before the stream and after the result is not
     counted. The result is rewritten to `path` (relative to the sim directory)
-    on every phase change and result word, so it survives a failing or
-    hanging test.
+    on every phase change and result word and every 1024 cycles, so it
+    survives a failing or hanging test.
     Summarise it with `python -m open_eye.profile_report`.
     """
     try:
@@ -953,9 +1001,12 @@ async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
         "NUM_GLB_PSUM": oep.NUM_GLB_PSUM, "QUANT_AMOUNT": os.environ.get("QUANT_AMOUNT"),
         "CLOCK_NS": ptp.clk_cycle,
     })
+    mem_config = memory_model.MemoryConfig.from_env(beat_bytes=oep.DMA_BITWIDTH // 8)
+    config["MEMORY"] = mem_config.as_dict() if mem_config is not None else {"name": "ideal (legacy driver)"}
 
     def empty():
-        return {"cycles": 0, "in_offered": 0, "in_accepted": 0, "out_words": 0}
+        return {"cycles": 0, "in_offered": 0, "in_accepted": 0, "out_words": 0,
+                "in_stall": 0, "out_stall": 0}
 
     phases = {}         # phase -> counters, up to the last output word
     pending = {}        # counters after the last output word, merged on the next one
@@ -966,8 +1017,10 @@ async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
     last_phase = None
 
     def dump():
+        # pending: counters after the last result word (not part of the measured
+        # window); kept for debugging a test that hangs before its first result.
         result = {"config": config, "total_cycles": sum(p["cycles"] for p in phases.values()),
-                  "layer_starts": layer_starts, "phases": phases}
+                  "layer_starts": layer_starts, "phases": phases, "pending": pending}
         try:
             with open(path, "w") as f:
                 json.dump(result, f, indent=1)
@@ -979,6 +1032,8 @@ async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
         offered = bit(dut.enable_dma_i_reg)
         accepted = offered & bit(dut.ready_dma_o)
         out_word = bit(dut.enable_dma_o) & bit(dut.ready_dma_i)
+        out_waiting = bit(dut.enable_dma_o) & (1 - bit(dut.ready_dma_i))
+        dut_ready_idle = bit(dut.ready_dma_o) & (1 - offered)
         if not started:
             if not accepted:
                 continue
@@ -1003,6 +1058,8 @@ async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
         counters["in_offered"] += offered
         counters["in_accepted"] += accepted
         counters["out_words"] += out_word
+        counters["in_stall"] += dut_ready_idle if phase.startswith("load_") else 0
+        counters["out_stall"] += out_waiting
         cycle += 1
         if out_word:
             for name, add in pending.items():
@@ -1011,8 +1068,9 @@ async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
                     total[key] += add[key]
             pending = {}
         # The testbench may end the simulation right after the last result
-        # word, so write after every result word as well as on phase changes.
-        if out_word or phase != last_phase:
+        # word, so write after every result word as well as on phase changes,
+        # and every 1024 cycles so a hanging test leaves current counters.
+        if out_word or phase != last_phase or cycle % 1024 == 0:
             dump()
         last_phase = phase
 
@@ -1759,6 +1817,10 @@ async def compare_stream_Conv(ptp, dut, layer_number, layer_repetition, layer_pa
         word_index = 0
         read_data = 1
         chance = 100
+        # With a memory model (OPENEYE_MEM*), ready_dma_i follows the model's
+        # write channel (S2MM) instead of the random chance below.
+        mem_config = memory_model.MemoryConfig.from_env(beat_bytes=oep.DMA_BITWIDTH // 8)
+        write_channel = memory_model.WriteChannel(mem_config) if mem_config is not None else None
         while (dut.enable_dma_o.value == 1):
             if (read_data):
                 if(logging.DEBUG >= login_level):
@@ -1786,7 +1848,12 @@ async def compare_stream_Conv(ptp, dut, layer_number, layer_repetition, layer_pa
                     except:
                         pass
 
-            if random.randint(1, 100) <= chance:
+            if write_channel is not None:
+                write_channel.end_cycle(bool(read_data))
+                take_next = write_channel.ready()
+            else:
+                take_next = random.randint(1, 100) <= chance
+            if take_next:
                 read_data = 1
                 cocotb.start_soon(set_input(ptp,(dut.ready_dma_i), 1))
             else:
@@ -1794,6 +1861,9 @@ async def compare_stream_Conv(ptp, dut, layer_number, layer_repetition, layer_pa
                 cocotb.start_soon(set_input(ptp,(dut.ready_dma_i), 0))
             await Timer(ptp.clk_cycle, unit=ptp.clk_cycle_unit)
 
+        if write_channel is not None:
+            logger.info("Memory model: output stream done, ready_dma_i low for %d cycle(s)",
+                        write_channel.stall_cycles)
         cocotb.start_soon(set_input(ptp,(dut.ready_dma_i), 0))
 
     if(math.floor(layer_repetition%(layer_parameters.iact_transmissions_pe*layer_parameters.needed_wght_transmissions)) == \

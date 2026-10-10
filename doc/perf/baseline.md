@@ -1,4 +1,9 @@
-# Latency and DMA bandwidth baseline (2026-10-09)
+# Latency and DMA bandwidth baseline
+
+**Current baseline: `baseline_2026-10-10/`** (9 cases: the 6 small cases below, unchanged, plus 3 MNIST-like
+layers added in Phase 0.3, see the end of this file). `baseline_2026-10-09/` holds the original 6 cases.
+
+## Small layers (2026-10-09)
 
 Single convolution layers on the `OpenEye_FPGA` top level, measured with the
 cycle/DMA profiler (`rtl_test_utils.profile_dma_phases`, `OPENEYE_PROFILE=1`).
@@ -9,7 +14,7 @@ Code: branch `dev` on top of upstream `c4bd562`. Raw numbers: `baseline_2026-10-
 Raw profiles of this baseline: `baseline_2026-10-09/<case>.json`. Rerun all cases and compare in one command:
 
 ```sh
-venv/bin/python tools/run_profile.py --compare doc/perf/baseline_2026-10-09
+venv/bin/python tools/run_profile.py --jobs 4 --compare doc/perf/baseline_2026-10-10
 ```
 
 Rerunning the unchanged RTL reproduces every number exactly (checked 2026-10-10: 0 change in all
@@ -169,3 +174,18 @@ measured results; each needs an RTL change and a new measurement.
 - Small single layers only; multi-layer runs and pooling are not profiled here.
 - The host is always ready and has no memory latency (testbench `chance = 100`),
   so the numbers are a best case for the external memory side.
+
+
+## MNIST-like layers (Phase 0.3, 2026-10-10)
+
+Scaled to what the RTL and the reference generator support today (at most 32 filters, no 1-channel input,
+no 7-wide padding columns); see README_FI section 6.7. Ideal memory, `QUANT_AMOUNT=32`, 64-bit DMA.
+
+| case | stands in for | total cycles | compute | largest non-compute phases |
+|---|---|---:|---:|---|
+| `mnist1_28x28_c4_f32_q32_dma64` | Conv1 28x28, 1 -> 32 | 65,800 | 51.1% | bias 21.8% (14,336 words for 96 bytes of payload), readout 21.8% |
+| `mnist2_14x14_c32_f32_q32_dma64` | Conv2 14x14, 32 -> 64 | 87,032 | 76.6% | weights 8.8% (15% bus efficiency), convert 5.4% |
+| `mnist3_8x8_c32_f32_q32_dma64` | Conv3 7x7, 64 -> 64 | 26,728 | 70.6% | weights 14.4% (30%), convert 6.3% |
+
+Compared with the small layers, compute dominates the deeper layers, while the first layer (large image,
+few channels) is dominated by the per-pixel bias stream and the readout. Per-phase tables: `baseline_2026-10-10.md`.

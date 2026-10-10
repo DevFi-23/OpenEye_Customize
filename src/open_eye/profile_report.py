@@ -89,6 +89,8 @@ def summarise(profile):
             "out_words": p["out_words"],
             "payload_bytes": need,
             "efficiency": need / (words * word_bytes) if need is not None and words else None,
+            # memory stalls (memory model only; absent in older profiles)
+            "mem_stall": p.get("in_stall", 0) + p.get("out_stall", 0),
         })
     return rows
 
@@ -126,10 +128,16 @@ def load_profiles(paths):
     return profiles
 
 
+def memory_name(config):
+    """Name of the memory model a profile was measured with."""
+    return (config.get("MEMORY") or {}).get("name", "ideal (legacy driver)")
+
+
 def describe(config):
     return ("{LAYER} {INPUT_SIZE_X}x{INPUT_SIZE_Y}x{INPUT_CHANNELS} k{KERNEL_SIZE_X}x{KERNEL_SIZE_Y} "
             "f{NUM_FILTERS} | {CLUSTER_ROWS}x{CLUSTER_COLUMNS} clusters, DMA {DMA_BITWIDTH} b, "
-            "psum {DATA_PSUM_BITWIDTH} b, QUANT_AMOUNT {QUANT_AMOUNT}").format(**config)
+            "psum {DATA_PSUM_BITWIDTH} b, QUANT_AMOUNT {QUANT_AMOUNT}").format(**config) \
+        + f" | memory: {memory_name(config)}"
 
 
 def print_report(case, profile, rows):
@@ -139,16 +147,17 @@ def print_report(case, profile, rows):
     compute = sum(r["cycles"] for r in rows if r["phase"] == "compute")
     print(f"\n## {case}")
     print(describe(config))
+    stall = sum(r["mem_stall"] for r in rows)
     print(f"total {total} cycles ({total * config['CLOCK_NS']} ns), compute {compute / total:.1%}, "
-          f"DMA busy {words / total:.1%} of cycles\n")
-    print("| phase | cycles | share | DMA in | DMA out | payload B | bus eff. |")
-    print("|---|---:|---:|---:|---:|---:|---:|")
+          f"DMA busy {words / total:.1%} of cycles, waiting for memory {stall / total:.1%}\n")
+    print("| phase | cycles | share | DMA in | DMA out | mem stall | payload B | bus eff. |")
+    print("|---|---:|---:|---:|---:|---:|---:|---:|")
     for r in rows:
         eff = f"{r['efficiency']:.0%}" if r["efficiency"] is not None else ""
         need = r["payload_bytes"] if r["payload_bytes"] is not None else ""
         drop = f" ({r['refused_words']} refused)" if r["refused_words"] else ""
         print(f"| {r['phase']} | {r['cycles']} | {r['share']:.1%} | {r['in_words']}{drop} | "
-              f"{r['out_words']} | {need} | {eff} |")
+              f"{r['out_words']} | {r['mem_stall']} | {need} | {eff} |")
 
 
 # Configuration keys that must agree for two profiles to be comparable
@@ -186,6 +195,8 @@ def compare_rows(base_profile, new_profile):
             "words_new": (n["in_words"] + n["out_words"]) if n else 0,
             "eff_base": b["efficiency"] if b else None,
             "eff_new": n["efficiency"] if n else None,
+            "stall_base": b["mem_stall"] if b else 0,
+            "stall_new": n["mem_stall"] if n else 0,
         })
     rows.append({
         "phase": "TOTAL",
@@ -194,6 +205,8 @@ def compare_rows(base_profile, new_profile):
         "words_base": sum(r["words_base"] for r in rows),
         "words_new": sum(r["words_new"] for r in rows),
         "eff_base": None, "eff_new": None,
+        "stall_base": sum(r["stall_base"] for r in rows),
+        "stall_new": sum(r["stall_new"] for r in rows),
     })
     return rows
 
@@ -212,8 +225,11 @@ def print_comparison(base, new):
         if mismatch:
             print("WARNING: configuration differs in " + ", ".join(
                 f"{k} ({b['config'].get(k)} -> {n['config'].get(k)})" for k in mismatch))
-        print("\n| phase | cycles base | cycles new | change | DMA words base | DMA words new | change | bus eff. |")
-        print("|---|---:|---:|---:|---:|---:|---:|---:|")
+        if memory_name(b["config"]) != memory_name(n["config"]):
+            print(f"memory model: {memory_name(b['config'])} -> {memory_name(n['config'])}")
+        print("\n| phase | cycles base | cycles new | change | DMA words base | DMA words new | change "
+              "| mem stall | bus eff. |")
+        print("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
         for r in rows:
             eff = ""
             if r["eff_base"] is not None or r["eff_new"] is not None:
@@ -221,7 +237,7 @@ def print_comparison(base, new):
             bold = "**" if r["phase"] == "TOTAL" else ""
             print(f"| {bold}{r['phase']}{bold} | {r['cycles_base']} | {r['cycles_new']} | "
                   f"{_delta(r['cycles_base'], r['cycles_new'])} | {r['words_base']} | {r['words_new']} | "
-                  f"{_delta(r['words_base'], r['words_new'])} | {eff} |")
+                  f"{_delta(r['words_base'], r['words_new'])} | {r['stall_base']} -> {r['stall_new']} | {eff} |")
         summary.append((case, rows[-1]))
 
     print("\n## Summary\n")

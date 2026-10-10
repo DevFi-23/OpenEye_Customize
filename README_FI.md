@@ -200,69 +200,155 @@ thì vừa tiết kiệm tài nguyên, vừa giảm DMA, vừa giúp simulation 
 - **Liên quan tới hướng nghiên cứu:** `SERIAL=0` giữ dữ liệu trong GLB của từng cluster, tức tái sử dụng dữ liệu trên chip nhiều hơn
   và giảm lưu lượng DMA. Về lâu dài đây có thể là một hướng kiến trúc, nhưng phải hoàn thiện phần RTL còn thiếu. Đây là việc lớn, không thuộc trước mắt.
 
-## 6. Profiler (`profile_dma_phases`): cách dùng và phạm vi
+## 6. Hướng dẫn chạy công cụ đo hiệu suất
 
-**Hoạt động:** coroutine cocotb lấy mẫu **mỗi cạnh lên của clock**. Với mỗi chu kỳ, nó xác định pha (mục 5.1) và đếm:
-`cycles`, `in_offered` (host đưa word vào), `in_accepted` (DUT nhận word, `enable_dma_i_reg & ready_dma_o`),
-`out_words` (word ra, `enable_dma_o & ready_dma_i`). Cửa sổ đo bắt đầu từ word vào đầu tiên và kết thúc ở word ra cuối cùng.
-Kết quả được ghi vào `profile.json` trong thư mục simulation.
+### 6.1 Các công cụ
 
-**Bật:** đặt biến môi trường `OPENEYE_PROFILE=1` trước khi chạy test `OpenEye_FPGA_tb` (mặc định tắt).
+| Công cụ | File | Vai trò |
+|---|---|---|
+| Profiler | `src/open_eye/rtl_test_utils.py` → `profile_dma_phases` | Chạy bên trong simulation. Mỗi chu kỳ ghi lại pha, số word DMA vào/ra và chu kỳ chờ bộ nhớ; kết quả vào `profile.json`. Bật bằng `OPENEYE_PROFILE=1` |
+| Các case đo | `test/cocotb_fpga/test_profile.py` | 9 cấu hình layer Conv (mục 6.7) |
+| Bộ chạy | `tools/run_profile.py` | **Lệnh chính.** Chạy các case song song, so sánh, lưu snapshot |
+| Báo cáo | `src/open_eye/profile_report.py` | In bảng từ các `profile.json`; `--compare` để so sánh trước/sau |
+| Mô hình bộ nhớ | `src/open_eye/memory_model.py` | Giả lập DDR + AXI DMA (mục 6c). Bật bằng `--mem` |
+| Baseline | `doc/perf/baseline_2026-10-10/` | Số liệu mốc của 9 case (bộ nhớ lý tưởng) |
 
-**Báo cáo:**
+### 6.2 Chuẩn bị (một lần)
 
-```bash
-venv/bin/python -m open_eye.profile_report test/.temp/*test_profile*/profile.json --csv out.csv
-```
+- Đứng ở thư mục gốc của repo: `cd ~/OpenEye_orig`.
+- Dùng Python của venv: `venv/bin/python` (đã có cocotb, cocotb-test, tensorflow, open_eye).
+- Cần `iverilog` (Icarus Verilog 11) trong `PATH`; máy này đã có sẵn.
+- Không cần `source venv/bin/activate` nếu luôn gọi `venv/bin/python ...`.
 
-**Các cấu hình đã đo** (`test/cocotb_fpga/test_profile.py`). Tất cả là **một layer Conv đơn** (`Convolution_Single`),
-kernel 3×3, 4 channel vào, 2×2 cluster, psum 20 bit:
-
-| Case | Input | Filter | QUANT_AMOUNT | DMA | Tổng chu kỳ | Compute |
-|---|---|---|---|---|---:|---:|
-| `8x1_f4_q1024_dma64` | 8×1 | 4 | 1024 | 64 | 1188 | 13.6% |
-| `8x1_f4_q32_dma64` | 8×1 | 4 | 32 | 64 | 568 | 28.3% |
-| `16x3_f4_q32_dma64` | 16×3 | 4 | 32 | 64 | 984 | 36.3% |
-| `32x3_f4_q32_dma64` | 32×3 | 4 | 32 | 64 | 1672 | 40.0% |
-| `32x3_f16_q32_dma64` | 32×3 | 16 | 32 | 64 | 3652 | 31.1% |
-| `32x3_f4_q32_dma32` | 32×3 | 4 | 32 | 32 | 2236 | 29.9% |
-
-**Chưa đo MNIST.** Model MNIST (`models/mnist_conv_net.py`) gồm Conv1 (1→32 channel, ảnh 28×28),
-MaxPool, Conv2 (32→64, 14×14), MaxPool, Conv3 (64→64, 7×7), rồi FC (3136→10).
-Conv1 có 25.088 output, gấp khoảng 16 lần cấu hình lớn nhất ở trên. Lý do chưa đo được:
-1. Testcase chạy model (`model_test` trong `OpenEye_FPGA_tb.py`) đang bị tắt trong code upstream.
-2. RTL upstream còn lỗi ở đúng những điểm MNIST cần: input **1 channel** cho ra toàn bias
-   (`test_conv_input_mapping[1-*]`, `test_conv_tall_ramp` fail), và chuỗi Conv rồi Pool rồi Conv chưa ổn định
-   (xem `doc/test_status_handover.md`).
-3. Bản thân profiler chạy được cho lượt nhiều layer (nó ghi `layer_starts`), nhưng phần tính payload và hiệu suất
-   hiện chỉ hỗ trợ `Convolution_Single`.
-
-### 6a. So sánh trước/sau (việc 0.1)
-
-Quy trình chuẩn khi thử một tối ưu:
+### 6.3 Chạy nhanh
 
 ```bash
-# 1. Sửa code (RTL hoặc Python), rồi chạy lại toàn bộ case và so với baseline:
-venv/bin/python tools/run_profile.py --compare doc/perf/baseline_2026-10-09
+# Chạy 6 case nhỏ (khoảng 1–4 phút) và so với baseline:
+venv/bin/python tools/run_profile.py -k "not mnist" --compare doc/perf/baseline_2026-10-10
 
-# Chỉ chạy một số case (bộ lọc -k của pytest), ví dụ bỏ case chậm q1024:
-venv/bin/python tools/run_profile.py -k q32 --compare doc/perf/baseline_2026-10-09
+# Chạy cả 9 case (khoảng 10 phút, 3 case kiểu MNIST mất 4–9 phút mỗi case):
+venv/bin/python tools/run_profile.py --jobs 4 --compare doc/perf/baseline_2026-10-10
 
-# 2. Nếu thay đổi được giữ lại: lưu snapshot mới và báo cáo, để làm mốc cho lần sau
-venv/bin/python tools/run_profile.py --save doc/perf/<tên>_<ngày> --report doc/perf/<tên>_<ngày>.md \
-    --compare doc/perf/baseline_2026-10-09
-git add -f doc/perf/<tên>_<ngày>/*.json doc/perf/<tên>_<ngày>.md
+# Chỉ in bảng, không so sánh:
+venv/bin/python tools/run_profile.py -k "8x1_f4_q32"
 ```
 
-- `tools/run_profile.py`: tự xoá `profile.json` cũ (tránh lẫn số liệu cũ), chạy mỗi case trong một process riêng
-  (mặc định 3 case song song, đổi bằng `--jobs`), **loại bỏ case FAIL** (vì kết quả sai thì số đo không có ý nghĩa),
-  log từng case ở `test/.temp/run_profile_logs/`. Mã thoát khác 0 nếu có case FAIL.
-- `profile_report --compare BASE NEW`: ghép case theo tên, in cho mỗi case bảng theo pha
-  (chu kỳ, số word DMA, hiệu suất bus: trước → sau, chênh lệch tuyệt đối và %) và một bảng tổng hợp.
-  **Cảnh báo** nếu cấu hình của 2 bên khác nhau (khi đó so sánh không còn công bằng).
-- Snapshot baseline: `doc/perf/baseline_2026-10-09/<case>.json` (số liệu gốc), `doc/perf/baseline.md` (giải thích).
-- **Mô phỏng là tất định:** chạy lại RTL chưa sửa cho ra đúng 100% số liệu cũ (đã kiểm tra: cả 6 case chênh lệch bằng 0).
-  Vì vậy mọi chênh lệch đều do code đã sửa gây ra, không phải nhiễu.
+Output gồm: dòng PASS/FAIL của từng case (kèm thời gian chạy), rồi bảng của từng case, rồi bảng tổng hợp (mục 6.5).
+Mã thoát khác 0 nếu có case FAIL.
+
+### 6.4 Các tuỳ chọn của `tools/run_profile.py`
+
+| Tuỳ chọn | Ý nghĩa | Ví dụ |
+|---|---|---|
+| `-k BIỂU_THỨC` | Chọn case theo tên (cú pháp `-k` của pytest) | `-k q32`, `-k "not mnist"`, `-k "mnist2 or 32x3"` |
+| `--jobs N` | Số case chạy song song (mặc định 3). Máy 12 nhân, 7 GB RAM: tối đa khoảng 4–6 | `--jobs 4` |
+| `--compare DIR` | So với snapshot trong `DIR` (lặp lại được) | `--compare doc/perf/baseline_2026-10-10` |
+| `--save DIR` | Lưu các `profile.json` mới thành `DIR/<case>.json` | `--save doc/perf/bias_fix_2026-10-12` |
+| `--report FILE` | Ghi báo cáo markdown ra file | `--report doc/perf/bias_fix_2026-10-12.md` |
+| `--mem PRESET` | Bật mô hình bộ nhớ: `ideal`, `typical`, `slow` (mục 6c) | `--mem typical` |
+| `--mem-set K=V` | Đổi một tham số bộ nhớ (lặp lại được): `latency`, `burst_beats`, `outstanding`, `bandwidth`, `fifo_beats`, `setup`, `jitter`, `seed` | `--mem typical --mem-set latency=60` |
+
+Log của từng case: `test/.temp/run_profile_logs/<case>.log`. Log chi tiết của simulation: `test/.temp/<thư mục case>/cocotb_sim.log`.
+
+### 6.5 Đọc báo cáo
+
+Bảng của một case (không so sánh):
+
+| Cột | Ý nghĩa |
+|---|---|
+| `phase` | Pha của layer (mục 5.1) |
+| `cycles`, `share` | Số chu kỳ ở pha đó và tỉ lệ trên tổng |
+| `DMA in` / `DMA out` | Số word DMA vào/ra trong pha. `(N refused)`: word host đưa nhưng DUT không nhận |
+| `mem stall` | Chu kỳ chờ bộ nhớ: DUT sẵn sàng nhận nhưng không có dữ liệu, hoặc có kết quả nhưng host chưa nhận. Bằng 0 khi bộ nhớ lý tưởng |
+| `payload B` | Số byte tối thiểu cần chuyển (mục 5.3); chỉ có cho `Convolution_Single` |
+| `bus eff.` | Hiệu suất bus = payload ÷ (số word × độ rộng bus) |
+
+Dòng đầu của mỗi case: `total` (tổng chu kỳ và ns), `compute` (tỉ lệ tính toán), `DMA busy` (tỉ lệ chu kỳ bus có dữ liệu),
+`waiting for memory` (tỉ lệ chu kỳ chờ bộ nhớ).
+
+Bảng so sánh (`--compare`): mỗi pha có `cycles base → new`, `change` (tuyệt đối và %), số word DMA trước/sau, `mem stall` trước → sau,
+hiệu suất bus trước → sau. Dòng **TOTAL** là tổng. Bảng **Summary** cuối cùng gồm mỗi case một dòng.
+- `WARNING: configuration differs`: hai bên khác cấu hình (kích thước, DMA, `QUANT_AMOUNT`,…), nên so sánh không công bằng.
+- `memory model: A -> B`: hai bên dùng mô hình bộ nhớ khác nhau. Đây là thông tin, không phải lỗi.
+- `(not run)`: case có trong baseline nhưng không chạy lần này (ví dụ do `-k`). `(not in baseline)`: case mới.
+
+### 6.6 Quy trình đánh giá một tối ưu
+
+1. Tạo branch hoặc commit riêng cho thay đổi (RTL hoặc Python).
+2. Kiểm tra đúng sai trước: các test chức năng liên quan (ví dụ `test_conv_const.py`) phải PASS.
+3. Đo: `venv/bin/python tools/run_profile.py --jobs 4 --compare doc/perf/baseline_2026-10-10`.
+   Mô phỏng là tất định, nên **mọi chênh lệch đều do thay đổi của bạn gây ra**.
+4. (Tuỳ chọn) đo thêm với bộ nhớ thực tế hơn: thêm `--mem typical`, và so với `doc/perf/mem_typical_2026-10-10` (5 case `q32`).
+5. Nếu giữ thay đổi: lưu snapshot và báo cáo, rồi commit:
+   ```bash
+   venv/bin/python tools/run_profile.py --jobs 4 --save doc/perf/<tên>_<ngày> \
+       --report doc/perf/<tên>_<ngày>.md --compare doc/perf/baseline_2026-10-10
+   git add -f doc/perf/<tên>_<ngày>/*.json doc/perf/<tên>_<ngày>.md
+   ```
+   (`-f` vì `.gitignore` của upstream bỏ qua `*.json`/`*.csv`/`*.txt`.)
+6. Ghi kết quả vào mục Nhật ký của file này.
+7. Nếu sửa RTL: chạy lint (mục 9c); warning mới thì sửa, hoặc chấp nhận bằng `--update` kèm lý do.
+
+### 6.7 Các case đo
+
+Mọi case: một layer `Convolution_Single`, kernel 3×3, ramp activation, 2×2 cluster, `NUM_GLB_IACT=1`, psum 20 bit.
+
+| Case | Input (X×Y×C) | Filter | QUANT_AMOUNT | DMA | Thời gian chạy | Nhóm |
+|---|---|---:|---:|---:|---:|---|
+| `8x1_f4_q1024_dma64` | 8×1×4 | 4 | 1024 | 64 | ~4 phút | nhỏ (2026-10-09) |
+| `8x1_f4_q32_dma64` | 8×1×4 | 4 | 32 | 64 | ~15 s | nhỏ |
+| `16x3_f4_q32_dma64` | 16×3×4 | 4 | 32 | 64 | ~15 s | nhỏ |
+| `32x3_f4_q32_dma64` | 32×3×4 | 4 | 32 | 64 | ~15 s | nhỏ |
+| `32x3_f16_q32_dma64` | 32×3×4 | 16 | 32 | 64 | ~20 s | nhỏ |
+| `32x3_f4_q32_dma32` | 32×3×4 | 4 | 32 | 32 | ~15 s | nhỏ |
+| `mnist1_28x28_c4_f32_q32_dma64` | 28×28×4 | 32 | 32 | 64 | ~7 phút | kiểu MNIST (0.3) |
+| `mnist2_14x14_c32_f32_q32_dma64` | 14×14×32 | 32 | 32 | 64 | ~9 phút | kiểu MNIST |
+| `mnist3_8x8_c32_f32_q32_dma64` | 8×8×32 | 32 | 32 | 64 | ~4 phút | kiểu MNIST |
+
+**Vì sao giữ các case nhỏ cũ (không xoá):**
+- Chúng là mốc của mọi so sánh đã làm; xoá đi thì mất tính liên tục của số liệu.
+- Chạy rất nhanh (khoảng 15 giây), phù hợp để kiểm tra nhanh trong lúc sửa code (`-k "not mnist"`).
+- Mỗi case nhỏ cô lập một yếu tố: `q1024` so với `q32` (bảng lượng tử), `dma32` so với `dma64` (độ rộng bus), `f16` so với `f4` (số filter).
+- Các case kiểu MNIST cho **tỉ lệ thực tế** giữa các pha, nhưng chạy lâu; dùng chúng để xác nhận kết quả cuối.
+
+**Vì sao các case MNIST bị "thu nhỏ" so với model thật:**
+
+| Layer thật | Case dùng | Lý do khác |
+|---|---|---|
+| Conv1: 28×28, 1 → 32 | 28×28, **4** → 32 | RTL sai với 1 channel vào (mục 9) |
+| Conv2: 14×14, 32 → **64** | 14×14, 32 → **32** | Bộ sinh dữ liệu Python lỗi với 64 filter (`layer_parameters.read_data_from_layer`, IndexError) |
+| Conv3: **7×7**, 64 → 64 | **8×8**, 32 → 32 | 7×7 có cột đệm; phần cứng ghi giá trị khác 0 vào ô đệm nên kiểm tra chuỗi DMA FAIL (giá trị thật vẫn đúng). 64 → 32 như trên |
+
+Khảo sát ngày 2026-10-10 (đều `QUANT_AMOUNT=32`, `NUM_GLB_IACT=1`): **PASS**: 8/16/32 channel, 32 filter, 14×14, 28×28, 8×8.
+**FAIL**: 64 filter (lỗi Python), 7×7 (ô đệm).
+
+### 6.8 Thêm một case mới
+
+Thêm một dòng vào `CASES` trong `test/cocotb_fpga/test_profile.py`:
+`"tên_case": (width, height, channels, filters, QUANT_AMOUNT, DMA_BITWIDTH)`. Tên case không được chứa dấu `]`.
+Chạy thử với `-k tên_case`; nếu PASS thì thêm vào snapshot bằng `--save` (một snapshot có thể được bổ sung từng case).
+
+### 6.9 Xử lý sự cố
+
+| Hiện tượng | Nguyên nhân thường gặp | Cách xử lý |
+|---|---|---|
+| Case FAIL | Kết quả phần cứng sai, hoặc chuỗi DMA khác file tham chiếu | Xem `test/.temp/run_profile_logs/<case>.log` và `cocotb_sim.log` (tìm `Difference found`, `result check failed`) |
+| Chạy rất lâu rồi FAIL với `No FSM progress for 100000 cycles` | FSM bị treo (ví dụ lỗi `GET_BIAS` với bộ nhớ có khoảng trống, mục 9) | Với layer nhỏ, đặt `OPENEYE_FAIL_ON_STALL=5000` để dừng sớm. `profile.json` có mục `pending` (ghi lại mỗi 1024 chu kỳ) cho biết pha đang kẹt và số word đã nhận |
+| `No FSM progress for N cycles` ở một pha nạp (ví dụ `(4, 0, 0)` = `GET_WGHT`) với layer lớn | **Báo động giả**: bộ phát hiện treo không coi việc nhận từng word trong `GET_*` là tiến triển. Một pha nạp dài hơn N chu kỳ (ví dụ 3840 word weight × 1,44 chu kỳ với `typical`) sẽ bị coi là treo | Đừng đặt `OPENEYE_FAIL_ON_STALL` nhỏ hơn số word lớn nhất của một pha nhân hệ số chậm của bộ nhớ; mặc định 100000 là an toàn |
+| `warning: ... passed but wrote no profile.json` | `OPENEYE_PROFILE` không tới được simulation | Chạy qua `tools/run_profile.py` hoặc `test_profile.py` (cả hai đều tự đặt biến này) |
+| Mọi thứ chậm bất thường | Case `QUANT_AMOUNT=1024` (mục 5.6), hoặc chạy quá nhiều job song song | `-k q32`, giảm `--jobs` |
+| Số liệu lạ | Đọc nhầm `profile.json` cũ | `run_profile.py` luôn xoá file cũ trước khi chạy; nếu chạy pytest trực tiếp thì tự xoá |
+
+### 6.10 Profiler hoạt động thế nào
+
+Coroutine cocotb lấy mẫu **mỗi cạnh lên của clock**. Với mỗi chu kỳ, nó xác định pha (FSM chính, hoặc `readout` khi FSM psum
+ở `PSUM_SEND_RESULTS`) và đếm: `cycles`, `in_offered` (host đưa word), `in_accepted` (`enable_dma_i_reg & ready_dma_o`),
+`out_words` (`enable_dma_o & ready_dma_i`), `in_stall` (pha nạp, DUT sẵn sàng nhưng không có word), `out_stall` (có kết quả nhưng
+`ready_dma_i` thấp). Cửa sổ đo bắt đầu từ word vào đầu tiên được nhận và kết thúc ở word ra cuối cùng. File `profile.json` được ghi lại
+mỗi khi đổi pha và sau mỗi word ra, nên vẫn còn khi test FAIL hoặc treo.
+
+Giới hạn: payload và hiệu suất bus chỉ tính cho `Convolution_Single` (việc 0.2 sẽ mở rộng cho Dense và lượt nhiều layer).
+**Chưa đo được MNIST nguyên model**: `model_test` bị tắt, RTL sai với 1 channel, và chuỗi nhiều layer chưa ổn định.
 
 ## 6b. Đo trên mô phỏng so với chạy trên FPGA thật
 
@@ -292,28 +378,105 @@ Phần nằm giữa (`OpenEye_FPGA` và toàn bộ RTL bên trong) **là cùng m
 - Giảm số beat thường còn **có lợi hơn** trên FPGA thật, vì mỗi beat bỏ bớt cũng tránh được thời gian chờ DDR tương ứng.
 
 ### Cách thu hẹp khoảng cách
-1. **Mô hình bộ nhớ trong cocotb** (phần còn thiếu của Giai đoạn 0): thêm độ trễ đầu burst, giới hạn băng thông và ngắt quãng ngẫu nhiên
-   vào phía host của testbench (`ready`/`valid` không phải lúc nào cũng bằng 1). Không cần sửa RTL.
+1. **Mô hình bộ nhớ trong cocotb**: **đã làm** (mục 6c).
 2. **Bộ đếm hiệu năng trong RTL**: đếm chu kỳ của mỗi pha và số beat, đọc qua AXI-Lite trên board. Đây là thay đổi RTL, cần bạn đồng ý.
 3. **Tổng hợp bằng Vivado** để lấy fmax và tài nguyên (thư mục `dse_scripts/` đã có script nhưng đang trỏ tới project trên máy của tác giả gốc).
 4. Nếu có board: đo thời gian tổng bằng timer của CPU quanh `openeye_runtime`, rồi so với dự đoán từ mô phỏng.
 
+## 6c. Mô hình bộ nhớ ngoài trong testbench (2026-10-10)
+
+### Mục đích
+Testbench gốc giả định **bộ nhớ lý tưởng**: mỗi chu kỳ đưa 1 word vào, luôn nhận kết quả ngay.
+Mô hình bộ nhớ thay phía host bằng một mô hình đơn giản của **DDR + AXI DMA**, để đo xem độ trễ và burst ảnh hưởng tới
+độ trễ của layer bao nhiêu, và RTL có xử lý đúng khi dữ liệu không tới liên tục hay không.
+
+### Thành phần
+| File | Nội dung |
+|---|---|
+| `src/open_eye/memory_model.py` | `MemoryConfig` (tham số và preset), `ReadChannel` (MM2S: DDR → bộ tăng tốc), `WriteChannel` (S2MM: bộ tăng tốc → DDR) |
+| `rtl_test_utils.send_words_through_memory` | Driver mới: gửi **toàn bộ stream của một layer như một lần truyền DMA**, theo đúng handshake AXI-Stream |
+| `rtl_test_utils.compare_stream_Conv` | Phía đọc kết quả: `ready_dma_i` do `WriteChannel` quyết định (chỉ với layer Conv) |
+| `profile_dma_phases` | Thêm đếm `in_stall`/`out_stall` (cột `mem stall` trong báo cáo) và ghi cấu hình bộ nhớ vào `profile.json` (`config.MEMORY`) |
+| `test/test_memory_model.py` | 15 unit test so với công thức tính tay |
+
+### Mô hình hoạt động thế nào
+**Đọc (MM2S):** stream của layer được chia thành các burst `burst_beats` word (không vượt ranh giới 4 KB).
+DMA gửi yêu cầu cho một burst khi (a) số burst đang chờ dữ liệu ít hơn `outstanding`, và (b) FIFO của DMA (`fifo_beats`) còn đủ chỗ
+cho cả burst. Dữ liệu của burst bắt đầu về sau `latency` (+ ngẫu nhiên 0..`jitter`) chu kỳ, tối đa `bandwidth` word mỗi chu kỳ,
+và vào FIFO. Mỗi chu kỳ, host chỉ bật `valid` (`enable_dma_i`) khi FIFO có word; word chỉ được tính là đã gửi khi `valid` và
+`ready_dma_o` cùng bằng 1 ở cạnh clock. Nếu chưa, host giữ nguyên word đó.
+
+**Ghi (S2MM):** kết quả vào FIFO; khi FIFO có đủ một burst (hoặc rảnh lâu), DMA gửi burst đó ra bộ nhớ với tốc độ `bandwidth`.
+Mỗi burst giữ một "slot" cho tới khi có phản hồi ghi (`latency` chu kỳ sau word cuối). Hết slot hoặc FIFO đầy thì `ready_dma_i = 0`.
+
+### Tham số và preset
+| Tham số | Biến môi trường | `ideal` | `typical` | `slow` |
+|---|---|---:|---:|---:|
+| `latency` (chu kỳ) | `OPENEYE_MEM_LATENCY` | 0 | 30 | 80 |
+| `burst_beats` | `OPENEYE_MEM_BURST` | 256 | 16 | 16 |
+| `outstanding` | `OPENEYE_MEM_OUTSTANDING` | 64 | 2 | 1 |
+| `bandwidth` (word/chu kỳ) | `OPENEYE_MEM_BANDWIDTH` | 1.0 | 1.0 | 0.5 |
+| `fifo_beats` | `OPENEYE_MEM_FIFO` | rất lớn | 64 | 32 |
+| `setup` (chu kỳ, mỗi lần truyền) | `OPENEYE_MEM_SETUP` | 0 | 0 | 0 |
+| `jitter` | `OPENEYE_MEM_JITTER` | 0 | 0 | 10 |
+| `seed` | `OPENEYE_MEM_SEED` | 0 | 0 | 0 |
+
+Chọn preset bằng `OPENEYE_MEM=<preset>` (hoặc `run_profile.py --mem`), đổi từng tham số bằng `OPENEYE_MEM_*` (`--mem-set`).
+**Không đặt biến nào thì testbench chạy driver cũ** (để mọi test có sẵn không bị ảnh hưởng).
+**Các giá trị `typical`/`slow` chỉ để minh hoạ, chưa được hiệu chỉnh theo board thật.**
+
+### Kết quả kiểm chứng (5 case `q32`)
+| Cấu hình bộ nhớ | Kết quả | Độ trễ so với baseline |
+|---|---|---|
+| `ideal` (driver mới) | 5/5 PASS | **Giống hệt 100%** (chênh lệch 0 ở mọi pha). Driver mới đúng |
+| `typical` | 5/5 PASS | **+10 % đến +22 %**. Chỉ các pha có DMA chậm đi; `convert`/`compute` không đổi. Tổng chu kỳ chờ bộ nhớ **bằng đúng** phần tăng thêm |
+| `slow` | 5/5 **FAIL (treo)** | Phát hiện lỗi RTL `GET_BIAS` (mục 9) |
+| `typical`, 3 case kiểu MNIST | 3/3 PASS | Conv1 **+19,2 %**, Conv2 +7,6 %, Conv3 +9,7 %. Layer nặng về DMA (Conv1) chịu ảnh hưởng nhiều nhất |
+
+Chi tiết `typical` (8 case, so với `baseline_2026-10-10`): `doc/perf/mem_typical_2026-10-10.md`, số liệu gốc ở `doc/perf/mem_typical_2026-10-10/`. Ví dụ case `32x3_f16`: 3652 → 4451 chu kỳ. Ở mọi pha nạp, cứ 16 word thì
+có thêm 7 chu kỳ chờ, tức **mỗi word thực tế tốn khoảng 1,44 chu kỳ**. Hệ quả: giảm số word DMA (Giai đoạn 1) có lợi khoảng 1,44 lần
+so với khi đo trên bộ nhớ lý tưởng.
+
+Khoanh vùng lỗi (case `8x1_f4_q32`): khoảng nghỉ **dài** giữa các burst (độ trễ 80, 1 burst mỗi lần, jitter) vẫn PASS; dữ liệu **xen kẽ
+từng word** (`bandwidth=0.5`, hoặc burst 1 word) thì FAIL. `profile.json` (`pending`) cho thấy pha `load_bias` chỉ nhận **31/32** word.
+
+### Giới hạn hiện tại
+- Phía ghi chỉ mô hình hoá cho readout của layer Conv (`compare_stream_Conv`); Dense, Depthwise và Pooling vẫn luôn sẵn sàng (sẽ làm cùng việc 0.2).
+- Cửa sổ đo của profiler bắt đầu từ word đầu tiên được nhận, nên `setup` và độ trễ trước burst đầu **không** nằm trong tổng chu kỳ.
+- Một layer là một lần truyền; chưa mô hình hoá thời gian của CPU giữa các layer, chưa tranh chấp bus với CPU.
+- Tham số chưa hiệu chỉnh: kết quả dùng để **so sánh tương đối** giữa các phương án.
+
 ## 7. Kết quả baseline chính (chi tiết: `doc/perf/baseline.md`)
 
-1. Phần tính toán chỉ chiếm **14–40%** độ trễ của một layer, phần còn lại là nạp dữ liệu, chuyển đổi và đọc ra.
-   Mọi pha chạy **tuần tự**, không chồng lên nhau.
+**Baseline hiện tại: `doc/perf/baseline_2026-10-10/`** (9 case, bộ nhớ lý tưởng).
+
+**Layer kiểu MNIST (0.3):**
+
+| Case | Thay cho | Tổng chu kỳ | Compute | Pha không tính toán lớn nhất |
+|---|---|---:|---:|---|
+| `mnist1_28x28_c4_f32` | Conv1 | 65.800 | 51% | **bias 22%** (14.336 word cho 96 byte payload), readout 22% |
+| `mnist2_14x14_c32_f32` | Conv2 | 87.032 | **77%** | weight 9% (hiệu suất 15%), convert 5% |
+| `mnist3_8x8_c32_f32` | Conv3 | 26.728 | 71% | weight 14% (hiệu suất 30%), convert 6% |
+
+**Layer nhỏ (2026-10-09):**
+1. Phần tính toán chỉ chiếm **14–40%** độ trễ; mọi pha chạy **tuần tự**.
 2. Bus DMA chỉ bận **35–58%** số chu kỳ.
-3. **Bias gửi theo từng pixel output** thay vì theo filter: hiệu suất 1–5%, chiếm tới 21% độ trễ ở layer 16 filter.
-4. **Weight**: hiệu suất 15% (30 beat cho 36 byte mỗi filter 3×3×4).
+3. **Bias gửi theo từng pixel output** (hiệu suất 1–5%).
+4. **Weight**: hiệu suất 15%.
 5. **Bảng lượng tử** luôn gửi đủ `QUANT_AMOUNT` entry.
-6. **Readout** gửi psum 20 bit trong ô 32 bit, chưa lượng tử về INT8 trước khi gửi ra.
-7. Ước tính giới hạn trên: sửa 3 điểm bias, weight và readout có thể giảm tới khoảng 48% độ trễ của layer 32×3, 16 filter.
+6. **Readout** gửi psum 20 bit trong ô 32 bit.
+
+**Rút ra cho Giai đoạn 1:**
+- Layer đầu (ảnh lớn, ít channel): **bias theo filter** và **readout INT8** là quan trọng nhất (tới khoảng 40% độ trễ).
+- Layer sâu (nhiều channel): compute chiếm phần lớn; tối ưu DMA còn khoảng 10–15% (chủ yếu weight). Muốn giảm thêm thì phải
+  chạy chồng pha (Giai đoạn 2) hoặc tăng hiệu suất tính toán.
+- Với bộ nhớ thực tế hơn (`typical`), mỗi word DMA tốn khoảng 1,44 chu kỳ, nên lợi ích của việc giảm word còn lớn hơn (mục 6c).
 
 ## 8. Lộ trình
 
 | Giai đoạn | Nội dung | Trạng thái |
 |---|---|---|
-| 0. Đo lường | Profiler chu kỳ/DMA, công cụ báo cáo, baseline | **Phần lõi xong**; còn 3 việc nên làm trước Giai đoạn 1 (xem bên dưới) |
+| 0. Đo lường | Profiler, báo cáo, so sánh, baseline 9 case, mô hình bộ nhớ | **Gần xong**: còn 0.2 (Dense, nhiều layer) |
 | 1. Giảm lưu lượng DMA | Bias theo filter, đóng gói weight, bảng quant theo F hoặc lưu BRAM, readout INT8 | Chưa làm. Đề xuất bắt đầu với bias |
 | 2. Che độ trễ | Double-buffering (`BRANCHES=2`): nạp lượt sau trong lúc lượt hiện tại tính toán | Chưa làm (cần sửa lỗi chọn nửa buffer iact trước) |
 | 3. Mô hình và DSE | Mô hình Python dự đoán chu kỳ và byte, roofline, quét cấu hình | Chưa làm |
@@ -326,10 +489,10 @@ Phần nằm giữa (`OpenEye_FPGA` và toàn bộ RTL bên trong) **là cùng m
 | Công cụ báo cáo + hiệu suất bus (`profile_report`) | Xong (chỉ cho `Convolution_Single`) |
 | Baseline 6 cấu hình Conv đơn (`doc/perf/baseline.md`) | Xong |
 | CI lint theo baseline | Xong |
-| **0.1 So sánh trước/sau**: `profile_report --compare`, `tools/run_profile.py` (mục 6a) | **Xong** (2026-10-10) |
+| **0.1 So sánh trước/sau**: `profile_report --compare`, `tools/run_profile.py` (mục 6.3–6.6) | **Xong** (2026-10-10) |
 | **0.2 Mở rộng phạm vi đo**: payload/hiệu suất cho layer Dense (FC) và cho lượt 2 layer (pha `writeback`), tách số liệu theo từng layer (đã có `layer_starts` nhưng báo cáo chưa dùng) | **Chưa.** Bias, bảng quant và readout INT8 đều ảnh hưởng tới Dense và write-back giữa các layer |
-| **0.3 Cấu hình gần thực tế hơn**: layer lớn hơn trong giới hạn RTL đang chạy đúng (2 hoặc 4 channel, có thể 8/16 nếu chạy được, `NUM_GLB_IACT=1`), ví dụ cỡ Conv2/Conv3 của MNIST (14×14, 7×7) | **Chưa.** Baseline hiện chỉ có layer rất nhỏ (tối đa 32×3), nên tỉ lệ giữa các pha có thể khác ở layer thật |
-| Mô hình bộ nhớ ngoài (độ trễ burst, giới hạn băng thông) | **Tạm hoãn** theo quyết định ngày 2026-10-10 |
+| **0.3 Cấu hình gần thực tế hơn**: 3 case kiểu MNIST (mục 6.7), baseline mới `baseline_2026-10-10` | **Xong** (2026-10-10) |
+| Mô hình bộ nhớ ngoài (độ trễ burst, giới hạn băng thông) | **Xong** (2026-10-10, mục 6c); tham số chưa hiệu chỉnh theo board |
 
 ## 9. Các lỗi upstream đã biết (ảnh hưởng tới việc đo)
 
@@ -347,6 +510,17 @@ Phần nằm giữa (`OpenEye_FPGA` và toàn bộ RTL bên trong) **là cùng m
   (như 3) bị lệch dữ liệu, còn 1 channel đi theo một đường xử lý khác và hỏng theo kiểu khác (chỉ ra bias).
 - `NUM_GLB_IACT=3` sai với mọi số channel đã thử.
 - MNIST Conv1 có 1 channel vào, nên chưa chạy được trên RTL hiện tại.
+
+**Lỗi `GET_BIAS` khi dữ liệu DMA tới không liên tục** (tìm ra ngày 2026-10-10 bằng mô hình bộ nhớ, **chưa sửa**):
+- `hdl/OpenEye_FPGA.v:1974`: trạng thái `GET_BIAS` chuyển sang `GET_QUANTIZE` khi `fsm_psum_cycle == trans_cycles_psum - 1`
+  **mà không kiểm tra `enable_dma_i_reg`**, tức không kiểm tra word bias cuối cùng đã thực sự tới hay chưa. Các trạng thái
+  `GET_IACT`, `GET_WGHT` và `GET_QUANTIZE` đều có kiểm tra này.
+- Hậu quả: nếu đúng chu kỳ đó không có dữ liệu (`valid = 0`), word bias cuối bị mất, word đó bị hiểu là word đầu của bảng
+  lượng tử, mọi thứ lệch 1 word, và FSM treo ở `PSUM_SEND_RESULTS`.
+- Với bộ nhớ lý tưởng (testbench cũ) lỗi không bao giờ xảy ra. Trên FPGA thật, AXI DMA có thể tạo khoảng trống bất kỳ lúc nào,
+  nên lỗi có thể **xảy ra lúc có lúc không**.
+- Đề xuất sửa (1 dòng, **chờ đồng ý**): `if ((fsm_psum_cycle == trans_cycles_psum - 1) & enable_dma_i_reg) begin`.
+  Sau khi sửa cần chạy lại `--mem slow` và toàn bộ test Conv để kiểm chứng.
 
 **Khác:**
 - `CLUSTER_ROWS=1`: có cấu hình bị treo FSM (theo `doc/test_status_handover.md`).
@@ -507,4 +681,12 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
 - Mục 6b: so sánh những gì đo được trên mô phỏng với khi chạy trên FPGA thật.
 - Mục 5.7: giải thích `SERIAL=1` và `SERIAL=0`. Mục 8: trạng thái chi tiết của Giai đoạn 0; việc thu hẹp khoảng cách mô phỏng/FPGA tạm hoãn.
 - **Việc 0.1 xong:** `profile_report --compare`, `tools/run_profile.py`, snapshot `doc/perf/baseline_2026-10-09/`,
-  10 unit test. Chạy lại toàn bộ 6 case so với baseline: chênh lệch 0, tức mô phỏng tất định (mục 6a).
+  10 unit test. Chạy lại toàn bộ 6 case so với baseline: chênh lệch 0, tức mô phỏng tất định (mục 6.3–6.6).
+- **Việc 0.3 xong** (cấu hình gần thực tế): khảo sát giới hạn RTL (PASS: 8/16/32 channel, 32 filter, 14×14, 28×28, 8×8;
+  FAIL: 64 filter (lỗi Python), 7×7 (ô đệm)). Thêm 3 case kiểu MNIST vào `test_profile.py`, **giữ 6 case cũ**.
+  Baseline mới 9 case: `doc/perf/baseline_2026-10-10/` (6 case cũ không đổi). Layer đầu: bias + readout khoảng 44 %; layer sâu:
+  compute 71–77 %.
+- **Mô hình bộ nhớ ngoài** (`memory_model.py`, driver AXI-Stream mới, bộ đếm chờ bộ nhớ, `run_profile --mem`), 15 unit test.
+  `ideal` cho kết quả giống hệt baseline; `typical` chậm thêm 8–22 %; `slow` làm lộ **lỗi RTL `GET_BIAS`** (mục 9, chưa sửa).
+- Profiler: ghi `pending` (số liệu chưa chốt) và ghi file định kỳ mỗi 1024 chu kỳ để chẩn đoán test bị treo.
+- README: mục 6 viết lại thành hướng dẫn chạy chi tiết; thêm mục 6c (mô hình bộ nhớ).
