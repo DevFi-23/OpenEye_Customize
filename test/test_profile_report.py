@@ -54,3 +54,48 @@ def test_main_writes_csv(tmp_path, capsys):
     assert profile_report.main([str(path), "--csv", str(out_csv)]) == 0
     assert "| compute | 60 | 60.0% |" in capsys.readouterr().out
     assert len(out_csv.read_text().strip().splitlines()) == 1 + 3
+
+
+@pytest.mark.parametrize("path,case", [
+    ("doc/perf/baseline/8x1_f4_q32_dma64.json", "8x1_f4_q32_dma64"),
+    ("test/.temp/test_cocotb_fpga_test_profile.py_test_profile_conv_8x1_f4_q32_dma64_/profile.json",
+     "8x1_f4_q32_dma64"),
+    ("test/.temp/some_other_sim/profile.json", "some_other_sim"),
+])
+def test_case_name(path, case):
+    assert profile_report.case_name(path) == case
+
+
+def test_load_profiles_from_snapshot_and_sim_dirs(tmp_path):
+    snap = tmp_path / "snap"
+    snap.mkdir()
+    (snap / "a.json").write_text(json.dumps(make_profile()))
+    sim = tmp_path / "sims" / "x_test_profile_conv_b_"
+    sim.mkdir(parents=True)
+    (sim / "profile.json").write_text(json.dumps(make_profile()))
+    profiles = profile_report.load_profiles([str(snap), str(tmp_path / "sims")])
+    assert sorted(profiles) == ["a", "b"]
+
+
+def test_compare_rows_deltas():
+    base = make_profile()
+    new = make_profile()
+    new["phases"]["load_wght"] = {"cycles": 5, "in_offered": 5, "in_accepted": 5, "out_words": 0}
+    new["total_cycles"] = 85
+    rows = {r["phase"]: r for r in profile_report.compare_rows(base, new)}
+    assert (rows["load_wght"]["cycles_base"], rows["load_wght"]["cycles_new"]) == (20, 5)
+    assert (rows["load_wght"]["words_base"], rows["load_wght"]["words_new"]) == (18, 5)
+    assert rows["TOTAL"]["cycles_new"] == 85
+    assert rows["TOTAL"]["words_base"] == 18 + 16 and rows["TOTAL"]["words_new"] == 5 + 16
+
+
+def test_print_comparison(capsys):
+    base = {"c": ("b.json", make_profile()), "old_only": ("o.json", make_profile())}
+    changed = make_profile()
+    changed["total_cycles"] = 80
+    changed["config"]["QUANT_AMOUNT"] = "1024"
+    profile_report.print_comparison(base, {"c": ("n.json", changed)})
+    out = capsys.readouterr().out
+    assert "| **TOTAL** | 100 | 80 | -20 (-20.0%) |" in out
+    assert "WARNING: configuration differs in QUANT_AMOUNT (32 -> 1024)" in out
+    assert "| old_only | 100 | (not run) |" in out

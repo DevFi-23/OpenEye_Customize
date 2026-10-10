@@ -12,16 +12,27 @@ needs (e.g. F*C*Kx*Ky weight bytes) and the resulting bus efficiency:
 
     efficiency = payload bytes / (DMA words * DMA_BITWIDTH / 8)
 
+With --compare it puts two sets of profiles side by side (e.g. a saved
+baseline and the profiles of a modified RTL), matched by case name, and
+prints the change per phase and per case.
+
+Profiles can be given as profile.json files or as directories: a directory
+of snapshots (<case>.json, as in doc/perf/baseline_*/) or of simulation
+directories (<dir>/profile.json).
+
 Usage:
     python -m open_eye.profile_report test/.temp/*/profile.json
     python -m open_eye.profile_report --csv baseline.csv test/.temp/*/profile.json
+    python -m open_eye.profile_report --compare doc/perf/baseline_2026-10-09 test/.temp/*test_profile*/profile.json
 """
 
 import argparse
 import csv
 import json
 import math
+import glob
 import os
+import re
 import sys
 
 PHASE_ORDER = ["load_config", "load_iact", "load_wght", "load_bias", "load_quant",
@@ -82,18 +93,51 @@ def summarise(profile):
     return rows
 
 
+def case_name(path):
+    """Case name of a profile: <case>.json -> case; .../<sim dir>/profile.json -> sim dir.
+
+    Simulation directories of test_profile.py are named after the pytest node
+    id, e.g. test_cocotb_fpga_test_profile.py_test_profile_conv_8x1_f4_q32_dma64_;
+    only the parameter id (8x1_f4_q32_dma64) is kept.
+    """
+    path = os.path.abspath(path)
+    base = os.path.basename(path)
+    if base != "profile.json":
+        return os.path.splitext(base)[0]
+    name = os.path.basename(os.path.dirname(path))
+    m = re.search(r"test_profile_conv_(.+?)_?$", name)
+    return m.group(1) if m else name
+
+
+def load_profiles(paths):
+    """{case: (path, profile)} from profile files and directories."""
+    files = []
+    for path in paths:
+        if os.path.isdir(path):
+            found = sorted(glob.glob(os.path.join(path, "*.json")))
+            found += sorted(glob.glob(os.path.join(path, "*", "profile.json")))
+            files += found
+        else:
+            files.append(path)
+    profiles = {}
+    for path in files:
+        with open(path) as f:
+            profiles[case_name(path)] = (path, json.load(f))
+    return profiles
+
+
 def describe(config):
     return ("{LAYER} {INPUT_SIZE_X}x{INPUT_SIZE_Y}x{INPUT_CHANNELS} k{KERNEL_SIZE_X}x{KERNEL_SIZE_Y} "
             "f{NUM_FILTERS} | {CLUSTER_ROWS}x{CLUSTER_COLUMNS} clusters, DMA {DMA_BITWIDTH} b, "
             "psum {DATA_PSUM_BITWIDTH} b, QUANT_AMOUNT {QUANT_AMOUNT}").format(**config)
 
 
-def print_report(path, profile, rows):
+def print_report(case, profile, rows):
     config = profile["config"]
     total = profile["total_cycles"]
     words = sum(r["in_words"] + r["out_words"] for r in rows)
     compute = sum(r["cycles"] for r in rows if r["phase"] == "compute")
-    print(f"\n## {os.path.basename(os.path.dirname(os.path.abspath(path)))}")
+    print(f"\n## {case}")
     print(describe(config))
     print(f"total {total} cycles ({total * config['CLOCK_NS']} ns), compute {compute / total:.1%}, "
           f"DMA busy {words / total:.1%} of cycles\n")
@@ -107,20 +151,111 @@ def print_report(path, profile, rows):
               f"{r['out_words']} | {need} | {eff} |")
 
 
+# Configuration keys that must agree for two profiles to be comparable
+COMPARE_CONFIG_KEYS = ("LAYER", "NUM_FILTERS", "KERNEL_SIZE_X", "KERNEL_SIZE_Y", "INPUT_SIZE_X",
+                       "INPUT_SIZE_Y", "INPUT_CHANNELS", "STRIDE", "DMA_BITWIDTH",
+                       "CLUSTER_ROWS", "CLUSTER_COLUMNS", "QUANT_AMOUNT")
+
+
+def _delta(old, new):
+    if old is None or new is None:
+        return ""
+    d = new - old
+    pct = f" ({d / old:+.1%})" if old else ""
+    return f"{d:+d}{pct}" if d else "0"
+
+
+def _eff(value):
+    return f"{value:.0%}" if value is not None else ""
+
+
+def compare_rows(base_profile, new_profile):
+    """Per-phase comparison rows plus a total row."""
+    base = {r["phase"]: r for r in summarise(base_profile)}
+    new = {r["phase"]: r for r in summarise(new_profile)}
+    names = [p for p in PHASE_ORDER if p in base or p in new]
+    names += sorted((set(base) | set(new)) - set(PHASE_ORDER))
+    rows = []
+    for name in names:
+        b, n = base.get(name), new.get(name)
+        rows.append({
+            "phase": name,
+            "cycles_base": b["cycles"] if b else 0,
+            "cycles_new": n["cycles"] if n else 0,
+            "words_base": (b["in_words"] + b["out_words"]) if b else 0,
+            "words_new": (n["in_words"] + n["out_words"]) if n else 0,
+            "eff_base": b["efficiency"] if b else None,
+            "eff_new": n["efficiency"] if n else None,
+        })
+    rows.append({
+        "phase": "TOTAL",
+        "cycles_base": base_profile["total_cycles"],
+        "cycles_new": new_profile["total_cycles"],
+        "words_base": sum(r["words_base"] for r in rows),
+        "words_new": sum(r["words_new"] for r in rows),
+        "eff_base": None, "eff_new": None,
+    })
+    return rows
+
+
+def print_comparison(base, new):
+    """Markdown comparison of two {case: (path, profile)} sets."""
+    common = [c for c in sorted(base) if c in new]
+    summary = []
+    for case in common:
+        b, n = base[case][1], new[case][1]
+        rows = compare_rows(b, n)
+        print(f"\n## {case}")
+        print(describe(n["config"]))
+        mismatch = [k for k in COMPARE_CONFIG_KEYS
+                    if str(b["config"].get(k)) != str(n["config"].get(k))]
+        if mismatch:
+            print("WARNING: configuration differs in " + ", ".join(
+                f"{k} ({b['config'].get(k)} -> {n['config'].get(k)})" for k in mismatch))
+        print("\n| phase | cycles base | cycles new | change | DMA words base | DMA words new | change | bus eff. |")
+        print("|---|---:|---:|---:|---:|---:|---:|---:|")
+        for r in rows:
+            eff = ""
+            if r["eff_base"] is not None or r["eff_new"] is not None:
+                eff = f"{_eff(r['eff_base'])} -> {_eff(r['eff_new'])}"
+            bold = "**" if r["phase"] == "TOTAL" else ""
+            print(f"| {bold}{r['phase']}{bold} | {r['cycles_base']} | {r['cycles_new']} | "
+                  f"{_delta(r['cycles_base'], r['cycles_new'])} | {r['words_base']} | {r['words_new']} | "
+                  f"{_delta(r['words_base'], r['words_new'])} | {eff} |")
+        summary.append((case, rows[-1]))
+
+    print("\n## Summary\n")
+    print("| case | cycles base | cycles new | change | DMA words base | DMA words new | change |")
+    print("|---|---:|---:|---:|---:|---:|---:|")
+    for case, t in summary:
+        print(f"| {case} | {t['cycles_base']} | {t['cycles_new']} | {_delta(t['cycles_base'], t['cycles_new'])} | "
+              f"{t['words_base']} | {t['words_new']} | {_delta(t['words_base'], t['words_new'])} |")
+    for case in sorted(set(base) - set(new)):
+        print(f"| {case} | {base[case][1]['total_cycles']} | (not run) | | | | |")
+    for case in sorted(set(new) - set(base)):
+        print(f"| {case} | (not in baseline) | {new[case][1]['total_cycles']} | | | | |")
+    return summary
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("profiles", nargs="+", help="profile.json files")
+    parser.add_argument("profiles", nargs="+", help="profile.json files or directories")
     parser.add_argument("--csv", help="also write one row per (profile, phase) to this file")
+    parser.add_argument("--compare", action="append", metavar="BASELINE",
+                        help="baseline profile file or directory to compare against (repeatable)")
     args = parser.parse_args(argv)
 
+    profiles = load_profiles(args.profiles)
+    if args.compare:
+        print_comparison(load_profiles(args.compare), profiles)
+        return 0
+
     csv_rows = []
-    for path in args.profiles:
-        with open(path) as f:
-            profile = json.load(f)
+    for case, (path, profile) in profiles.items():
         rows = summarise(profile)
-        print_report(path, profile, rows)
+        print_report(case, profile, rows)
         for r in rows:
-            csv_rows.append({"profile": path, **profile["config"], **r})
+            csv_rows.append({"profile": case, **profile["config"], **r})
     if args.csv and csv_rows:
         with open(args.csv, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=list(csv_rows[0]))

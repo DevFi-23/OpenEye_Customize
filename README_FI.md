@@ -237,6 +237,33 @@ Conv1 có 25.088 output, gấp khoảng 16 lần cấu hình lớn nhất ở tr
 3. Bản thân profiler chạy được cho lượt nhiều layer (nó ghi `layer_starts`), nhưng phần tính payload và hiệu suất
    hiện chỉ hỗ trợ `Convolution_Single`.
 
+### 6a. So sánh trước/sau (việc 0.1)
+
+Quy trình chuẩn khi thử một tối ưu:
+
+```bash
+# 1. Sửa code (RTL hoặc Python), rồi chạy lại toàn bộ case và so với baseline:
+venv/bin/python tools/run_profile.py --compare doc/perf/baseline_2026-10-09
+
+# Chỉ chạy một số case (bộ lọc -k của pytest), ví dụ bỏ case chậm q1024:
+venv/bin/python tools/run_profile.py -k q32 --compare doc/perf/baseline_2026-10-09
+
+# 2. Nếu thay đổi được giữ lại: lưu snapshot mới và báo cáo, để làm mốc cho lần sau
+venv/bin/python tools/run_profile.py --save doc/perf/<tên>_<ngày> --report doc/perf/<tên>_<ngày>.md \
+    --compare doc/perf/baseline_2026-10-09
+git add -f doc/perf/<tên>_<ngày>/*.json doc/perf/<tên>_<ngày>.md
+```
+
+- `tools/run_profile.py`: tự xoá `profile.json` cũ (tránh lẫn số liệu cũ), chạy mỗi case trong một process riêng
+  (mặc định 3 case song song, đổi bằng `--jobs`), **loại bỏ case FAIL** (vì kết quả sai thì số đo không có ý nghĩa),
+  log từng case ở `test/.temp/run_profile_logs/`. Mã thoát khác 0 nếu có case FAIL.
+- `profile_report --compare BASE NEW`: ghép case theo tên, in cho mỗi case bảng theo pha
+  (chu kỳ, số word DMA, hiệu suất bus: trước → sau, chênh lệch tuyệt đối và %) và một bảng tổng hợp.
+  **Cảnh báo** nếu cấu hình của 2 bên khác nhau (khi đó so sánh không còn công bằng).
+- Snapshot baseline: `doc/perf/baseline_2026-10-09/<case>.json` (số liệu gốc), `doc/perf/baseline.md` (giải thích).
+- **Mô phỏng là tất định:** chạy lại RTL chưa sửa cho ra đúng 100% số liệu cũ (đã kiểm tra: cả 6 case chênh lệch bằng 0).
+  Vì vậy mọi chênh lệch đều do code đã sửa gây ra, không phải nhiễu.
+
 ## 6b. Đo trên mô phỏng so với chạy trên FPGA thật
 
 **Đường dữ liệu thật:** CPU (ARM) → DDR → AXI DMA IP (MM2S) → AXI4-Stream 64 bit → `OpenEye_FPGA` → AXI4-Stream → AXI DMA (S2MM) → DDR.
@@ -299,7 +326,7 @@ Phần nằm giữa (`OpenEye_FPGA` và toàn bộ RTL bên trong) **là cùng m
 | Công cụ báo cáo + hiệu suất bus (`profile_report`) | Xong (chỉ cho `Convolution_Single`) |
 | Baseline 6 cấu hình Conv đơn (`doc/perf/baseline.md`) | Xong |
 | CI lint theo baseline | Xong |
-| **0.1 So sánh trước/sau**: `profile_report` đọc 2 bộ profile (baseline và bản đã sửa), in bảng chênh lệch theo từng pha; kèm script chạy lại toàn bộ baseline bằng một lệnh | **Chưa.** Bắt buộc để đánh giá mọi thay đổi ở Giai đoạn 1 |
+| **0.1 So sánh trước/sau**: `profile_report --compare`, `tools/run_profile.py` (mục 6a) | **Xong** (2026-10-10) |
 | **0.2 Mở rộng phạm vi đo**: payload/hiệu suất cho layer Dense (FC) và cho lượt 2 layer (pha `writeback`), tách số liệu theo từng layer (đã có `layer_starts` nhưng báo cáo chưa dùng) | **Chưa.** Bias, bảng quant và readout INT8 đều ảnh hưởng tới Dense và write-back giữa các layer |
 | **0.3 Cấu hình gần thực tế hơn**: layer lớn hơn trong giới hạn RTL đang chạy đúng (2 hoặc 4 channel, có thể 8/16 nếu chạy được, `NUM_GLB_IACT=1`), ví dụ cỡ Conv2/Conv3 của MNIST (14×14, 7×7) | **Chưa.** Baseline hiện chỉ có layer rất nhỏ (tối đa 32×3), nên tỉ lệ giữa các pha có thể khác ở layer thật |
 | Mô hình bộ nhớ ngoài (độ trễ burst, giới hạn băng thông) | **Tạm hoãn** theo quyết định ngày 2026-10-10 |
@@ -479,3 +506,5 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   (vô hại / tiềm ẩn / đáng ngờ), mục 9c ghi cách dùng. **RTL không đổi.**
 - Mục 6b: so sánh những gì đo được trên mô phỏng với khi chạy trên FPGA thật.
 - Mục 5.7: giải thích `SERIAL=1` và `SERIAL=0`. Mục 8: trạng thái chi tiết của Giai đoạn 0; việc thu hẹp khoảng cách mô phỏng/FPGA tạm hoãn.
+- **Việc 0.1 xong:** `profile_report --compare`, `tools/run_profile.py`, snapshot `doc/perf/baseline_2026-10-09/`,
+  10 unit test. Chạy lại toàn bộ 6 case so với baseline: chênh lệch 0, tức mô phỏng tất định (mục 6a).

@@ -4,15 +4,16 @@ Single convolution layers on the `OpenEye_FPGA` top level, measured with the
 cycle/DMA profiler (`rtl_test_utils.profile_dma_phases`, `OPENEYE_PROFILE=1`).
 Code: branch `dev` on top of upstream `c4bd562`. Raw numbers: `baseline_2026-10-09.csv`.
 
-## Reproduce
+## Reproduce and compare
+
+Raw profiles of this baseline: `baseline_2026-10-09/<case>.json`. Rerun all cases and compare in one command:
 
 ```sh
-source venv/bin/activate
-cd test/cocotb_fpga
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest test_profile.py -q -p no:cacheprovider
-cd ../..
-python -m open_eye.profile_report test/.temp/*test_profile*/profile.json
+venv/bin/python tools/run_profile.py --compare doc/perf/baseline_2026-10-09
 ```
+
+Rerunning the unchanged RTL reproduces every number exactly (checked 2026-10-10: 0 change in all
+6 cases), so any difference in a comparison comes from a code change.
 
 All cases pass the testbench result check. Common setup: `Convolution_Single`, 3x3
 kernel, 4 input channels, ramp activations, `CLUSTER_ROWS=2`, `CLUSTER_COLUMNS=2`,
