@@ -183,6 +183,23 @@ Nguyên nhân nằm ở cách RTL lưu bảng lượng tử:
 Trên FPGA thật, cách lưu này cũng tốn **khoảng 41.000 flip-flop**. Nếu lưu bảng trong BRAM và chỉ nạp `F` entry
 thì vừa tiết kiệm tài nguyên, vừa giảm DMA, vừa giúp simulation nhanh hơn. Đây là một ứng viên tối ưu.
 
+### 5.7 SERIAL=1 và SERIAL=0
+
+`SERIAL` là tham số phần cứng chọn **cách dữ liệu đi vào và đi ra mảng tính toán** (`OpenEye_Parallel.v`, `GLB_cluster.v`, `PE.v`).
+
+| | `SERIAL=1` (đang dùng) | `SERIAL=0` (chế độ song song) |
+|---|---|---|
+| Ai dùng | `OpenEye_FPGA.v` (mặc định `SERIAL=1`), toàn bộ luồng FPGA và các test `test/cocotb_fpga` | `OpenEye_Parallel.v` khi đứng một mình làm top-level (mặc định `SERIAL=0`), testbench `test/cocotb_parallel` |
+| Dữ liệu vào | **Một luồng DMA** vào `OpenEye_FPGA`, được đệm ở buffer trung tâm (iact/weight/psum buffer), rồi phân phối qua router | **Nhiều cổng song song rộng**, mỗi GLB của mỗi cluster một cổng, do một bộ điều khiển bên ngoài cấp |
+| Global buffer (GLB) trong cluster | **Không có RAM**, chỉ là đường dẫn thẳng | **Có RAM riêng** (iact GLB, psum GLB), truy cập độc lập và đồng thời, kiểu chip Eyeriss v2 |
+| Đầu ra psum của PE (`PE.v:820`) | Qua adder tree | Đường kết hợp khác (đây là chỗ có warning SELRANGE) |
+| Tình trạng | Chạy được (test FPGA pass ở các cấu hình hỗ trợ) | **Chưa hoàn thiện**: bộ sinh địa chỉ GLB chưa tồn tại (comment ở `OpenEye_Parallel.v:790`); testbench `cocotb_parallel` đã cũ và fail (`doc/test_status_handover.md` mục 4.3) |
+
+- **Khi nào dùng `SERIAL=0`:** khi `OpenEye_Parallel` được dùng làm lõi tính toán độc lập, ví dụ trong ASIC hoặc một hệ thống
+  tự cấp dữ liệu song song cho từng cluster. Hiện **không có luồng nào chạy được ở chế độ này**.
+- **Liên quan tới hướng nghiên cứu:** `SERIAL=0` giữ dữ liệu trong GLB của từng cluster, tức tái sử dụng dữ liệu trên chip nhiều hơn
+  và giảm lưu lượng DMA. Về lâu dài đây có thể là một hướng kiến trúc, nhưng phải hoàn thiện phần RTL còn thiếu. Đây là việc lớn, không thuộc trước mắt.
+
 ## 6. Profiler (`profile_dma_phases`): cách dùng và phạm vi
 
 **Hoạt động:** coroutine cocotb lấy mẫu **mỗi cạnh lên của clock**. Với mỗi chu kỳ, nó xác định pha (mục 5.1) và đếm:
@@ -269,10 +286,23 @@ Phần nằm giữa (`OpenEye_FPGA` và toàn bộ RTL bên trong) **là cùng m
 
 | Giai đoạn | Nội dung | Trạng thái |
 |---|---|---|
-| 0. Đo lường | Profiler chu kỳ/DMA, công cụ báo cáo, baseline | **Xong** (còn thiếu mô hình bộ nhớ ngoài: độ trễ và burst) |
+| 0. Đo lường | Profiler chu kỳ/DMA, công cụ báo cáo, baseline | **Phần lõi xong**; còn 3 việc nên làm trước Giai đoạn 1 (xem bên dưới) |
 | 1. Giảm lưu lượng DMA | Bias theo filter, đóng gói weight, bảng quant theo F hoặc lưu BRAM, readout INT8 | Chưa làm. Đề xuất bắt đầu với bias |
 | 2. Che độ trễ | Double-buffering (`BRANCHES=2`): nạp lượt sau trong lúc lượt hiện tại tính toán | Chưa làm (cần sửa lỗi chọn nửa buffer iact trước) |
 | 3. Mô hình và DSE | Mô hình Python dự đoán chu kỳ và byte, roofline, quét cấu hình | Chưa làm |
+
+**Giai đoạn 0: trạng thái chi tiết** (cập nhật 2026-10-10)
+
+| Việc | Trạng thái |
+|---|---|
+| Profiler chu kỳ và beat DMA theo pha (`profile_dma_phases`) | Xong |
+| Công cụ báo cáo + hiệu suất bus (`profile_report`) | Xong (chỉ cho `Convolution_Single`) |
+| Baseline 6 cấu hình Conv đơn (`doc/perf/baseline.md`) | Xong |
+| CI lint theo baseline | Xong |
+| **0.1 So sánh trước/sau**: `profile_report` đọc 2 bộ profile (baseline và bản đã sửa), in bảng chênh lệch theo từng pha; kèm script chạy lại toàn bộ baseline bằng một lệnh | **Chưa.** Bắt buộc để đánh giá mọi thay đổi ở Giai đoạn 1 |
+| **0.2 Mở rộng phạm vi đo**: payload/hiệu suất cho layer Dense (FC) và cho lượt 2 layer (pha `writeback`), tách số liệu theo từng layer (đã có `layer_starts` nhưng báo cáo chưa dùng) | **Chưa.** Bias, bảng quant và readout INT8 đều ảnh hưởng tới Dense và write-back giữa các layer |
+| **0.3 Cấu hình gần thực tế hơn**: layer lớn hơn trong giới hạn RTL đang chạy đúng (2 hoặc 4 channel, có thể 8/16 nếu chạy được, `NUM_GLB_IACT=1`), ví dụ cỡ Conv2/Conv3 của MNIST (14×14, 7×7) | **Chưa.** Baseline hiện chỉ có layer rất nhỏ (tối đa 32×3), nên tỉ lệ giữa các pha có thể khác ở layer thật |
+| Mô hình bộ nhớ ngoài (độ trễ burst, giới hạn băng thông) | **Tạm hoãn** theo quyết định ngày 2026-10-10 |
 
 ## 9. Các lỗi upstream đã biết (ảnh hưởng tới việc đo)
 
@@ -448,3 +478,4 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   `.github/workflows/lint.yml`. Thêm mục tiêu lint `fpga` (`OpenEye_FPGA.v`, `SERIAL=1`). Mục 9b ghi chi tiết từng warning
   (vô hại / tiềm ẩn / đáng ngờ), mục 9c ghi cách dùng. **RTL không đổi.**
 - Mục 6b: so sánh những gì đo được trên mô phỏng với khi chạy trên FPGA thật.
+- Mục 5.7: giải thích `SERIAL=1` và `SERIAL=0`. Mục 8: trạng thái chi tiết của Giai đoạn 0; việc thu hẹp khoảng cách mô phỏng/FPGA tạm hoãn.
