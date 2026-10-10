@@ -1075,6 +1075,46 @@ async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
         last_phase = phase
 
 
+async def trace_dma_input(ptp, dut, path="dma_in_trace.csv"):
+    """Log every DMA input word the DUT takes, and every main-FSM transition (opt-in: OPENEYE_TRACE_DMA=1).
+
+    A word counts as taken when enable_dma_i_reg and ready_dma_o are high at
+    a rising edge, the condition OpenEye_FPGA.v itself uses. Rows (CSV):
+      word,<cycle>,<main state>,<index>,<data>          one per taken word
+      state,<cycle>,<old>-><new>,<enable_dma_i_reg>,<ready_dma_o>,<fsm_psum_cycle>
+    where the last three are the values at the edge that made the transition.
+    The file is flushed after each row so a hanging test leaves a usable trace.
+    Compare the word column with demo/layer_*/dma_stream_input.txt to check
+    that the DUT received exactly the stream the testbench generated.
+    """
+    def val(sig):
+        try:
+            return int(sig.value)
+        except ValueError:
+            return -1
+
+    psum_cycle = dut.psum_pipeline_inst.fsm_psum_cycle
+    cycle = index = 0
+    last_state = None
+    with open(path, "w") as f:
+        while True:
+            await RisingEdge(dut.clk_i)
+            state = val(dut.fsm_current_state)
+            enable, ready = val(dut.enable_dma_i_reg), val(dut.ready_dma_o)
+            if enable == 1 and ready == 1:
+                f.write(f"word,{cycle},{state},{index},{val(dut.data_dma_i_reg)}\n")
+                index += 1
+            # fsm_current_state read at this edge is the value before the
+            # update, so a transition shows up one edge later: report the
+            # signals of the previous edge, which caused it.
+            if last_state is not None and state != last_state:
+                f.write(f"state,{cycle - 1},{last_state}->{state},{prev[0]},{prev[1]},{prev[2]}\n")
+            prev = (enable, ready, val(psum_cycle))
+            last_state = state
+            cycle += 1
+            f.flush()
+
+
 async def probe_fsm_states(ptp, dut, stall_report_after=20000, oep=None):
     """Record every main-FSM state the DUT enters (opt-in diagnostic).
 

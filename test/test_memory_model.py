@@ -105,3 +105,16 @@ def test_from_env():
     assert cfg.burst_beats == 8 and cfg.latency == 0 and cfg.name == "custom+burst_beats"
     with pytest.raises(ValueError):
         MemoryConfig.from_env(environ={"OPENEYE_MEM": "nonsense"})
+
+
+def test_gap_before_inserts_exactly_one_idle_cycle():
+    cfg = MemoryConfig(gap_before=[3, 7])
+    ch = ReadChannel(cfg, 10)
+    pattern = []
+    while ch.sent < 10:
+        avail = ch.word_available()
+        pattern.append(int(avail))
+        ch.end_cycle(avail)
+    assert pattern == [1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1]
+    cfg = MemoryConfig.from_env(environ={"OPENEYE_MEM_GAP_BEFORE": "173,200"})
+    assert cfg.gap_before == (173, 200) and cfg.latency == 0

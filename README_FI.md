@@ -337,6 +337,7 @@ Chạy thử với `-k tên_case`; nếu PASS thì thêm vào snapshot bằng `-
 | `No FSM progress for N cycles` ở một pha nạp (ví dụ `(4, 0, 0)` = `GET_WGHT`) với layer lớn | **Báo động giả**: bộ phát hiện treo không coi việc nhận từng word trong `GET_*` là tiến triển. Một pha nạp dài hơn N chu kỳ (ví dụ 3840 word weight × 1,44 chu kỳ với `typical`) sẽ bị coi là treo | Đừng đặt `OPENEYE_FAIL_ON_STALL` nhỏ hơn số word lớn nhất của một pha nhân hệ số chậm của bộ nhớ; mặc định 100000 là an toàn |
 | `warning: ... passed but wrote no profile.json` | `OPENEYE_PROFILE` không tới được simulation | Chạy qua `tools/run_profile.py` hoặc `test_profile.py` (cả hai đều tự đặt biến này) |
 | Mọi thứ chậm bất thường | Case `QUANT_AMOUNT=1024` (mục 5.6), hoặc chạy quá nhiều job song song | `-k q32`, giảm `--jobs` |
+| Nghi ngờ DUT nhận sai dữ liệu (thừa, thiếu, lệch thứ tự) | — | Chạy với `OPENEYE_TRACE_DMA=1`, rồi `python3 tools/check_dma_trace.py test/.temp/<thư mục case>` |
 | Số liệu lạ | Đọc nhầm `profile.json` cũ | `run_profile.py` luôn xoá file cũ trước khi chạy; nếu chạy pytest trực tiếp thì tự xoá |
 
 ### 6.10 Profiler hoạt động thế nào
@@ -396,6 +397,7 @@ Mô hình bộ nhớ thay phía host bằng một mô hình đơn giản của *
 | `src/open_eye/memory_model.py` | `MemoryConfig` (tham số và preset), `ReadChannel` (MM2S: DDR → bộ tăng tốc), `WriteChannel` (S2MM: bộ tăng tốc → DDR) |
 | `rtl_test_utils.send_words_through_memory` | Driver mới: gửi **toàn bộ stream của một layer như một lần truyền DMA**, theo đúng handshake AXI-Stream |
 | `rtl_test_utils.compare_stream_Conv` | Phía đọc kết quả: `ready_dma_i` do `WriteChannel` quyết định (chỉ với layer Conv) |
+| `rtl_test_utils.trace_dma_input` + `tools/check_dma_trace.py` | `OPENEYE_TRACE_DMA=1`: ghi mọi word DUT nhận và mọi lần đổi trạng thái vào `dma_in_trace.csv`; script so với stream testbench sinh ra |
 | `profile_dma_phases` | Thêm đếm `in_stall`/`out_stall` (cột `mem stall` trong báo cáo) và ghi cấu hình bộ nhớ vào `profile.json` (`config.MEMORY`) |
 | `test/test_memory_model.py` | 15 unit test so với công thức tính tay |
 
@@ -420,6 +422,9 @@ Mỗi burst giữ một "slot" cho tới khi có phản hồi ghi (`latency` chu
 | `setup` (chu kỳ, mỗi lần truyền) | `OPENEYE_MEM_SETUP` | 0 | 0 | 0 |
 | `jitter` | `OPENEYE_MEM_JITTER` | 0 | 0 | 10 |
 | `seed` | `OPENEYE_MEM_SEED` | 0 | 0 | 0 |
+| `gap_before` (vị trí word, ví dụ `173,200`) | `OPENEYE_MEM_GAP_BEFORE` | – | – | – |
+
+`gap_before` chèn **đúng 1 chu kỳ trống** trước các word chỉ định, dùng cho thí nghiệm có mục tiêu (ví dụ kiểm chứng lỗi `GET_BIAS`).
 
 Chọn preset bằng `OPENEYE_MEM=<preset>` (hoặc `run_profile.py --mem`), đổi từng tham số bằng `OPENEYE_MEM_*` (`--mem-set`).
 **Không đặt biến nào thì testbench chạy driver cũ** (để mọi test có sẵn không bị ảnh hưởng).
@@ -511,16 +516,41 @@ từng word** (`bandwidth=0.5`, hoặc burst 1 word) thì FAIL. `profile.json` (
 - `NUM_GLB_IACT=3` sai với mọi số channel đã thử.
 - MNIST Conv1 có 1 channel vào, nên chưa chạy được trên RTL hiện tại.
 
-**Lỗi `GET_BIAS` khi dữ liệu DMA tới không liên tục** (tìm ra ngày 2026-10-10 bằng mô hình bộ nhớ, **chưa sửa**):
-- `hdl/OpenEye_FPGA.v:1974`: trạng thái `GET_BIAS` chuyển sang `GET_QUANTIZE` khi `fsm_psum_cycle == trans_cycles_psum - 1`
-  **mà không kiểm tra `enable_dma_i_reg`**, tức không kiểm tra word bias cuối cùng đã thực sự tới hay chưa. Các trạng thái
-  `GET_IACT`, `GET_WGHT` và `GET_QUANTIZE` đều có kiểm tra này.
-- Hậu quả: nếu đúng chu kỳ đó không có dữ liệu (`valid = 0`), word bias cuối bị mất, word đó bị hiểu là word đầu của bảng
-  lượng tử, mọi thứ lệch 1 word, và FSM treo ở `PSUM_SEND_RESULTS`.
-- Với bộ nhớ lý tưởng (testbench cũ) lỗi không bao giờ xảy ra. Trên FPGA thật, AXI DMA có thể tạo khoảng trống bất kỳ lúc nào,
-  nên lỗi có thể **xảy ra lúc có lúc không**.
+**Lỗi `GET_BIAS` khi dữ liệu DMA tới không liên tục** (tìm ra và kiểm chứng ngày 2026-10-10, **chưa sửa RTL**):
+- `hdl/OpenEye_FPGA.v:1974`: `GET_BIAS` chuyển sang `GET_QUANTIZE` khi `fsm_psum_cycle == trans_cycles_psum - 1`,
+  **không kiểm tra `enable_dma_i_reg`**. Các trạng thái nạp khác thì có kiểm tra.
+- Hậu quả: nếu đúng chu kỳ đó không có word hợp lệ, word bias cuối không được nhận, bị `GET_QUANTIZE` coi là word đầu của bảng
+  lượng tử, toàn bộ dữ liệu sau lệch 1 word, FSM treo. `fsm_psum_cycle` còn kẹt ở N−1, ảnh hưởng tới layer sau.
+
+**Kiểm chứng: lỗi do *thời điểm*, không do dữ liệu** (case `8x1_f4_q32`, stream 194 word: status 0–17, iact 18–21, weight 22–141,
+bias 142–173, quant 174–193). Công cụ: `OPENEYE_TRACE_DMA=1` (ghi mọi word DUT nhận và mọi lần đổi trạng thái) và
+`tools/check_dma_trace.py` (so với `dma_stream_input.txt` do testbench sinh ra).
+
+| Kịch bản | Kết quả | Word DUT nhận | Lúc `GET_BIAS` → `GET_QUANTIZE` |
+|---|---|---|---|
+| Driver cũ (testbench gốc) | PASS | 194/194, đúng nội dung và thứ tự | `enable_reg=1` |
+| Driver mới, bộ nhớ lý tưởng | PASS | 194/194, đúng | `enable_reg=1` |
+| Chèn **1 chu kỳ trống trước word 173** (bias cuối) | **FAIL** | 193/194, **đúng nội dung và thứ tự**, chỉ thiếu word cuối | **`enable_reg=0`**, `fsm_psum_cycle=31` |
+| 1 chu kỳ trống trước word 172 (bias áp chót) | PASS | 194/194 | `enable_reg=1` |
+| 1 chu kỳ trống trước word 142 (bias đầu), 174 (quant đầu), 193 (quant cuối) | PASS | 194/194 | `enable_reg=1` |
+| 1 chu kỳ trống trước word cuối của `GET_PARAMETERS` (14), `GET_ROUTER_CONFIG` (17), `GET_IACT` (21), `GET_WGHT` (141) | PASS | 194/194 | `enable_reg=1` |
+| `typical` (khoảng trống giữa các burst) | PASS | 194/194 | `enable_reg=1` |
+| `typical` + `bandwidth=0.5` (cứ 1 word nghỉ 1 chu kỳ) | FAIL | 193/194, đúng thứ tự | **`enable_reg=0`** |
+
+Kết luận:
+1. **Dữ liệu không thừa, không lệch thứ tự**: ở mọi kịch bản, DUT nhận đúng chuỗi testbench sinh ra (cùng nội dung, cùng thứ tự);
+   số word bias gửi (32) khớp với số DUT mong đợi (`trans_cycles_psum` = 32).
+2. Cùng một dữ liệu, chỉ thêm **đúng 1 chu kỳ trống ở đúng 1 vị trí** (trước word bias cuối) là đủ làm hỏng; dời khoảng trống
+   đi 1 word về trước hoặc về sau là PASS. Trong 6 trạng thái nạp, chỉ `GET_BIAS` có điểm yếu này.
+3. **Không phải tối ưu hiệu năng.** Khi dữ liệu tới liên tục, tại chu kỳ chuyển trạng thái `enable_dma_i_reg` luôn bằng 1
+   (dòng 1–2 của bảng), nên thêm điều kiện `& enable_dma_i_reg` **không làm chậm đi chu kỳ nào**. Nó chỉ thay đổi hành vi khi có
+   khoảng trống, mà khi đó hành vi hiện tại là sai. Cái giá duy nhất là 1 cổng AND trong logic chuyển trạng thái; các trạng thái khác đều đã có.
+4. Thiết kế hiện tại dựa vào giả định "dữ liệu tới liên tục mỗi chu kỳ" (comment trong `psum_pipeline.v` ghi "fixed lockstep schedule,
+   no flow control"). AXI4-Stream cho phép `tvalid` thấp ở bất kỳ chu kỳ nào, và AXI DMA không đảm bảo dữ liệu liên tục khi DDR hoặc
+   interconnect chậm, nên trên FPGA thật lỗi có thể xảy ra **lúc có lúc không**.
 - Đề xuất sửa (1 dòng, **chờ đồng ý**): `if ((fsm_psum_cycle == trans_cycles_psum - 1) & enable_dma_i_reg) begin`.
-  Sau khi sửa cần chạy lại `--mem slow` và toàn bộ test Conv để kiểm chứng.
+  Kiểm chứng sau khi sửa: kịch bản "trước word 173" và `--mem slow` phải PASS; baseline 9 case phải **không đổi chu kỳ nào**
+  (chứng minh không mất hiệu năng); toàn bộ test Conv; lint baseline.
 
 **Khác:**
 - `CLUSTER_ROWS=1`: có cấu hình bị treo FSM (theo `doc/test_status_handover.md`).
@@ -690,3 +720,7 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   `ideal` cho kết quả giống hệt baseline; `typical` chậm thêm 8–22 %; `slow` làm lộ **lỗi RTL `GET_BIAS`** (mục 9, chưa sửa).
 - Profiler: ghi `pending` (số liệu chưa chốt) và ghi file định kỳ mỗi 1024 chu kỳ để chẩn đoán test bị treo.
 - README: mục 6 viết lại thành hướng dẫn chạy chi tiết; thêm mục 6c (mô hình bộ nhớ).
+- **Kiểm chứng lỗi `GET_BIAS`** (theo yêu cầu: có phải do dữ liệu DMA thừa hoặc lệch thứ tự?): thêm `OPENEYE_TRACE_DMA`
+  (`trace_dma_input`), `tools/check_dma_trace.py`, tham số `gap_before` của mô hình bộ nhớ. 13 kịch bản: dữ liệu luôn đúng số lượng và
+  thứ tự; chỉ 1 chu kỳ trống đúng trước word bias cuối là FAIL. Không phải tối ưu hiệu năng (không tốn chu kỳ nào khi dữ liệu liên tục).
+  Chi tiết mục 9. **RTL vẫn chưa sửa**, chờ đồng ý.

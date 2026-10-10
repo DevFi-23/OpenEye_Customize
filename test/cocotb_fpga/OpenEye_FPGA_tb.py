@@ -234,6 +234,8 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
         # reset the DUT
         await cocotb.start_soon(rtl_test_utils.reset_all_signals(ptp, dut, openeye_parameter.SERIAL))
 
+    if os.environ.get("OPENEYE_TRACE_DMA") and only_files == 0:
+        cocotb.start_soon(rtl_test_utils.trace_dma_input(ptp, dut))
     if os.environ.get("OPENEYE_PROFILE") and only_files == 0:
         cocotb.start_soon(rtl_test_utils.profile_dma_phases(ptp, dut, openeye_parameter))
     if os.environ.get("OPENEYE_PROBE_FSM"):

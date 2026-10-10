@@ -22,6 +22,10 @@ a configurable memory:
   jitter       random extra latency 0..jitter per burst (seeded, so a run
                is reproducible)
   boundary     bytes; a burst never crosses a multiple of it (AXI: 4 KB)
+  gap_before   word indices (0-based, within the transfer) before which the
+               read channel inserts exactly one cycle without data, on top of
+               everything else; for targeted experiments (OPENEYE_MEM_GAP_BEFORE=
+               "173,200")
 
 The defaults (latency 0, one word per cycle, no setup) are the ideal memory
 the testbench assumed before. Configuration comes from environment variables
@@ -53,13 +57,14 @@ ENV_KEYS = {
     "setup": "OPENEYE_MEM_SETUP",
     "jitter": "OPENEYE_MEM_JITTER",
     "seed": "OPENEYE_MEM_SEED",
+    "gap_before": "OPENEYE_MEM_GAP_BEFORE",
 }
 
 
 class MemoryConfig:
     def __init__(self, latency=0, burst_beats=256, outstanding=64, bandwidth=1.0,
                  fifo_beats=1 << 20, setup=0, jitter=0, seed=0, boundary=4096,
-                 beat_bytes=8, name="custom"):
+                 beat_bytes=8, name="custom", gap_before=()):
         if burst_beats < 1 or outstanding < 1 or fifo_beats < 1:
             raise ValueError("burst_beats, outstanding and fifo_beats must be >= 1")
         if not 0 < bandwidth <= 1:
@@ -75,10 +80,12 @@ class MemoryConfig:
         self.boundary = int(boundary)
         self.beat_bytes = int(beat_bytes)
         self.name = name
+        self.gap_before = tuple(int(i) for i in gap_before)
 
     def as_dict(self):
         return {k: getattr(self, k) for k in ("name", "latency", "burst_beats", "outstanding",
-                                              "bandwidth", "fifo_beats", "setup", "jitter", "seed")}
+                                              "bandwidth", "fifo_beats", "setup", "jitter", "seed",
+                                              "gap_before")}
 
     @classmethod
     def from_env(cls, beat_bytes=8, environ=None):
@@ -96,7 +103,10 @@ class MemoryConfig:
             raise ValueError(f"OPENEYE_MEM={preset!r}; known presets: {sorted(PRESETS)}")
         params = dict(PRESETS[preset or "ideal"])
         for key, value in overrides.items():
-            params[key] = float(value) if key == "bandwidth" else int(value)
+            if key == "gap_before":
+                params[key] = [int(i) for i in value.split(",") if i.strip()]
+            else:
+                params[key] = float(value) if key == "bandwidth" else int(value)
         name = (preset or "custom") + ("+" + ",".join(sorted(overrides)) if overrides else "")
         return cls(beat_bytes=beat_bytes, name=name, **params)
 
@@ -135,6 +145,8 @@ class ReadChannel:
         self.tokens = 0.0
         self.cycle = 0
         self.stall_cycles = 0     # cycles where the host had no word to drive
+        self.sent = 0             # words accepted so far
+        self.gaps = set(config.gap_before)
         self._deliver()
 
     def _deliver(self):
@@ -157,15 +169,18 @@ class ReadChannel:
                 self.inflight.pop(0)
 
     def word_available(self):
-        return self.fifo > 0
+        return self.fifo > 0 and self.sent not in self.gaps
 
     def end_cycle(self, accepted):
         if accepted:
             if self.fifo <= 0:
                 raise RuntimeError("word accepted while the read FIFO was empty")
             self.fifo -= 1
-        elif self.fifo == 0:
-            self.stall_cycles += 1
+            self.sent += 1
+        else:
+            if self.fifo == 0 or self.sent in self.gaps:
+                self.stall_cycles += 1
+            self.gaps.discard(self.sent)   # a requested gap lasts one cycle
         self.cycle += 1
         self._deliver()
 
