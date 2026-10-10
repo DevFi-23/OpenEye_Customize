@@ -1,0 +1,390 @@
+# Verilator 5.020 lint baseline. count<TAB>code | file | message
+# Regenerate with: python3 tools/lint_check.py --update
+4	BLKANDNBLK | hdl/psum_pipeline.v | Unsupported: Blocked and non-blocking assignments to same variable: 'OpenEye_FPGA.psum_pipeline_inst.results_ready'
+10	BLKSEQ | hdl/OpenEye_FPGA.v | Blocking assignment '=' in sequential logic process
+3	BLKSEQ | hdl/psum_pipeline.v | Blocking assignment '=' in sequential logic process
+1	EOFNEWLINE | hdl/quantization_unit.v | Missing newline at end of file (POSIX 3.206).
+1	EOFNEWLINE | hdl/ring_buffer_pipelined.v | Missing newline at end of file (POSIX 3.206).
+1	EOFNEWLINE | hdl/router_configurator.v | Missing newline at end of file (POSIX 3.206).
+1	GENUNNAMED | hdl/iact_stream_constructor.v | Unnamed generate block 'genblk1' (IEEE 1800-2017 27.6)
+1	PINCONNECTEMPTY | hdl/OpenEye_FPGA.v | Cell pin connected by name with empty reference: 'valid_o'
+2	PINMISSING | hdl/GLB_cluster.v | Cell has missing pin: 'wr_mask_i'
+1	PINMISSING | hdl/OpenEye_FPGA.v | Cell has missing pin: 'wr_mask_i'
+1	REALCVT | hdl/OpenEye_FPGA.v | Implicit conversion of real to integer
+1	UNDRIVEN | hdl/GLB_cluster.v | Signal is not driven: 'router_cluster_iact_enable_o_delay_1'
+1	UNDRIVEN | hdl/GLB_cluster.v | Signal is not driven: 'router_cluster_psum_enable_o_delay_1'
+1	UNOPTFLAT | hdl/PE.v | Signal unoptimizable: Circular combinational logic: 'OpenEye_FPGA.OpenEye_Parallel.gen_x[0].gen_y[1].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_spad_oh_acc'
+1	UNOPTFLAT | hdl/data_pipeline_wght.v | Signal unoptimizable: Circular combinational logic: 'OpenEye_FPGA.OpenEye_Parallel.gen_x[0].gen_y[1].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler.overhead_temp'
+1	UNUSEDGENVAR | hdl/iact_stream_constructor.v | Genvar is not used: 'b_gen'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'ADDR_IACT_BITWIDTH'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'ADDR_WGHT_BITWIDTH'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'BITWIDTH_IACT'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'BRANCHES_WIDTH'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'CALCULATE_PSUM'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'FINAL_DATA_IACT_BITWIDTH'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'IACT_FSM_CYCL_WORDS'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'IACT_MEM_ADDR_BITS'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'IS_TOPLEVEL'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'PSUM_CELL_INPUT_WIDTH'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'PSUM_GET_RESULTS'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'PSUM_MEM_ADDR_BITS'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'PSUM_ONE_WORD_ALL_RAM'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'PSUM_SEND_RESULTS'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'PSUM_TO_IACT_CYCLES'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'TEMP_BITS_PSUM_TO_IACT'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'WAIT_TO_SEND_READY_SIGNAL'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'WGHT_FSM_CYCL_WORDS'
+1	UNUSEDPARAM | hdl/OpenEye_FPGA.v | Parameter is not used: 'WORDS_PER_CYCLE'
+1	UNUSEDPARAM | hdl/iact_stream_constructor.v | Parameter is not used: 'CLUSTERS'
+1	UNUSEDPARAM | hdl/iact_stream_constructor.v | Parameter is not used: 'CLUSTER_ROW_ID'
+1	UNUSEDPARAM | hdl/iact_stream_constructor.v | Parameter is not used: 'IACT_WORDS_IN_RAM'
+1	UNUSEDPARAM | hdl/iact_stream_constructor.v | Parameter is not used: 'PARAM_EXTENDING'
+1	UNUSEDPARAM | hdl/iact_stream_constructor.v | Parameter is not used: 'RAM_CELLS'
+1	UNUSEDPARAM | hdl/psum_pipeline.v | Parameter is not used: 'DATA_PSUM_BITWIDTH'
+1	UNUSEDPARAM | hdl/psum_pipeline.v | Parameter is not used: 'PSUM_CYCLES_ONE_WORD_ALL_CELLS'
+1	UNUSEDPARAM | hdl/psum_pipeline.v | Parameter is not used: 'PSUM_PER_PE'
+1	UNUSEDPARAM | hdl/router_configurator.v | Parameter is not used: 'FSM_CEIL_PSUM_RTR_CCLS'
+1	UNUSEDPARAM | hdl/router_configurator.v | Parameter is not used: 'PSUM_CHOOSE_REP_2'
+1	UNUSEDPARAM | hdl/router_configurator.v | Parameter is not used: 'PSUM_CHOOSE_REP_4'
+1	UNUSEDSIGNAL | <generated>/dma_storage.v | Bits of signal are not used: 'pipe_chain_reg'[895:883]
+1	UNUSEDSIGNAL | hdl/GLB_cluster.v | Signal is not used: 'data_write_enable_i'
+1	UNUSEDSIGNAL | hdl/GLB_cluster.v | Signal is not used: 'data_write_enable_iact_i'
+1	UNUSEDSIGNAL | hdl/GLB_cluster.v | Signal is not used: 'ext_mem_iact_addr_i'
+1	UNUSEDSIGNAL | hdl/GLB_cluster.v | Signal is not used: 'ext_mem_psum_addr_i'
+1	UNUSEDSIGNAL | hdl/GLB_cluster.v | Signal is not used: 'router_cluster_iact_enable_o_delay_2'
+1	UNUSEDSIGNAL | hdl/GLB_cluster.v | Signal is not used: 'router_cluster_psum_enable_o_delay_2'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Bits of signal are not used: 'iact_out_reg'[1151:256]
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Bits of signal are not used: 'kernel_per_pe_cluster_reg'[3:2]
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'buffer_r_en_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'cc'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'cr'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'data_dma_o_counter'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'data_dma_o_q1'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'data_dma_o_q2'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'debug_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'finished_cycles_psum'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'fsm_psum_r'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'fsm_psum_r_q'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'fsm_psum_row_offset'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'fsm_x_cl_psum'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'fsm_x_cl_psum_q1'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'fsm_x_cl_psum_q2'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'fsm_x_cl_psum_q3'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'fsm_y_cl_psum'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'fsm_y_cl_psum_offset'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'fsm_y_cl_psum_q1'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'fsm_y_cl_psum_q2'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'fsm_y_cl_psum_q3'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'g'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'iact_channel_counter_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'iact_choose_i'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'iact_converter_mem_off_1_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'iact_converter_mem_off_2_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'iact_converter_mem_off_3_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'iact_converter_n_1_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'iact_converter_n_2_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'iact_converter_n_3_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'iact_data_i_wire'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'iact_enable_i_wire'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'iact_ready_o_wire'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'line'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'pcb_1'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'pcb_2'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'pcb_3'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'pcb_inc_1'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'pcb_inc_2'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'pcb_inc_3'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_buffer_addr_storage'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_buffer_0'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_buffer_1'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_buffer_2'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_buffer_3'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_buffer_4'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_inc_0'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_inc_1'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_inc_2'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_inc_3'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_inc_4'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_limit_0'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_limit_1'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_limit_2'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_limit_3'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'psum_cycle_limit_4'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'results_ready'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'sending_cluster_rows'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'storage_cycles'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not driven, nor used: 'write_dma_addr'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'buffer_addr_lower_limit'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'buffer_addr_upper_limit'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'buffer_cycles_for_x_iact'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'buffer_select'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'current_filter'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'exp_out_trace'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'fifo_data_i'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'fifo_read_i'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'fifo_write_i'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'first_cycle'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'fsm_iact_r'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'fsm_psum_last_state'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'fsm_wght_r'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'fsm_x_cl'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'fsm_y_cl'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'iact_channels_counter_psum_router'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'iact_converter_buffer_addr_cycles'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'iact_converter_buffer_addr_max_cycles'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'iact_needed_cycles'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'iact_ready'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'limit_increase'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'limit_increase_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'lower_bound'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'mant_out_trace'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'needed_iact_buffer_words'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'offset_out_trace'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'overhang'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'overhang_counter'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'overhang_delay'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'pooling_stage_1_trace'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'pooling_stage_2_trace'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'pooling_stage_3_trace'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'pooling_stage_4'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'pooling_stage_out_trace'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'prepared_iact'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'psum_cnt'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'psum_data_i_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'psum_router_set_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'quantized_out_trace'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'router_mode_iact_storage'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'select_ram_offset'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'skipWght_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'start_new_cycle'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'storage_cycles_router'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'upper_bound'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'wght_buffer_rd_addr_storage'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'wght_cycles_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_FPGA.v | Signal is not used: 'x_lines_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_Parallel.v | Signal is not used: 'af_cluster_mode_i_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_Parallel.v | Signal is not used: 'bano_cluster_mode_i_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_Parallel.v | Signal is not used: 'compute_i_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_Parallel.v | Signal is not used: 'compute_mask_i_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_Parallel.v | Signal is not used: 'data_mode_i_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_Parallel.v | Signal is not used: 'gemm_mode_i_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_Parallel.v | Signal is not used: 'iact_data_i_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_Parallel.v | Signal is not used: 'iact_enable_i_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_Parallel.v | Signal is not used: 'kernel_per_pe_cluster_i_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_Parallel.v | Signal is not used: 'router_mode_iact_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_Parallel.v | Signal is not used: 'router_mode_psum_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_Parallel.v | Signal is not used: 'wght_data_i_reg'
+1	UNUSEDSIGNAL | hdl/OpenEye_Parallel.v | Signal is not used: 'wght_enable_i_reg'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Bits of signal are not used: 'params'[37:36,23:8]
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not driven, nor used: 'b'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'change_state'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'channels'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'fc_storage_valid_i'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'finished_y_lines'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'iact_channel_counter'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'kernel_y_counter'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'needed_iact_channel_cycles_i'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'needed_wght_cycles_i'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'needed_y_cls_i'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'padding_x'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'padding_y'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'pos'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'ram_wr_addr_q'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'rd_cycle_loop_cnt_4'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'rd_loop_limit_4'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'wght_counter'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'wght_size_y'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'wr_cycle_loop_cnt_2'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'wr_loop_limit_2'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'x_line_counter'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'x_lines_i'
+1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'y_lines_per_calc'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Bits of signal are not used: 'data_dma_i_reg'[63:40]
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Bits of signal are not used: 'psum_cycle_addr_0_next'[13:12]
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Bits of signal are not used: 'psum_cycle_addr_1_next'[13:12]
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Bits of signal are not used: 'psum_cycle_addr_2_next'[13:12]
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Bits of signal are not used: 'psum_cycle_addr_3_next'[13:12]
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Bits of signal are not used: 'psum_cycle_addr_4_next'[13:12]
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not driven, nor used: 'b_psum'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not driven, nor used: 'fsm_x_cl_psum_reg'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not driven, nor used: 'fsm_y_cl_psum_reg'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not driven, nor used: 'pre_quantized_value_flat'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not driven, nor used: 'psum_buffer_en_r_int'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not driven, nor used: 'psum_buffer_en_w_int'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not driven, nor used: 'psum_cycle_loop_cnt'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not driven, nor used: 'psum_cycle_loop_limit'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not driven, nor used: 'trans_idx'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'calc_filters_wght'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'fsm_psum_r_q'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'iact_channels_per_pe_next_layer'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'iact_size_x'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'iact_size_y'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'iact_x_line_repetitions'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'iteration_for_kernels'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'kernels_per_calc'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'psum_size_y'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'psum_x_all_cluster'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'psum_x_with_add_up'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'ready_dma_i_q2'
+1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'sending_cluster_rows'
+1	UNUSEDSIGNAL | hdl/quantization_unit.v | Signal is not driven, nor used: 'valid_s1'
+1	UNUSEDSIGNAL | hdl/quantization_unit.v | Signal is not used: 'valid_s2'
+1	UNUSEDSIGNAL | hdl/ring_buffer_pipelined.v | Signal is not used: 'valid_s1'
+1	VARHIDDEN | <generated>/parameters_FPGA.vh | Declaration of signal hides declaration in upper scope: 'DMA_BITWIDTH'
+1	VARHIDDEN | <generated>/parameters_FPGA.vh | Declaration of signal hides declaration in upper scope: 'TRANSMISSIONS'
+1	VARHIDDEN | hdl/psum_pipeline.v | Declaration of signal hides declaration in upper scope: 'DMA_BITWIDTH'
+1	VARHIDDEN | hdl/router_configurator.v | Declaration of signal hides declaration in upper scope: 'DMA_BITWIDTH'
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 12 bits on the LHS, but LHS's VARREF 'iact_converter_c' generates 8 bits.
+3	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 12 bits on the LHS, but LHS's VARREF 'iact_converter_x' generates 8 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 12 bits on the RHS, but RHS's VARREF 'iact_channels_per_pe' generates 4 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 12 bits on the RHS, but RHS's VARREF 'iact_x_per_cluster' generates 4 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 32 bits on the LHS, but LHS's VARREF 'iact_converter_cycles' generates 8 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 32 or 12 bits on the LHS, but LHS's VARREF 'fsm_iact_params' generates 8 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 32 or 12 bits on the LHS, but LHS's VARREF 'iact_converter_x' generates 8 bits.
+2	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 32 or 12 bits on the LHS, but LHS's VARREF 'iact_size_y' generates 8 bits.
+2	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 32 or 12 bits on the RHS, but RHS's VARREF 'padding_x' generates 4 bits.
+2	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 32 or 12 bits on the RHS, but RHS's VARREF 'padding_y' generates 4 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 32 or 14 bits on the LHS, but LHS's VARREF 'current_x' generates 12 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 32 or 16 bits on the LHS, but LHS's VARREF 'iact_channels_per_pe' generates 4 bits.
+2	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 8 bits on the RHS, but RHS's VARREF 'iact_channels_per_pe' generates 4 bits.
+2	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 192 bits on the Assign RHS, but Assign RHS's SEL generates 64 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 48 bits on the Assign RHS, but Assign RHS's SEL generates 16 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 48 bits on the Assign RHS, but Assign RHS's SEL generates 8 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 6 bits on the Assign RHS, but Assign RHS's VARREF 'fsm_row_offset' generates 5 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 8 bits on the Assign RHS, but Assign RHS's VARREF 'iact_x_per_cluster' generates 4 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ASSIGNW expects 25 bits on the Assign RHS, but Assign RHS's SEL generates 8 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator COND expects 11 bits on the Conditional False, but Conditional False's ARRAYSEL generates 10 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator COND expects 14 bits on the Conditional False, but Conditional False's VARREF 'iact_size_x' generates 12 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 12 bits on the LHS, but LHS's VARREF 'current_y' generates 8 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 20 bits on the RHS, but RHS's VARREF 'needed_cycles' generates 18 bits.
+2	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'current_buffer' generates 5 bits.
+2	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'iact_to_psum_storage_counter' generates 3 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'iact_to_psum_trans_counter' generates 4 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'relative_pos' generates 3 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'select_iact_glb_addr_inc' generates 2 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 32 bits on the RHS, but RHS's VARREF 'iact_glb_writing_cycles' generates 16 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 32 or 12 bits on the LHS, but LHS's VARREF 'iact_converter_cycles' generates 8 bits.
+5	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 32 or 8 bits on the LHS, but LHS's VARREF 'iact_channels_counter' generates 5 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator GTE expects 32 or 12 bits on the LHS, but LHS's VARREF 'iact_to_psum_x_pos_counter' generates 10 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator LT expects 12 bits on the LHS, but LHS's VARREF 'iact_to_psum_x_pos_counter' generates 10 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator LT expects 12 bits on the LHS, but LHS's VARREF 'iact_x_per_cluster' generates 4 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator LT expects 14 bits on the LHS, but LHS's VARREF 'current_x' generates 12 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator LTE expects 13 bits on the RHS, but RHS's VARREF 'wghts_per_pe' generates 12 bits.
+2	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator NEGATE expects 12 bits on the LHS, but LHS's VARREF 'padding_x' generates 4 bits.
+2	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator NEGATE expects 8 bits on the LHS, but LHS's VARREF 'padding_y' generates 4 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator SUB expects 32 bits on the LHS, but LHS's VARREF 'pagu_wght_limit' generates 10 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator SUB expects 32 bits on the LHS, but LHS's VARREF 'psum_size_x' generates 12 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator SUB expects 32 bits on the LHS, but LHS's VARREF 'trans_cycles_iact' generates 16 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator SUB expects 32 bits on the LHS, but LHS's VARREF 'trans_cycles_wght' generates 16 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator SUB expects 32 or 12 bits on the RHS, but RHS's VARREF 'stride_x' generates 3 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator SUB expects 32 or 12 bits on the RHS, but RHS's VARREF 'stride_y' generates 3 bits.
+3	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator SUB expects 32 or 20 bits on the LHS, but LHS's VARREF 'needed_cycles' generates 18 bits.
+2	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator SUB expects 32 or 8 bits on the LHS, but LHS's VARREF 'kernels_per_calc' generates 5 bits.
+1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator SUB expects 32 or 8 bits on the LHS, but LHS's VARREF 'y_lines_per_calc' generates 4 bits.
+1	WIDTHEXPAND | hdl/PE.v | Input port connection 'first_spad_max_i' expects 8 bits on the pin connection, but pin connection's VARREF 'filters_reg_M0' generates 6 bits.
+1	WIDTHEXPAND | hdl/PE.v | Operator ADD expects 32 or 6 bits on the LHS, but LHS's VARREF 'iact_oh_delay_1' generates 4 bits.
+1	WIDTHEXPAND | hdl/PE.v | Operator ASSIGNDLY expects 6 bits on the Assign RHS, but Assign RHS's VARREF 'iact_oh_delay_1' generates 4 bits.
+2	WIDTHEXPAND | hdl/PE.v | Operator SUB expects 32 or 6 bits on the LHS, but LHS's VARREF 'iact_data_spad_oh' generates 4 bits.
+1	WIDTHEXPAND | hdl/PE.v | Output port connection 'first_spad_words_o' expects 7 bits on the pin connection, but pin connection's VARREF 'first_spad_words_wght' generates 5 bits.
+1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator ADD expects 16 bits on the RHS, but RHS's ARRAYSEL generates 4 bits.
+1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator ADD expects 17 bits on the RHS, but RHS's SEL generates 4 bits.
+1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator ADD expects 17 bits on the RHS, but RHS's VARREF 'overhead_next_word' generates 4 bits.
+1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator ADD expects 32 or 17 bits on the LHS, but LHS's SEL generates 4 bits.
+1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator ADD expects 32 or 17 bits on the LHS, but LHS's VARREF 'filters_w' generates 7 bits.
+1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator ADD expects 32 or 17 bits on the RHS, but RHS's VARREF 'overhead_next_word' generates 4 bits.
+3	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator ADD expects 32 or 17 bits on the RHS, but RHS's VARREF 'overhead_w' generates 4 bits.
+1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator ADD expects 32 or 8 bits on the RHS, but RHS's VARREF 'overhead_w' generates 4 bits.
+1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator ASSIGNW expects 24 bits on the Assign RHS, but Assign RHS's SEL generates 12 bits.
+1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator COND expects 32 or 17 bits on the Conditional False, but Conditional False's SEL generates 4 bits.
+3	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator GTE expects 17 bits on the RHS, but RHS's VARREF 'filters_w' generates 7 bits.
+1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator LT expects 17 bits on the RHS, but RHS's VARREF 'filters_w' generates 7 bits.
+3	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator SUB expects 32 or 17 bits on the RHS, but RHS's VARREF 'filters_w' generates 7 bits.
+1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator SUB expects 32 or 17 bits on the RHS, but RHS's VARREF 'over_ending' generates 1 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ADD expects 13 bits on the LHS, but LHS's REPLICATE generates 4 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ADD expects 13 bits on the RHS, but RHS's VARREF 'single_output_half' generates 1 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ADD expects 32 or 12 bits on the RHS, but RHS's VARREF 'wght_size_x' generates 6 bits.
+2	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ADD expects 32 or 8 bits on the RHS, but RHS's VARREF 'ram_inc_counter_offset' generates 1 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ADD expects 8 bits on the RHS, but RHS's SEL generates 4 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ADD expects 8 bits on the RHS, but RHS's VARREF 'fsm_row_offset' generates 4 bits.
+3	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 12 bits on the Assign RHS, but Assign RHS's VARREF 'x_start' generates 8 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'rd_addr_3' generates 12 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'rd_addr_inc_0_next' generates 12 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'rd_addr_inc_1_next' generates 12 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'rd_addr_inc_2_next' generates 12 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'rd_addr_inc_3_next' generates 12 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'rd_addr_inc_4_next' generates 12 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'wr_addr_0' generates 12 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'wr_addr_1' generates 12 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'wr_addr_2' generates 12 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator COND expects 13 bits on the Conditional False, but Conditional False's VARREF 'rd_addr_inc_4' generates 12 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 12 bits on the LHS, but LHS's VARREF 'wr_cycle_loop_cnt_0' generates 8 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 12 bits on the RHS, but RHS's VARREF 'iact_words_per_compute' generates 8 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 16 bits on the RHS, but RHS's VARREF 'needed_iact_buffer_words_i' generates 12 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'router_cycle' generates 2 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 32 or 12 bits on the LHS, but LHS's VARREF 'x_pos_in_w_cycle' generates 8 bits.
+2	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator GTE expects 12 bits on the LHS, but LHS's VARREF 'x_pos_in_w_cycle' generates 8 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator LT expects 12 bits on the LHS, but LHS's VARREF 'x_pos_in_w_cycle' generates 8 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator LTE expects 12 bits on the LHS, but LHS's VARREF 'x_pos_in_w_cycle' generates 8 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator NEQ expects 16 bits on the RHS, but RHS's REPLICATE generates 15 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator SUB expects 32 or 12 bits on the RHS, but RHS's VARREF 'stride_x_i' generates 3 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator SUB expects 32 or 8 bits on the LHS, but LHS's VARREF 'channel_div_trans' generates 2 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator SUB expects 32 or 8 bits on the LHS, but LHS's VARREF 'needed_iact_router_cycles_i' generates 4 bits.
+2	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator SUB expects 32 or 8 bits on the LHS, but LHS's VARREF 'values_per_word' generates 4 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 14 bits on the LHS, but LHS's VARREF 'psum_cycle_addr_0' generates 12 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 14 bits on the LHS, but LHS's VARREF 'psum_cycle_addr_1' generates 12 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 14 bits on the LHS, but LHS's VARREF 'psum_cycle_addr_2' generates 12 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 14 bits on the LHS, but LHS's VARREF 'psum_cycle_addr_3' generates 12 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 14 bits on the LHS, but LHS's VARREF 'psum_cycle_addr_4' generates 12 bits.
+2	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 14 bits on the RHS, but RHS's REPLICATE generates 12 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 14 bits on the RHS, but RHS's VARREF 'psum_cycle_addr_inc_0' generates 8 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 14 bits on the RHS, but RHS's VARREF 'psum_cycle_addr_inc_1' generates 8 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 14 bits on the RHS, but RHS's VARREF 'psum_cycle_addr_inc_2' generates 8 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 14 bits on the RHS, but RHS's VARREF 'psum_cycle_addr_inc_3' generates 8 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 14 bits on the RHS, but RHS's VARREF 'psum_cycle_addr_inc_4' generates 8 bits.
+3	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 32 bits on the LHS, but LHS's VARREF 'psum_cluster_select_0' generates 4 bits.
+3	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 32 bits on the LHS, but LHS's VARREF 'psum_cluster_select_1' generates 4 bits.
+3	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 32 bits on the LHS, but LHS's VARREF 'psum_cluster_select_2' generates 4 bits.
+3	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 32 bits on the LHS, but LHS's VARREF 'psum_cluster_select_3' generates 4 bits.
+3	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 32 bits on the RHS, but RHS's VARREF 'psum_cluster_inc_0' generates 4 bits.
+3	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 32 bits on the RHS, but RHS's VARREF 'psum_cluster_inc_1' generates 4 bits.
+3	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 32 bits on the RHS, but RHS's VARREF 'psum_cluster_inc_2' generates 4 bits.
+3	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 32 bits on the RHS, but RHS's VARREF 'psum_cluster_inc_3' generates 4 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ADD expects 32 or 16 bits on the RHS, but RHS's VARREF 'fully_connected_layer' generates 1 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ASSIGNDLY expects 14 bits on the Assign RHS, but Assign RHS's VARREF 'psum_cycle_addr_0' generates 12 bits.
+3	WIDTHEXPAND | hdl/psum_pipeline.v | Operator ASSIGNDLY expects 40 bits on the Assign RHS, but Assign RHS's REPLICATE generates 32 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator EQ expects 16 bits on the RHS, but RHS's VARREF 'filters' generates 6 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator EQ expects 16 bits on the RHS, but RHS's VARREF 'psum_cycle_loop_limit_0' generates 8 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator EQ expects 17 bits on the LHS, but LHS's VARREF 'fsm_psum_cycle' generates 16 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'psum_cycle_count' generates 8 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator EQ expects 5 bits on the RHS, but RHS's VARREF 'psum_cluster_limit_0' generates 4 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator EQ expects 5 bits on the RHS, but RHS's VARREF 'psum_cluster_limit_1' generates 4 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator EQ expects 5 bits on the RHS, but RHS's VARREF 'psum_cluster_limit_2' generates 4 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator EQ expects 5 bits on the RHS, but RHS's VARREF 'psum_cluster_limit_3' generates 4 bits.
+1	WIDTHEXPAND | hdl/psum_pipeline.v | Operator OR expects 1280 bits on the RHS, but RHS's SEL generates 40 bits.
+1	WIDTHEXPAND | hdl/quantization_unit.v | Operator ADD expects 21 bits on the RHS, but RHS's VARREF 'quant_offset' generates 8 bits.
+1	WIDTHEXPAND | hdl/router_configurator.v | Operator EQ expects 32 or 8 bits on the LHS, but LHS's VARREF 'iact_channels_counter_i' generates 5 bits.
+10	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Bit extraction of array[7:0] requires 3 bit index, not 4 bits.
+1	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 1 bits on the Assign RHS, but Assign RHS's CONST '?32?sh4' generates 32 or 3 bits.
+1	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 2 bits on the Assign RHS, but Assign RHS's VARREF 'current_pos_in_iact_glb' generates 3 bits.
+2	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 224 bits on the Assign RHS, but Assign RHS's SHIFTR generates 256 bits.
+1	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 256 bits on the Assign RHS, but Assign RHS's VARREF 'iact_out_reg' generates 1152 bits.
+1	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 8 bits on the Assign RHS, but Assign RHS's ADD generates 32 or 12 bits.
+2	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 8 bits on the Assign RHS, but Assign RHS's MODDIV generates 32 or 12 bits.
+1	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 8 bits on the Assign RHS, but Assign RHS's VARREF 'iact_x_add_up' generates 12 bits.
+1	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Operator ASSIGNW expects 10 bits on the Assign RHS, but Assign RHS's COND generates 11 bits.
+1	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Operator ASSIGNW expects 5 bits on the Assign RHS, but Assign RHS's SUB generates 32 or 12 bits.
+1	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Operator ASSIGNW expects 7 bits on the Assign RHS, but Assign RHS's SEL generates 8 bits.
+1	WIDTHTRUNC | hdl/data_pipeline_wght.v | Operator ASSIGNW expects 4 bits on the Assign RHS, but Assign RHS's ADD generates 16 bits.
+1	WIDTHTRUNC | hdl/data_pipeline_wght.v | Operator ASSIGNW expects 4 bits on the Assign RHS, but Assign RHS's COND generates 32 or 17 bits.
+1	WIDTHTRUNC | hdl/data_pipeline_wght.v | Operator ASSIGNW expects 4 bits on the Assign RHS, but Assign RHS's SEL generates 16 bits.
+1	WIDTHTRUNC | hdl/data_pipeline_wght.v | Operator ASSIGNW expects 7 bits on the Assign RHS, but Assign RHS's COND generates 32 or 8 bits.
+1	WIDTHTRUNC | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 2 bits on the Assign RHS, but Assign RHS's SUB generates 4 bits.
+1	WIDTHTRUNC | hdl/iact_stream_constructor.v | Operator ASSIGNW expects 12 bits on the Assign RHS, but Assign RHS's ADD generates 13 bits.
+3	WIDTHTRUNC | hdl/psum_pipeline.v | Bit extraction of array[31:0] requires 5 bit index, not 8 bits.
+1	WIDTHTRUNC | hdl/psum_pipeline.v | Operator ASSIGNDLY expects 12 bits on the Assign RHS, but Assign RHS's VARREF 'psum_cycle_addr_0_next' generates 14 bits.
+2	WIDTHTRUNC | hdl/psum_pipeline.v | Operator ASSIGNDLY expects 12 bits on the Assign RHS, but Assign RHS's VARREF 'psum_cycle_addr_1_next' generates 14 bits.
+3	WIDTHTRUNC | hdl/psum_pipeline.v | Operator ASSIGNDLY expects 12 bits on the Assign RHS, but Assign RHS's VARREF 'psum_cycle_addr_2_next' generates 14 bits.
+4	WIDTHTRUNC | hdl/psum_pipeline.v | Operator ASSIGNDLY expects 12 bits on the Assign RHS, but Assign RHS's VARREF 'psum_cycle_addr_3_next' generates 14 bits.
+5	WIDTHTRUNC | hdl/psum_pipeline.v | Operator ASSIGNDLY expects 12 bits on the Assign RHS, but Assign RHS's VARREF 'psum_cycle_addr_4_next' generates 14 bits.
+4	WIDTHTRUNC | hdl/psum_pipeline.v | Operator ASSIGNW expects 4 bits on the Assign RHS, but Assign RHS's COND generates 32 bits.
+1	WIDTHTRUNC | hdl/quantization_unit.v | Operator ASSIGNDLY expects 8 bits on the Assign RHS, but Assign RHS's SHIFTRS generates 46 bits.

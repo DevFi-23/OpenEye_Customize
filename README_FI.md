@@ -220,6 +220,40 @@ Conv1 có 25.088 output, gấp khoảng 16 lần cấu hình lớn nhất ở tr
 3. Bản thân profiler chạy được cho lượt nhiều layer (nó ghi `layer_starts`), nhưng phần tính payload và hiệu suất
    hiện chỉ hỗ trợ `Convolution_Single`.
 
+## 6b. Đo trên mô phỏng so với chạy trên FPGA thật
+
+**Đường dữ liệu thật:** CPU (ARM) → DDR → AXI DMA IP (MM2S) → AXI4-Stream 64 bit → `OpenEye_FPGA` → AXI4-Stream → AXI DMA (S2MM) → DDR.
+**Trong cocotb:** testbench Python đóng vai trò "DDR + AXI DMA", đẩy thẳng mỗi chu kỳ một word vào cổng stream và luôn sẵn sàng nhận kết quả.
+Phần nằm giữa (`OpenEye_FPGA` và toàn bộ RTL bên trong) **là cùng một RTL** ở cả hai nơi.
+
+### Những gì đo được và mức độ tin cậy khi lên FPGA
+
+| Đại lượng | Mô phỏng đo được? | Trên FPGA (cùng RTL, cùng tham số) |
+|---|---|---|
+| Số beat DMA vào/ra của mỗi pha | Có, **chính xác** | **Giống hệt.** Số word do giao thức stream quyết định, không phụ thuộc vào DMA |
+| Hiệu suất bus (payload ÷ beat) | Có, **chính xác** | **Giống hệt** |
+| Số chu kỳ của các pha nội bộ: `convert_iact`, `compute`, `writeback`, `pooling` | Có, **chính xác theo chu kỳ** | **Giống hệt về số chu kỳ.** Thời gian thực = chu kỳ ÷ tần số clock đạt được sau khi tổng hợp |
+| Số chu kỳ của các pha nạp (`load_*`) và `readout` | Có, nhưng là **giới hạn dưới** | **Bằng hoặc lớn hơn.** Bằng nếu AXI DMA cấp đủ 1 beat mỗi chu kỳ; lớn hơn nếu DDR hoặc DMA bị ngắt quãng (độ trễ đầu burst, tranh chấp bus) |
+| Thứ tự và độ chồng của các pha | Có | Giống hệt (do FSM quyết định) |
+| Tổng độ trễ một layer | Giới hạn dưới | Lớn hơn: + thời gian chờ DMA + overhead phần mềm |
+| Độ trễ DDR, burst, ngắt quãng `tvalid` | **Không** | Có ảnh hưởng thật |
+| Overhead phần mềm (flush/invalidate cache, cấu hình DMA, polling, giữa các layer) | **Không** | Có; với layer nhỏ có thể lớn hơn cả thời gian tính |
+| Tần số clock tối đa (fmax), tài nguyên, công suất | **Không** | Chỉ biết sau khi tổng hợp và place & route (Vivado) |
+
+**Kết luận:**
+- Các tối ưu về **băng thông** (giảm số beat, tăng hiệu suất bus) đo trên mô phỏng là **chính xác** và giữ nguyên khi lên FPGA.
+- Các tối ưu **độ trễ bên trong** RTL (giảm chu kỳ convert/compute, chạy chồng pha) cũng chính xác **về số chu kỳ**.
+- Con số tổng độ trễ của mô phỏng là **trường hợp tốt nhất về phía bộ nhớ**; trên FPGA sẽ chậm hơn. Mức chậm hơn bao nhiêu
+  phụ thuộc vào board, cấu hình AXI DMA (độ dài burst, độ rộng bus) và phần mềm, nên chưa thể ước lượng nếu không đo trên board.
+- Giảm số beat thường còn **có lợi hơn** trên FPGA thật, vì mỗi beat bỏ bớt cũng tránh được thời gian chờ DDR tương ứng.
+
+### Cách thu hẹp khoảng cách
+1. **Mô hình bộ nhớ trong cocotb** (phần còn thiếu của Giai đoạn 0): thêm độ trễ đầu burst, giới hạn băng thông và ngắt quãng ngẫu nhiên
+   vào phía host của testbench (`ready`/`valid` không phải lúc nào cũng bằng 1). Không cần sửa RTL.
+2. **Bộ đếm hiệu năng trong RTL**: đếm chu kỳ của mỗi pha và số beat, đọc qua AXI-Lite trên board. Đây là thay đổi RTL, cần bạn đồng ý.
+3. **Tổng hợp bằng Vivado** để lấy fmax và tài nguyên (thư mục `dse_scripts/` đã có script nhưng đang trỏ tới project trên máy của tác giả gốc).
+4. Nếu có board: đo thời gian tổng bằng timer của CPU quanh `openeye_runtime`, rồi so với dự đoán từ mô phỏng.
+
 ## 7. Kết quả baseline chính (chi tiết: `doc/perf/baseline.md`)
 
 1. Phần tính toán chỉ chiếm **14–40%** độ trễ của một layer, phần còn lại là nạp dữ liệu, chuyển đổi và đọc ra.
@@ -260,25 +294,117 @@ Conv1 có 25.088 output, gấp khoảng 16 lần cấu hình lớn nhất ở tr
 **Khác:**
 - `CLUSTER_ROWS=1`: có cấu hình bị treo FSM (theo `doc/test_status_handover.md`).
 - `model_test` (chạy cả model) bị tắt trong testbench.
-- **CI "Lint" (GitHub Actions) fail** trên `dev` vì bước `verilator --lint-only -Wall` trên `hdl/` fail.
-  Lỗi kế thừa từ upstream: CI của repo gốc fail ở mọi commit gần đây, kể cả `c4bd562`; `hdl/` và `.github/` của `dev` giống hệt upstream.
-  Chi tiết từng warning: mục 9b.
+- **CI "Lint"** của upstream luôn fail vì các warning có sẵn trong RTL (repo gốc cũng fail ở mọi commit). Từ 2026-10-10, CI của `dev`
+  dùng lint theo baseline (mục 9c), chỉ fail khi có warning mới. Chi tiết từng warning: mục 9b.
 
-## 9b. Kết quả lint RTL (Verilator 5.020, 2026-10-10)
+## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
-Output đầy đủ: `doc/lint/verilator-5.020_2026-10-10.txt`. `hdl/` của `dev` giống hệt upstream, nên đây cũng là lỗi của upstream.
-CI fail vì `-Wall` biến warning thành lỗi ("Exiting due to 38 warning(s)"). **Không có lỗi cú pháp.**
-Lưu ý: lint của CI chỉ kiểm tra cây module dưới `OpenEye_Parallel.v`, **không kiểm tra `OpenEye_FPGA.v` và `psum_pipeline.v`**.
+Output gốc đầy đủ: `doc/lint/verilator-5.020_2026-10-10.txt`. **RTL chưa được sửa**; mọi warning dưới đây đều có sẵn trong upstream.
 
-| Loại | Số | Vị trí | Đánh giá |
-|---|---:|---|---|
-| WIDTHEXPAND | 26 | `data_pipeline_wght.v` (20), `PE.v` (4 + 2 cổng) | Toán hạng hẹp được mở rộng bằng 0. Theo chuẩn Verilog là đúng, **vô hại** |
-| WIDTHTRUNC | 4 | `data_pipeline_wght.v:376, 394, 396, 424` | Bị cắt bit. 376 (`filters_w` 7 bit) vô hại vì đầu vào tối đa 63. **394/396**: tổng overhead của các sub-word bị gói vào 4 bit, có thể tràn ở chế độ sparse với `PARALLEL_MACS>1`. **Cần kiểm tra** |
-| (cổng) | trong 26 ở trên | `PE.v:2210` | Output 7 bit `first_spad_words_o` nối vào dây 5 bit: **mất 2 bit cao** nếu số word lớn hơn 31. **Cần kiểm tra** (liên quan tới việc nạp weight) |
-| SELRANGE | 2 | `PE.v:820` | Nhánh `SERIAL==0` lấy 40 bit từ số 20 bit. Luồng FPGA dùng `SERIAL=1` nên không bị ảnh hưởng; là **lỗi tiềm ẩn** ở chế độ song song |
-| UNOPTFLAT | 2 | `PE.v:566`, `data_pipeline_wght.v:392` | Mảng nối tiếp kiểu `a[i+1] = f(a[i])` bị Verilator xem như vòng lặp tổ hợp. **Vòng lặp giả**, chỉ làm Verilator mô phỏng chậm hơn |
-| UNDRIVEN | 2 | `OpenEye_Parallel.v:260-261` (`mem_addr_iact/psum`) | Có bit không được gán trong nhánh generate đang dùng. Ít khả năng ảnh hưởng, nên xem lại |
-| PINMISSING | 2 | `GLB_cluster.v:187, 213` (`wr_mask_i`) | `RAM_SP.v` ghi chú rằng chân này được phép để trống. **Vô hại** |
+### Hai mục tiêu lint
+
+| Mục tiêu | File gốc | Tham số | Kết quả |
+|---|---|---|---|
+| `parallel` (lệnh CI gốc của upstream) | `OpenEye_Parallel.v` | mặc định **`SERIAL=0`** (chế độ song song, FPGA **không** dùng) | 38 warning, 0 lỗi |
+| `fpga` (thêm mới) | `OpenEye_FPGA.v` + `psum_pipeline.v` + toàn bộ cây con | **`SERIAL=1`**, đúng chế độ FPGA đang dùng | 474 warning + **4 lỗi `BLKANDNBLK`** |
+
+Lệnh CI gốc kiểm tra **chế độ không được dùng**, và bỏ sót `OpenEye_FPGA.v` cùng `psum_pipeline.v`, hai file sẽ bị sửa ở Giai đoạn 1.
+Vì vậy `fpga` là mục tiêu phản ánh đúng phần cứng thật.
+
+Mức đánh giá: **Vô hại** = không đổi hành vi phần cứng. **Tiềm ẩn** = chỉ sai ở chế độ hoặc cấu hình đang không dùng.
+**Đáng ngờ** = có thể đang gây sai, cần kiểm tra bằng test trước khi kết luận.
+
+### A. Mục tiêu `parallel`: 38 warning
+
+#### A1. Đáng ngờ (nên kiểm tra khi làm Giai đoạn 1, phần weight)
+
+**(1) `PE.v:2210`: số word của SPAD địa chỉ weight bị cắt từ 7 bit xuống 5 bit**
+```verilog
+wire [4:0] first_spad_words_wght;                 // PE.v:662, chỉ 5 bit (tối đa 31)
+.first_spad_words_o (first_spad_words_wght),      // PE.v:2210, output của data_pipeline_wght rộng $clog2(WGHT_ADDR_ADDR+1) = 7 bit
+```
+- Commit upstream `546338e` tăng `WGHT_ADDR_ADDR` lên 64 entry, nên output thành 7 bit, nhưng dây trong `PE.v` vẫn 5 bit.
+- Giá trị lớn hơn 31 sẽ mất 2 bit cao. Dây này được dùng ở `PE.v:1366, 1398, 1408, 1414` (`if ((first_spad_words_wght - 1) > wght_addr_vec)`)
+  để giới hạn địa chỉ weight trong **chế độ sparse**. Hậu quả có thể là đọc sai hoặc thiếu weight khi một PE có hơn 31 word địa chỉ weight.
+- Ảnh hưởng tới cấu hình đang đo: không, vì các test hiện dùng `SPARSITY_EN=0`. Sẽ quan trọng nếu bật sparsity.
+
+**(2) `data_pipeline_wght.v:394, 396`: tổng overhead bị gói vào 4 bit cố định**
+```verilog
+wire [3:0] overhead_temp [PARALLEL_MACS-1:0];   // 4 bit cố định
+assign overhead_temp[0]   = input_words_w[0][SECOND_PAYLOAD_WIDTH+:SECOND_OVERHEAD_WIDTH];
+assign overhead_temp[w+1] = input_words_w[w+1][...] + overhead_temp[w];   // cộng dồn qua các MAC
+```
+- "Overhead" là số weight bằng 0 bị bỏ qua trước một weight khác 0 (mã hoá sparse). Độ rộng thật là tham số `SECOND_OVERHEAD_WIDTH`
+  (với cấu hình mặc định của lint là 16 bit), nhưng `overhead_temp`, `overhead_w` và `overhead_next_word` lại khai báo cứng `[3:0]`.
+- Khi `PARALLEL_MACS > 1`, tổng của 2 overhead 4 bit có thể tới 30 nhưng bị cắt còn 4 bit (tối đa 15), nên **tràn**.
+- Tài liệu upstream (`doc/test_status_handover.md`) có nhắc lỗi "PARALLEL_MACS=2 weight shortfall" (thiếu weight khi chạy 2 MAC song song) chưa rõ nguyên nhân;
+  hai dòng này là một ứng viên. **Chưa kiểm chứng.**
+
+**(3) `data_pipeline_wght.v:424`: `overhead_output` (4 bit) nhận biểu thức 17/32 bit**
+- Kết quả sau khi trừ `filters_w` thường nhỏ, nhưng nếu phép trừ ra số âm thì bị cắt thành một số dương sai. Chỉ dùng khi `SPARSITY_EN=1`.
+  Nên kiểm tra cùng với (2).
+
+#### A2. Tiềm ẩn (chỉ sai ở `SERIAL=0`, FPGA không bị ảnh hưởng)
+
+**(4) `PE.v:820` SELRANGE ×2: lấy 40 bit từ số 20 bit**
+```verilog
+assign psum_data_o = SERIAL == 1 ? {zeros, adder_tree_o} : output_adder[TRANS_BITWIDTH_PSUM-1:0];
+```
+- Nhánh `SERIAL==0` lấy `[39:0]` từ `output_adder` chỉ có 20 bit. Với `SERIAL=1`, nhánh này không bao giờ được chọn.
+
+**(5) `OpenEye_Parallel.v:260-261` UNDRIVEN ×2: `mem_addr_iact`, `mem_addr_psum` không được gán**
+- Có chủ đích: comment ở `OpenEye_Parallel.v:790` ghi rằng chế độ `SERIAL=0` cần một bộ sinh địa chỉ chưa tồn tại,
+  nên các địa chỉ "cố ý để trống để lint tiếp tục báo". Với `SERIAL=1`, chúng được gán bằng 0 và không được dùng.
+
+#### A3. Vô hại
+
+**(6) WIDTHEXPAND ×26** (`data_pipeline_wght.v` 20, `PE.v` 6)
+- Phép toán trộn độ rộng, ví dụ `overhead_reg + PARALLEL_MACS + overhead_w` (17 bit + 32 bit + 4 bit). Verilog tự mở rộng
+  toán hạng hẹp bằng số 0, nên kết quả đúng. Gồm các dòng `data_pipeline_wght.v:381, 386, 396, 424, 425, 515, 589–601` và
+  `PE.v:829, 1287, 1367, 1409, 2211`. Riêng `PE.v:2211`: `filters_reg_M0` 6 bit nối vào input 8 bit, được thêm 0, nên đúng.
+  (`PE.v:2210` cũng được báo là WIDTHEXPAND nhưng là output, xem mục (1).)
+- `data_pipeline_wght.v:376` (WIDTHTRUNC): `filters_w` 7 bit nhận `first_spad_max_i` 8 bit. Vô hại vì đầu vào chỉ tới 63 (6 bit).
+
+**(7) UNOPTFLAT ×2** (`PE.v:566` `wght_data_spad_oh_acc`, `data_pipeline_wght.v:392` `overhead_temp`)
+- Mảng được nối tiếp kiểu `a[i+1] = f(a[i])`. Verilator coi cả mảng là một tín hiệu nên tưởng có vòng lặp tổ hợp.
+  Không có vòng lặp thật; chỉ làm Verilator mô phỏng chậm hơn. Icarus và FPGA không bị ảnh hưởng.
+
+**(8) PINMISSING ×2** (`GLB_cluster.v:187, 213`, chân `wr_mask_i` của `RAM_SP`)
+- `RAM_SP.v:86` ghi rõ: khi không dùng mask thì chân này được phép để trống.
+
+### B. Mục tiêu `fpga`: 474 warning + 4 lỗi
+
+| Loại | Số | Ý nghĩa và đánh giá |
+|---|---:|---|
+| UNUSEDSIGNAL | 184 | Tín hiệu khai báo nhưng không dùng (`OpenEye_FPGA.v` 109, `psum_pipeline.v` 28, `iact_stream_constructor.v` 24, `OpenEye_Parallel.v` 13,…). Vô hại, nhưng là dấu hiệu có code thừa |
+| WIDTHEXPAND | 178 | Như A3-(6). Vô hại |
+| WIDTHTRUNC | 51 | Cắt bit (`psum_pipeline.v` 22, `OpenEye_FPGA.v` 22, `data_pipeline_wght.v` 4 như mục A, `iact_stream_constructor.v` 2, `quantization_unit.v` 1). **Cần xem từng chỗ** khi sửa các file này |
+| UNUSEDPARAM | 30 | Tham số không dùng. Vô hại |
+| BLKSEQ | 13 | Phép gán blocking `=` trong khối tuần tự (`OpenEye_FPGA.v` 10, `psum_pipeline.v` 3). **Đáng ngờ** về mặt phong cách: dễ làm kết quả mô phỏng khác phần cứng sau tổng hợp |
+| **BLKANDNBLK (lỗi)** | 4 | **Đáng ngờ.** `psum_pipeline.v`: biến `results_ready` vừa được gán blocking `=` (dòng 429–454, 522: tích luỹ AND qua các cluster) vừa non-blocking `<=` (dòng 274, 485, 507, 900) trong cùng một khối. Icarus vẫn chạy, nhưng Verilator từ chối, và đây là mẫu code dễ sai khi tổng hợp. Nằm ở **đường readout**, đúng chỗ Giai đoạn 1 sẽ sửa |
+| Khác | 18 | VARHIDDEN 4 (tên biến trùng tên ở phạm vi ngoài), PINMISSING 3, EOFNEWLINE 3 (file thiếu xuống dòng ở cuối), UNOPTFLAT 2 (như A3-(7)), UNDRIVEN 2 (`GLB_cluster.v`), UNUSEDGENVAR 1, REALCVT 1 (số thực đổi sang nguyên), PINCONNECTEMPTY 1, GENUNNAMED 1 (khối generate không đặt tên). Vô hại |
+
+Tổng: 474 warning + 4 lỗi = 478. `SELRANGE` (mục A2) **không xuất hiện** ở mục tiêu này, vì nó chỉ thuộc chế độ `SERIAL=0`.
+Danh sách đầy đủ, đã gộp theo loại, file và nội dung: `tools/lint_baseline/fpga.txt` và `tools/lint_baseline/parallel.txt`.
+
+## 9c. CI lint theo baseline (hướng A cải tiến)
+
+- **Mục đích:** CI không fail vì các warning có sẵn từ upstream, nhưng **fail ngay khi bạn tạo ra warning mới**.
+- **Cách làm:** `tools/lint_check.py` lint 2 mục tiêu (mục 9b). Mỗi warning được nhận diện bằng `loại | file | nội dung`,
+  **không dùng số dòng**, để code chỉ dịch chỗ (ví dụ sau khi merge upstream) không bị tính là mới. Sau đó script so số lượng với
+  `tools/lint_baseline/*.txt`. Mục tiêu `fpga` tự sinh các header (`parameters_*.vh`, `regmap_params.vh`, `dma_storage.v`) vào thư mục tạm.
+- **CI** (`.github/workflows/lint.yml`): Ubuntu 24.04, `apt install verilator` (5.020, cùng phiên bản baseline) và `python3-yaml`.
+
+```bash
+python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator            # kiểm tra
+python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --update   # chấp nhận trạng thái hiện tại làm baseline
+```
+
+- Khi CI báo `NEW`: script in đúng `file:dòng` của warning mới. Sửa code, hoặc nếu warning đó chấp nhận được thì chạy `--update`
+  và commit baseline mới, ghi lý do trong commit message.
+- Khi sửa bớt warning: script báo `fixed`; chạy `--update` để hạ baseline, tránh warning đó quay lại mà không ai biết.
+- Khi merge upstream có RTL mới: warning mới của upstream sẽ hiện là `NEW`; xem xét rồi `--update`.
+- Lưu ý: bộ sinh code ghi thêm `src/open_eye/regmap_pack.py`. File này nằm trong `.gitignore` nên không ảnh hưởng tới git.
 
 ---
 
@@ -318,3 +444,7 @@ Lưu ý: lint của CI chỉ kiểm tra cây module dưới `OpenEye_Parallel.v`
 
 - Build Verilator 5.020 từ source (`~/tools`), chạy đúng lệnh lint của CI: 38 warning, chi tiết ở mục 9b. **Chưa sửa RTL.**
 - Ghi lại cách project dùng DMA (AXI DMA Simple mode + AXI4-Stream) ở mục 5.2.
+- **CI lint theo baseline** (hướng A cải tiến): `tools/lint_check.py`, `tools/lint_baseline/{parallel,fpga}.txt`,
+  `.github/workflows/lint.yml`. Thêm mục tiêu lint `fpga` (`OpenEye_FPGA.v`, `SERIAL=1`). Mục 9b ghi chi tiết từng warning
+  (vô hại / tiềm ẩn / đáng ngờ), mục 9c ghi cách dùng. **RTL không đổi.**
+- Mục 6b: so sánh những gì đo được trên mô phỏng với khi chạy trên FPGA thật.

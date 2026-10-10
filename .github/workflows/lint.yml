@@ -7,11 +7,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: install verilator
-        run: sudo apt install -y verilator
+      - name: install verilator and PyYAML
+        # Ubuntu 24.04 ships Verilator 5.020, the version the baseline was made with.
+        run: sudo apt-get update && sudo apt-get install -y verilator python3-yaml
 
-      - name: run verilator lint
-        # PE.v and PE_cluster.v `include generated parameter headers that only
-        # exist in a simulation build directory; the ifdef fallbacks give the
-        # linter the same defaults.
-        run: verilator --lint-only -Wall -Ihdl/ +define+USE_INTERNAL_PARAMS_PE +define+USE_INTERNAL_PARAMS_PE_cluster hdl/lint_waivers.vlt hdl/OpenEye_Parallel.v
+      - name: run verilator lint against the baseline
+        # The RTL inherited from upstream has known warnings (tools/lint_baseline/).
+        # Fail only on warnings that are not in the baseline. Lints both
+        # hdl/OpenEye_Parallel.v (the former check) and the FPGA top level
+        # hdl/OpenEye_FPGA.v, whose generated headers the script creates first.
+        run: python3 tools/lint_check.py
