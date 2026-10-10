@@ -527,6 +527,7 @@ từng word** (`bandwidth=0.5`, hoặc burst 1 word) thì FAIL. `profile.json` (
 | 9 | Ảnh rộng 7 (có cột đệm): phần cứng ghi giá trị khác 0 vào ô đệm (giá trị thật vẫn đúng) | RTL/testbench | **Chưa sửa** |
 | 10 | `CLUSTER_ROWS=1`: một số cấu hình treo FSM (theo tài liệu upstream) | RTL | **Chưa sửa**, chưa tự kiểm chứng |
 | 11 | Lint đáng ngờ: `PE.v:2210` (cắt 7→5 bit), `data_pipeline_wght.v:394/396/424` (overhead 4 bit), `BLKANDNBLK` trong `psum_pipeline.v` | RTL | **Chưa sửa**, cần test (mục 9b) |
+| 12 | `current_filter` (chỉ số filter của bộ lượng tử) chỉ được reset về 0, **không bao giờ tăng**, nên mọi filter dùng hệ số lượng tử của filter 0 (lượng tử theo filter chưa hoạt động) | `hdl/psum_pipeline.v` | **Chưa sửa**, phát hiện bằng đọc code (2026-10-10), chưa kiểm chứng bằng test. Test hiện tại dùng hệ số giống nhau cho mọi filter nên không phát hiện được |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên)
 
@@ -538,6 +539,29 @@ từng word** (`bandwidth=0.5`, hoặc burst 1 word) thì FAIL. `profile.json` (
 3. **Giai đoạn 1.3: tìm hiểu định dạng weight** (hiệu suất 15–30 %). Bước đầu chỉ phân tích, không sửa RTL; sau đó mới đề xuất cách đóng gói.
 4. **Việc 0.2:** đo layer Dense và lượt nhiều layer. Bị chặn một phần bởi lỗi #5; cần quyết định có điều tra hoặc sửa lỗi #5 không.
 5. **Giai đoạn 2:** chạy chồng pha nạp và pha tính toán (double-buffering), sau khi Giai đoạn 1 xong.
+
+**Thiết kế đề xuất cho 1.1 (gửi bias theo filter), chưa thực hiện, chờ đồng ý:**
+- Hiện tại: Python (`psum_stream_mapper.get_psum_stream`) gửi giá trị bias cho từng (lượt x, hàng output, filter), mỗi giá trị lặp
+  `block_length` lần. `psum_pipeline.v` ghép `CONV_BIAS_CYCLES` word (= 8 với 2×2 cluster, 4 GLB psum) thành 1 địa chỉ của bộ đệm psum.
+  Bộ đệm này là **giá trị khởi tạo của bộ cộng dồn**: `CALCULATE_PSUM` đưa nội dung bộ đệm vào mảng PE, lượt đầu là bias, các lượt sau là
+  kết quả cộng dồn.
+- **Phương án A (đề xuất): bảng bias trên chip + tự sinh lại đúng chuỗi ghi cũ.** DMA chỉ gửi F giá trị bias (2 giá trị mỗi word 64 bit).
+  RTL lưu chúng vào một bảng nhỏ, rồi một bộ đếm (lượt x → hàng → filter → lặp `block_length`) **ghi lại đúng các địa chỉ và nội dung như
+  trước**, mỗi chu kỳ 1 địa chỉ (đủ mọi cluster). Phần tính toán, cộng dồn và đọc ra giữ nguyên, nên rủi ro thấp và kiểm chứng được bit-exact
+  (so sánh nội dung bộ đệm psum giữa cách cũ và cách mới).
+- Phương án B (sau này): không ghi bias vào bộ đệm; ở lượt đầu của `CALCULATE_PSUM` thay `psum_buffer_data_r` bằng giá trị lấy từ bảng
+  bias. Loại bỏ cả thời gian ghi, nhưng cần ánh xạ địa chỉ/lane → filter, phức tạp hơn.
+- Phương án C (loại): cộng bias ở bước lượng tử/đọc ra. Không làm được trực tiếp vì `current_filter` không được cập nhật (lỗi #12).
+- File cần sửa (phương án A): `hdl/psum_pipeline.v` (bảng bias, bộ đếm sinh lại, `GET_BIAS`), `hdl/OpenEye_FPGA.v` (tham số bật/tắt,
+  điều kiện rời `GET_BIAS` chờ sinh lại xong), `src/open_eye/psum_stream_mapper.py` (stream F giá trị), `src/open_eye/layer_parameters.py`
+  (`trans_cycles_psum`), `src/open_eye/vh_file_creator.py`/`open_eye_parameters.py` (tham số). Có thể cần thêm thanh ghi cấu hình
+  (`test/cocotb_fpga/regmap.yaml`) cho số hàng, số lượt x, `block_length`. Giữ cách cũ khi tham số tắt, áp dụng trước cho Conv (Dense và
+  Depthwise giữ nguyên).
+- Ước tính (bộ nhớ lý tưởng): `mnist1` pha bias 14.336 → khoảng 16 word DMA + 1.792 chu kỳ sinh lại, tức khoảng −12.500 chu kỳ (khoảng −19 %);
+  `32x3_f16`: 768 → khoảng 8 + 96, khoảng −18 %. Với bộ nhớ `typical` lợi hơn (mỗi word DMA tốn khoảng 1,44 chu kỳ). Lưu lượng DMA của pha bias
+  giảm khoảng 900 lần.
+- Chi phí ước tính: bảng bias tối đa 32 × 20–32 bit (khoảng 640–1.024 flip-flop, hoặc vài chục LUT nếu dùng LUTRAM), khoảng 4 bộ đếm (khoảng 40 flip-flop),
+  logic chọn và ghép word. Đo lại bằng Yosys sau khi làm.
 
 Mỗi bước đều đánh giá bằng `tools/run_profile.py --compare doc/perf/baseline_2026-10-10`, kèm thêm `--mem typical` để thấy lợi ích khi có bộ nhớ thực tế hơn.
 
