@@ -200,6 +200,19 @@ thì vừa tiết kiệm tài nguyên, vừa giảm DMA, vừa giúp simulation 
 - **Liên quan tới hướng nghiên cứu:** `SERIAL=0` giữ dữ liệu trong GLB của từng cluster, tức tái sử dụng dữ liệu trên chip nhiều hơn
   và giảm lưu lượng DMA. Về lâu dài đây có thể là một hướng kiến trúc, nhưng phải hoàn thiện phần RTL còn thiếu. Đây là việc lớn, không thuộc trước mắt.
 
+### 5.8 Độ rộng DMA: 32 bit hay 64 bit
+
+- **Phần cứng FPGA (`fpga/hdl/open_eye_axi_v1_0.v`): 64 bit.** `C_dma_i_TDATA_WIDTH = C_dma_o_TDATA_WIDTH = 64`; wrapper không truyền
+  `DMA_BITWIDTH` vào `OpenEye_FPGA`, nên lõi dùng giá trị mặc định `parameter DMA_BITWIDTH = 64` (`OpenEye_FPGA.v:123`).
+- **Mô phỏng/đo hiệu suất:** giá trị lấy từ biến môi trường `DMA_BITWIDTH` (nếu không có thì mặc định 64 trong `OpenEyeParameters`) và được ghi
+  vào `parameters_FPGA.vh`. Các case đo dùng **64 bit** để khớp với phần cứng, trừ case `32x3_f4_q32_dma32` (32 bit, để so sánh: chậm hơn 34 %).
+  Lưu ý: `test/cocotb_fpga/Makefile` của upstream đặt `DMA_BITWIDTH = 32`, và notebook MNIST cũng dùng 32.
+- **Cố định hay thay đổi được?** `DMA_BITWIDTH` là **tham số lúc tổng hợp (elaboration)**: sau khi tổng hợp và nạp bitstream thì **cố định**; muốn đổi thì
+  tổng hợp lại. Khi đổi phải đổi **đồng thời**: độ rộng stream của IP AXI DMA, `C_dma_*_TDATA_WIDTH` của wrapper (và thêm `.DMA_BITWIDTH(...)` vào
+  wrapper, hiện chưa có), cùng bộ sinh stream Python và runtime (dữ liệu được đóng gói theo `DMA_BITWIDTH`).
+- **Giá trị nào chạy được:** 32 và 64 đã chạy đúng trong mô phỏng. Logic đọc kết quả xếp psum vào các ô 32 bit (`DMA_BITWIDTH // 32` psum mỗi beat),
+  nên độ rộng phải là bội của 32. 128 bit **chưa được kiểm chứng** (có các hằng số như `WORDS_PER_CYCLE = 2` và comment giả định beat 64 bit).
+
 ## 6. Hướng dẫn chạy công cụ đo hiệu suất
 
 ### 6.1 Các công cụ
@@ -498,6 +511,35 @@ từng word** (`bandwidth=0.5`, hoặc burst 1 word) thì FAIL. `profile.json` (
 | **0.2 Mở rộng phạm vi đo**: payload/hiệu suất cho layer Dense (FC) và cho lượt 2 layer (pha `writeback`), tách số liệu theo từng layer (đã có `layer_starts` nhưng báo cáo chưa dùng) | **Chưa.** Bias, bảng quant và readout INT8 đều ảnh hưởng tới Dense và write-back giữa các layer |
 | **0.3 Cấu hình gần thực tế hơn**: 3 case kiểu MNIST (mục 6.7), baseline mới `baseline_2026-10-10` | **Xong** (2026-10-10) |
 | Mô hình bộ nhớ ngoài (độ trễ burst, giới hạn băng thông) | **Xong** (2026-10-10, mục 6c); tham số chưa hiệu chỉnh theo board |
+
+### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-10)
+
+| # | Lỗi | Nơi | Trạng thái |
+|---|---|---|---|
+| 1 | Giải mã sai thứ tự output Conv ở chế độ SERIAL (124/128 giá trị sai ở 1×1 cluster, DMA 32 bit) | testbench Python | **Đã sửa** (`27aa75c`) |
+| 2 | Bộ sinh tài liệu Verilog: 125 warning Sphinx, mất parameter | `doc/verilog_doc_parser` | **Đã sửa** (`83750e9`) |
+| 3 | `GET_BIAS` rời trạng thái khi chưa nhận word bias cuối (treo khi DMA có khoảng trống) | `hdl/OpenEye_FPGA.v` | **Đã sửa** (`77f0477`), 0 chu kỳ, 0 tài nguyên |
+| 4 | CI lint luôn fail (38 warning có sẵn) | `.github` | **Đã xử lý** bằng lint baseline (`4a26867`); RTL không đổi |
+| 5 | Dense/FC: `FC activation write ... bank=1 addr=0` sai (23/63 test GEMM/Dense) | RTL hoặc testbench Dense | **Chưa sửa** (có sẵn ở upstream) |
+| 6 | Input 1 channel: chỉ ra bias | RTL (đường iact) | **Chưa sửa** |
+| 7 | Input 3 channel và mọi `NUM_GLB_IACT=3`: giá trị sai | RTL (đường iact) | **Chưa sửa** |
+| 8 | 64 filter: `IndexError` trong `layer_parameters.read_data_from_layer` | Python | **Chưa sửa** |
+| 9 | Ảnh rộng 7 (có cột đệm): phần cứng ghi giá trị khác 0 vào ô đệm (giá trị thật vẫn đúng) | RTL/testbench | **Chưa sửa** |
+| 10 | `CLUSTER_ROWS=1`: một số cấu hình treo FSM (theo tài liệu upstream) | RTL | **Chưa sửa**, chưa tự kiểm chứng |
+| 11 | Lint đáng ngờ: `PE.v:2210` (cắt 7→5 bit), `data_pipeline_wght.v:394/396/424` (overhead 4 bit), `BLKANDNBLK` trong `psum_pipeline.v` | RTL | **Chưa sửa**, cần test (mục 9b) |
+
+### 8c. Kế hoạch gần (theo thứ tự ưu tiên)
+
+1. **Giai đoạn 1.1: gửi bias theo filter.** Hiện bias được gửi theo từng pixel output (hiệu suất bus khoảng 0 %; 22 % độ trễ của layer kiểu Conv1).
+   Sửa RTL (`GET_BIAS`, `psum_pipeline.v`) và bộ sinh stream Python. Ước tính `mnist1`: 14.336 → vài chục word, giảm khoảng 20 % độ trễ.
+   **Cần bạn đồng ý** vì sửa RTL.
+2. **Giai đoạn 1.2: readout INT8.** Lượng tử kết quả trên chip trước khi gửi ra (đường này đã có cho write-back giữa các layer).
+   Readout của `mnist1` chiếm 22 %; có thể giảm khoảng 4 lần số word.
+3. **Giai đoạn 1.3: tìm hiểu định dạng weight** (hiệu suất 15–30 %). Bước đầu chỉ phân tích, không sửa RTL; sau đó mới đề xuất cách đóng gói.
+4. **Việc 0.2:** đo layer Dense và lượt nhiều layer. Bị chặn một phần bởi lỗi #5; cần quyết định có điều tra hoặc sửa lỗi #5 không.
+5. **Giai đoạn 2:** chạy chồng pha nạp và pha tính toán (double-buffering), sau khi Giai đoạn 1 xong.
+
+Mỗi bước đều đánh giá bằng `tools/run_profile.py --compare doc/perf/baseline_2026-10-10`, kèm thêm `--mem typical` để thấy lợi ích khi có bộ nhớ thực tế hơn.
 
 ## 9. Các lỗi upstream đã biết (ảnh hưởng tới việc đo)
 
