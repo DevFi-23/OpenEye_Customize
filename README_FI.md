@@ -608,6 +608,25 @@ Quy ra thời gian: `mnist1` 65.800 chu kỳ = 0,658 ms ở 100 MHz, 0,329 ms �
 **So với ước lượng Yosys:** LUT logic lệch dưới 1 %, nên Yosys dùng tốt để so sánh LUT tương đối. BRAM, URAM và DSP lệch nhiều,
 vì Yosys không dùng URAM và đưa bộ nhân vào DSP, nên các số này phải lấy từ Vivado.
 
+### Lần chạy thứ hai (clock 4 ns) và CRITICAL WARNING (`doc/synth/2026-10-12_synth4ns_zu7ev/`)
+
+- **Place & route chưa chạy.** Thư mục trên ổ C được xuất **trước** khi script có tuỳ chọn `impl`, nên lệnh `set run_impl 1` không có tác dụng:
+  Vivado chỉ tổng hợp lại. Bản script cũ còn đặt clock sau tổng hợp, nên đây vẫn là cùng một netlist, chỉ được đánh giá ở 4 ns.
+  Kết quả: WNS +0,116 ns, đường chậm nhất 3,884 ns, fmax sau tổng hợp vẫn khoảng 257 MHz. Tài nguyên chênh ±15 LUT/FF (nhiễu).
+- **Cách chạy đúng:** trong WSL chạy `venv/bin/python tools/export_vivado.py --out /mnt/c/openeye_vivado --name baseline_impl`. Bản này có tuỳ chọn `impl`
+  và đặt clock trước tổng hợp. Sau đó mở **một Vivado Tcl Shell mới**, `cd C:/openeye_vivado/baseline_impl`, `set run_impl 1`,
+  `set argv [list xczu7ev-ffvc1156-2-e 4]; set argc 2`, `source synth_ooc.tcl`. Kiểm tra trong log có dòng `OPENEYE_RESULT post-route`.
+- **CRITICAL WARNING Synth 8-6858/8-6859 → lỗi #13 (nghiêm trọng, mô phỏng khác phần cứng).** Trong `iact_stream_constructor.v`,
+  4 bộ đếm `rd_cycle_loop_cnt_0..3` được **reset ở một khối `always`** (dòng 437–479) nhưng **đếm ở một khối `always` khác** (dòng 233–400).
+  Một thanh ghi có 2 nguồn lái (multi-driven). Simulator (Icarus, Verilator) để lệnh ghi sau cùng thắng, nên mô phỏng chạy "đúng ý".
+  Vivado thì giữ nguồn hằng số (giá trị reset 0) và **bỏ logic đếm**, nên trên FPGA 4 bộ đếm này **luôn bằng 0**.
+  Chúng điều khiển vòng lặp địa chỉ đọc iact (so với `rd_loop_limit_0..3`). Nếu giới hạn khác 0, địa chỉ đọc iact trên FPGA sẽ khác với mô phỏng.
+  Verilator không báo lỗi này vì `MULTIDRIVEN` chỉ cảnh báo khi các khối dùng clock khác nhau.
+  Cách sửa dự kiến: chuyển 4 dòng reset vào khối reset của khối `always` đầu tiên (0 chu kỳ, 0 tài nguyên). **Chưa sửa, chờ bạn đồng ý.**
+- Các cảnh báo khác đáng chú ý: Synth 8-6090 (`results_ready` trong `psum_pipeline.v` vừa gán blocking vừa non-blocking, chính là lint `BLKANDNBLK` #11),
+  Synth 8-7137 (12 thanh ghi có set và reset cùng mức ưu tiên, "may cause simulation mismatches"), Synth 8-689 (`PE.v:2210/2211` lệch độ rộng, lint #11),
+  Synth 8-6057 (URAM không có thanh ghi pipeline, có thể giới hạn fmax sau route). Bảng đầy đủ ở `SUMMARY.md` của thư mục trên.
+
 ### Có phải tổng hợp lại sau mỗi lần sửa RTL hoặc tối ưu không? **Có, khi RTL hoặc cấu hình thay đổi.**
 
 | Thay đổi | Mô phỏng (cocotb) | Tổng hợp lại? |
@@ -673,7 +692,7 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 | **0.3 Cấu hình gần thực tế hơn**: 3 case kiểu MNIST (mục 6.7), baseline mới `baseline_2026-10-10` | **Xong** (2026-10-10) |
 | Mô hình bộ nhớ ngoài (độ trễ burst, giới hạn băng thông) | **Xong** (2026-10-10, mục 6c); tham số chưa hiệu chỉnh theo board |
 
-### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-10)
+### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-12)
 
 | # | Lỗi | Nơi | Trạng thái |
 |---|---|---|---|
@@ -689,8 +708,30 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 | 10 | `CLUSTER_ROWS=1`: một số cấu hình treo FSM (theo tài liệu upstream) | RTL | **Chưa sửa**, chưa tự kiểm chứng |
 | 11 | Lint đáng ngờ: `PE.v:2210` (cắt 7→5 bit), `data_pipeline_wght.v:394/396/424` (overhead 4 bit), `BLKANDNBLK` trong `psum_pipeline.v` | RTL | **Chưa sửa**, cần test (mục 9b) |
 | 12 | `current_filter` (chỉ số filter của bộ lượng tử) chỉ được reset về 0, **không bao giờ tăng**, nên mọi filter dùng hệ số lượng tử của filter 0 (lượng tử theo filter chưa hoạt động) | `hdl/psum_pipeline.v` | **Chưa sửa**, phát hiện bằng đọc code (2026-10-10), chưa kiểm chứng bằng test. Test hiện tại dùng hệ số giống nhau cho mọi filter nên không phát hiện được |
+| 13 | `rd_cycle_loop_cnt_0..3` bị lái từ 2 khối `always` (reset ở khối này, đếm ở khối kia). Vivado giữ giá trị reset nên trên FPGA các bộ đếm **luôn bằng 0**; mô phỏng không thấy | `hdl/iact_stream_constructor.v:233/437` | **Chưa sửa**, phát hiện bằng CRITICAL WARNING của Vivado (2026-10-12). Cần thí nghiệm giả lập phần cứng để đo ảnh hưởng (mục 8c) |
+| 14 | `results_ready` vừa gán blocking vừa non-blocking; Vivado: "entire logic could be removed" | `hdl/psum_pipeline.v:485/522/900` | **Chưa sửa** (cùng lint `BLKANDNBLK` ở #11, nay Vivado xác nhận rủi ro) |
+| 15 | 12 thanh ghi có set và reset cùng mức ưu tiên (Synth 8-7137, "may cause simulation mismatches") | `psum_pipeline.v:322/776`, `OpenEye_Parallel.v:443/448`, `PE.v:1113` | **Chưa phân tích** |
+| 16 | Wrapper AXI `fpga/hdl/open_eye_axi_v1_0.v` không biên dịch được (thiếu module `cfg_reg`, `QUANT_AMOUNT` chưa khai báo, `BUFFER_WIDTH` gán 2 lần, `RAM_CELLS` không tồn tại) | `fpga/hdl` | **Chưa sửa**; chỉ cần khi đóng gói IP hoặc làm block design |
 
-### 8c. Kế hoạch gần (theo thứ tự ưu tiên)
+### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-12 sau khi tổng hợp Vivado)
+
+**Định hướng sau kết quả Vivado (mốc: 64,5k LUT, 38,7k FF, 192 BRAM tile, fmax sau tổng hợp khoảng 257 MHz):**
+
+| # | Việc | Loại | Vì sao | Trạng thái |
+|---|---|---|---|---|
+| A | Place & route (clock 4 ns) để có fmax chính thức | Vivado, không sửa RTL | Fmax sau tổng hợp là ước lượng lạc quan; mọi tối ưu cần cả chu kỳ lẫn fmax | Chờ bạn chạy lại bằng thư mục `baseline_impl` (mục 6d) |
+| B | **Lỗi #13: phần cứng khác mô phỏng** ở `iact_stream_constructor` | Thí nghiệm, rồi sửa RTL | Nếu đúng như Vivado báo, bitstream hiện tại tính sai iact, nên mọi số đo trên board sẽ vô nghĩa | Đề xuất: (1) thí nghiệm trên bản sao tạm, giả lập bộ đếm luôn 0 rồi chạy 9 case baseline (không sửa RTL của project); (2) sửa 4 dòng reset. **Cần bạn đồng ý** |
+| C | Gửi bias theo filter (1.1 bên dưới) | Sửa RTL | Khoảng −19 % chu kỳ ở `mnist1`, DMA pha bias giảm khoảng 900 lần, chi phí khoảng +2 % FF và 0 BRAM | Chờ đồng ý |
+| D | Thu nhỏ bộ đệm psum (`BUFFER_WIDTH_PSUM` 14 → 11/12) | Đổi tham số, không sửa RTL | 144/168 RAMB36 là bộ đệm psum, layer lớn nhất chỉ dùng khoảng 1.792/16.384 địa chỉ (ước tính); tiết kiệm khoảng 100–124 BRAM36 để thêm cluster hoặc bộ đệm | Cần kiểm chứng bằng 9 case |
+| E | DMA 128 bit | Băng thông | Cổng HP của ZU+ rộng 128 bit; 64 bit ở 250 MHz chỉ đạt khoảng 2 GB/s; giảm một nửa số chu kỳ nạp và đọc kết quả | 128 bit chưa từng được kiểm chứng |
+| F | Pipeline đường găng iact converter (`OpenEye_FPGA.v` 943–950) | Sửa RTL (fmax) | Tính trước các tích tham số một lần mỗi layer | Chỉ làm nếu fmax sau route chưa đủ |
+| G | `USE_DSP=1` cho PE | Sửa RTL (tài nguyên) | Bộ nhân 48 PE đang dùng LUT, còn 1.724 DSP trống | Khi cần thêm cluster |
+| H | Lỗi #14, #15 (cảnh báo "simulation mismatch") | Phân tích, có thể sửa RTL | Cùng loại rủi ro với #13 | Phân tích sau B |
+
+Thứ tự đề xuất: **A và B trước** (B ảnh hưởng tới độ tin cậy của mọi kết quả trên phần cứng), sau đó C, rồi D.
+Mỗi thay đổi RTL: test, `run_profile --compare`, Yosys (so sánh nhanh LUT), Vivado ở các mốc quan trọng.
+
+**Kế hoạch theo giai đoạn (giữ nguyên từ 2026-10-10):**
 
 1. **Giai đoạn 1.1: gửi bias theo filter.** Hiện bias được gửi theo từng pixel output (hiệu suất bus khoảng 0 %; 22 % độ trễ của layer kiểu Conv1).
    Sửa RTL (`GET_BIAS`, `psum_pipeline.v`) và bộ sinh stream Python. Ước tính `mnist1`: 14.336 → vài chục word, giảm khoảng 20 % độ trễ.
@@ -1015,3 +1056,7 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   WNS +6,1 ns ở 10 ns, nên fmax sau tổng hợp khoảng 257 MHz. 46 % BRAM của chip là 8 bộ đệm psum. Đường găng là logic điều khiển iact converter.
   Báo cáo lưu ở `doc/synth/2026-10-12_baseline_zu7ev/` (kèm `SUMMARY.md`).
 - `synth_ooc.tcl`: ràng buộc clock đặt trước `synth_design`; thêm tuỳ chọn `impl` (place & route out-of-context, fmax sau route).
+- **Lần chạy Vivado thứ hai (clock 4 ns)**: place & route **không chạy**, vì thư mục trên ổ C là bản cũ chưa có tuỳ chọn `impl`. Fmax sau tổng hợp vẫn khoảng 257 MHz.
+  Lưu ở `doc/synth/2026-10-12_synth4ns_zu7ev/` (báo cáo, danh sách cảnh báo, `SUMMARY.md`).
+- **Lỗi mới #13** (CRITICAL WARNING Synth 8-6858/8-6859): `rd_cycle_loop_cnt_0..3` trong `iact_stream_constructor.v` bị lái từ 2 khối `always`;
+  trên FPGA chúng luôn bằng 0, mô phỏng không thấy. Thêm #14–#16 vào mục 8b. Mục 8c: bảng định hướng A–H sau Vivado. **RTL không đổi.**
