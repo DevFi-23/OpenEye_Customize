@@ -147,11 +147,22 @@ def write_flow(out_dir, sources, config, part, clock_ns):
     with open(os.path.join(out_dir, "synth_ooc.tcl"), "w") as f:
         f.write(f"""# Out-of-context synthesis of {TOP}, non-project mode.
 # Run from this folder:  vivado -mode batch -source synth_ooc.tcl
-# Optional arguments:    -tclargs <part> <clock_ns>
+# Optional arguments:    -tclargs <part> <clock_ns> [impl]
+#   impl: continue with opt/place/route (out-of-context) for a post-route fmax.
+# In the Vivado Tcl shell (no -tclargs) set run_impl 1 before sourcing to do the same.
 set part     {part}
 set clock_ns {clock_ns}
+if {{![info exists run_impl]}} {{ set run_impl 0 }}
 if {{$argc >= 1}} {{ set part     [lindex $argv 0] }}
 if {{$argc >= 2}} {{ set clock_ns [lindex $argv 1] }}
+if {{$argc >= 3 && [lindex $argv 2] eq "impl"}} {{ set run_impl 1 }}
+
+proc openeye_result {{stage part clock_ns}} {{
+    set wns [get_property SLACK [get_timing_paths -max_paths 1 -nworst 1 -setup]]
+    set fmax [expr {{1000.0 / ($clock_ns - $wns)}}]
+    puts [format "OPENEYE_RESULT %s part=%s clock_ns=%s WNS=%.3f ns  fmax~%.1f MHz" \\
+        $stage $part $clock_ns $wns $fmax]
+}}
 
 set here [file normalize [file dirname [info script]]]
 cd $here
@@ -166,12 +177,16 @@ foreach src [split [string trim [read $fh]] "\\n"] {{
 }}
 close $fh
 
+# Clock constraint before synthesis so that synthesis is timing driven
+# (the OOC clock port is clk_i). constraints.xdc holds the same for the GUI.
+set xdc [open reports/clock.xdc w]
+puts $xdc "create_clock -name clk -period $clock_ns \[get_ports clk_i\]"
+close $xdc
+read_xdc reports/clock.xdc
+
 synth_design -top {TOP} -part $part -mode out_of_context \\
     -include_dirs [list [file join $here include]] {defines} \\
     -flatten_hierarchy rebuilt
-
-# Clock constraint after synthesis (the OOC clock port is clk_i).
-create_clock -name clk -period $clock_ns [get_ports clk_i]
 
 report_utilization                        -file reports/utilization.txt
 report_utilization -hierarchical -hierarchical_depth 4 -file reports/utilization_hier.txt
@@ -179,10 +194,18 @@ report_timing_summary -max_paths 20       -file reports/timing_summary.txt
 report_timing -max_paths 20 -sort_by group -file reports/timing_paths.txt
 write_checkpoint -force reports/{TOP}_synth.dcp
 
-set wns [get_property SLACK [get_timing_paths -max_paths 1 -nworst 1 -setup]]
-set fmax [expr {{1000.0 / ($clock_ns - $wns)}}]
-puts [format "OPENEYE_RESULT part=%s clock_ns=%s WNS=%.3f ns  fmax~%.1f MHz (post-synthesis estimate)" \\
-    $part $clock_ns $wns $fmax]
+openeye_result post-synthesis $part $clock_ns
+
+if {{$run_impl}} {{
+    opt_design
+    place_design
+    phys_opt_design
+    route_design
+    report_utilization                  -file reports/utilization_route.txt
+    report_timing_summary -max_paths 20 -file reports/timing_summary_route.txt
+    write_checkpoint -force reports/{TOP}_route.dcp
+    openeye_result post-route $part $clock_ns
+}}
 """)
 
 

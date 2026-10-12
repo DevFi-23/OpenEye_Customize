@@ -537,6 +537,10 @@ source synth_ooc.tcl
 ```
 
 hoặc từ cmd: `vivado -mode batch -source synth_ooc.tcl -tclargs xczu7ev-ffvc1156-2-e 10`. Hai tham số `-tclargs` là part và chu kỳ clock (ns), có thể bỏ qua.
+Thêm tham số thứ ba `impl` (`-tclargs xczu7ev-ffvc1156-2-e 4 impl`) thì script chạy tiếp opt/place/route và ghi thêm `utilization_route.txt`,
+`timing_summary_route.txt`, cùng dòng `OPENEYE_RESULT post-route`. Trong Tcl shell, gõ `set run_impl 1` trước `source synth_ooc.tcl` để làm tương tự.
+Muốn biết fmax thật thì đặt clock **chặt** (ví dụ 4 ns = 250 MHz). Khi slack dư nhiều, công cụ không cố tối ưu, nên fmax suy ra chỉ là cận dưới.
+Bản script hiện tại đọc ràng buộc clock **trước** `synth_design`, nên tổng hợp có tính đến timing. Lần chạy đầu ngày 2026-10-12 dùng bản cũ (clock đặt sau tổng hợp); vì vậy hãy xuất lại thư mục trước khi chạy tiếp.
 Kết quả nằm trong `reports/`: `utilization.txt`, `utilization_hier.txt` (tài nguyên theo từng module), `timing_summary.txt`,
 `timing_paths.txt` (20 đường găng), `OpenEye_FPGA_synth.dcp` (checkpoint, mở lại bằng `open_checkpoint`).
 Dòng cuối của log in ra `OPENEYE_RESULT ... WNS=... fmax~... MHz`.
@@ -575,6 +579,34 @@ Lưu ý:
 - Bản Vivado miễn phí (ML Standard) hỗ trợ Zynq-7000 và một số Zynq UltraScale+ nhỏ. **ZU19EG** mà tác giả gốc dùng cần license trả phí.
   Kiểm tra danh sách thiết bị trước khi chọn part.
 - Lưu báo cáo vào repo: chép `reports/utilization.txt`, `reports/timing_summary.txt` và `config.json` vào `doc/synth/<ngày>_<cấu hình>/`.
+
+### Kết quả Vivado đầu tiên (2026-10-12, mốc chính thức, chi tiết `doc/synth/2026-10-12_baseline_zu7ev/SUMMARY.md`)
+
+Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 10 ns, cấu hình baseline, RTL `8a5bbd2` (đã có bản sửa `GET_BIAS`).
+
+| Tài nguyên | Dùng | Tỉ lệ ZU7EV |
+|---|---:|---:|
+| LUT | 64.540 (logic 61.877, LUTRAM/SRL 2.663) | 28,0 % |
+| Flip-flop | 38.655 | 8,4 % |
+| Block RAM tile | 192 (RAMB36 168 + RAMB18 48) | **61,5 %** |
+| URAM | 8 | 8,3 % |
+| DSP | 4 | 0,2 % |
+
+| Khối | Chiếm |
+|---|---|
+| Mảng PE (`OpenEye_Parallel`, 48 PE) | 84 % LUT, 85 % FF; mỗi PE khoảng 1.100 LUT và 655 FF. Bộ nhân của PE làm bằng LUT (`USE_DSP=0`) |
+| 8 bộ đệm psum (16.384 × 40 bit, `BUFFER_WIDTH_PSUM=14`) | **144 / 168 RAMB36**, tức 46 % BRAM của cả chip |
+| 4 `iact_stream_constructor` | 24 RAMB36 |
+| `router_configurator` / `psum_pipeline` / `dma_storage` | 2.477 / 2.438 / 2.130 LUT; 4 DSP nằm trong 4 bộ lượng tử |
+
+**Timing:** WNS +6,116 ns, hold +0,026 ns, không có vòng tổ hợp hay latch.
+Đường chậm nhất là 3,865 ns (17 tầng logic, 66 % là dây), nên **fmax sau tổng hợp ≈ 257 MHz**. Sau place & route thường thấp hơn 10–30 %.
+Đường găng nằm ở **logic điều khiển của bộ chuyển đổi iact** (`OpenEye_FPGA.v` khoảng dòng 943–950: 2 phép nhân giữa các tham số cấu hình,
+1 phép cộng và 1 phép so sánh trong cùng một chu kỳ). Đường găng không nằm ở MAC.
+Quy ra thời gian: `mnist1` 65.800 chu kỳ = 0,658 ms ở 100 MHz, 0,329 ms ở 200 MHz, 0,256 ms ở 257 MHz.
+
+**So với ước lượng Yosys:** LUT logic lệch dưới 1 %, nên Yosys dùng tốt để so sánh LUT tương đối. BRAM, URAM và DSP lệch nhiều,
+vì Yosys không dùng URAM và đưa bộ nhân vào DSP, nên các số này phải lấy từ Vivado.
 
 ### Có phải tổng hợp lại sau mỗi lần sửa RTL hoặc tối ưu không? **Có, khi RTL hoặc cấu hình thay đổi.**
 
@@ -979,3 +1011,7 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   viết `synth_ooc.tcl` (non-project, out-of-context). Đầu ra `vivado/` được đưa vào `.gitignore`. Header xuất ra giống hệt bản của phép đo `mnist1`.
   Yosys tổng hợp đầy đủ thư mục xuất ra: khoảng 61k LUT, 45k FF, 272 BRAM36, 121 DSP, nên cấu hình baseline không vừa xc7z020; part mặc định đổi thành ZU7EV.
   **RTL không đổi.**
+- **Kết quả Vivado đầu tiên** (bạn chạy trên Windows, Vivado 2024.2, ZU7EV): 64,5k LUT (28 %), 38,7k FF (8 %), 192 BRAM tile (62 %), 8 URAM, 4 DSP;
+  WNS +6,1 ns ở 10 ns, nên fmax sau tổng hợp khoảng 257 MHz. 46 % BRAM của chip là 8 bộ đệm psum. Đường găng là logic điều khiển iact converter.
+  Báo cáo lưu ở `doc/synth/2026-10-12_baseline_zu7ev/` (kèm `SUMMARY.md`).
+- `synth_ooc.tcl`: ràng buộc clock đặt trước `synth_design`; thêm tuỳ chọn `impl` (place & route out-of-context, fmax sau route).
