@@ -307,3 +307,6 @@ literature/*
 *.vscode
 CLAUDE.md
 notes.md
+
+# Generated Vivado source folders (tools/export_vivado.py), reproducible
+/vivado/

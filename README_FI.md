@@ -394,7 +394,7 @@ Phần nằm giữa (`OpenEye_FPGA` và toàn bộ RTL bên trong) **là cùng m
 ### Cách thu hẹp khoảng cách
 1. **Mô hình bộ nhớ trong cocotb**: **đã làm** (mục 6c).
 2. **Bộ đếm hiệu năng trong RTL**: đếm chu kỳ của mỗi pha và số beat, đọc qua AXI-Lite trên board. Đây là thay đổi RTL, cần bạn đồng ý.
-3. **Tổng hợp bằng Vivado** để lấy fmax và tài nguyên (thư mục `dse_scripts/` đã có script nhưng đang trỏ tới project trên máy của tác giả gốc).
+3. **Tổng hợp bằng Vivado** để lấy fmax và tài nguyên: hướng dẫn ở mục 6d (`tools/export_vivado.py`). Script `dse_scripts/` của upstream trỏ tới project trên máy của tác giả gốc nên không dùng được.
 4. Nếu có board: đo thời gian tổng bằng timer của CPU quanh `openeye_runtime`, rồi so với dự đoán từ mô phỏng.
 
 ## 6c. Mô hình bộ nhớ ngoài trong testbench (2026-10-10)
@@ -463,6 +463,135 @@ từng word** (`bandwidth=0.5`, hoặc burst 1 word) thì FAIL. `profile.json` (
 - Cửa sổ đo của profiler bắt đầu từ word đầu tiên được nhận, nên `setup` và độ trễ trước burst đầu **không** nằm trong tổng chu kỳ.
 - Một layer là một lần truyền; chưa mô hình hoá thời gian của CPU giữa các layer, chưa tranh chấp bus với CPU.
 - Tham số chưa hiệu chỉnh: kết quả dùng để **so sánh tương đối** giữa các phương án.
+
+## 6d. Tổng hợp bằng Vivado (2026-10-12)
+
+### Repo đã đủ file để add vào Vivado chưa? **Chưa, nếu add thẳng thư mục `hdl/`.**
+
+| Vấn đề | Chi tiết |
+|---|---|
+| Thiếu 4 header được sinh tự động | `OpenEye_FPGA.v` include `parameters_FPGA.vh`, `PE.v` include `parameters_PE.vh`, `PE_cluster.v` include `parameters_PE_cluster.vh`, `dma_storage.v` include `regmap_params.vh`. Các file này **không có trong git**: test runner sinh lại chúng cho mỗi cấu hình. Bản trong `test/cocotb_fpga/` và `hdl/include/` chỉ là kết quả của lần test chạy cuối, và **không cùng cấu hình với nhau** (ví dụ `TRANSMISSIONS` 27 và 26) |
+| `hdl/dma_storage.v` đã cũ | Bản này cũ hơn `test/cocotb_fpga/regmap.yaml`. Test luôn thay bằng bản sinh ra từ `regmap.yaml`. Dùng bản cũ thì bộ giải mã word cấu hình bị lệch, RTL đọc sai tham số layer |
+| `TRANSMISSIONS` phải khớp | Giá trị trong `parameters_FPGA.vh` phải bằng giá trị trong `regmap_params.vh`; cả hai phụ thuộc vào cấu hình mảng |
+| Wrapper AXI `fpga/hdl/open_eye_axi_v1_0.v` **không biên dịch được** | (1) Gọi module `open_eye_mt_v1_0_cfg_reg` nhưng module này không có trong repo. (2) Gán `QUANT_AMOUNT` nhưng wrapper không khai báo tham số này. (3) Gán `BUFFER_WIDTH` hai lần. (4) Gán `RAM_CELLS`, trong khi `OpenEye_FPGA` chỉ có `IACT_RAM_CELLS`. **Chưa sửa** (là HDL, cần bạn đồng ý). Không ảnh hưởng tới tổng hợp out-of-context `OpenEye_FPGA` |
+| Không có project Vivado và block design | `dse_scripts/run_impl.tcl` mở file `.xpr` và block design `.bd` trên máy của tác giả gốc; các file này không có trong repo |
+
+**Cách giải quyết:** script `tools/export_vivado.py` (không sửa RTL). Script sinh **đồng bộ từ một cấu hình duy nhất** đủ 4 header và
+`dma_storage.v`, chép RTL vào cùng một thư mục, rồi viết sẵn file Tcl. Cấu hình mặc định là **đúng cấu hình của baseline độ trễ**
+(`test_profile.py`): 2×2 cluster, `NUM_GLB_IACT=1`, `NUM_GLB_PSUM=4`, `NUM_GLB_WGHT=3`, psum 20 bit, `QUANT_AMOUNT=32`, DMA 64 bit.
+Vì vậy fmax đo được dùng trực tiếp để đổi số chu kỳ của baseline ra thời gian thật.
+Đã kiểm chứng: 4 header và `dma_storage.v` xuất ra **giống hệt từng byte** với bản mà phép đo `mnist1` dùng.
+Yosys đọc thư mục xuất ra với 0 lỗi, dựng đủ cây 30 module.
+
+### Ước lượng trước bằng Yosys (cấu hình baseline, 2026-10-12)
+
+Yosys 0.69 `synth_xilinx -flatten -family xc7` chạy trên đúng thư mục `vivado/baseline`: 0 lỗi, 8 phút 20 giây, RAM tối đa 3,2 GB (vừa với WSL 7 GB).
+Đây là **ước lượng**. Vivado thường gói LUT tốt hơn và suy luận BRAM khác, nên số chính thức phải lấy từ Vivado.
+
+| Tài nguyên | Yosys (baseline 2×2) | xc7z020 (PYNQ-Z2) | xczu7ev (ZCU104) |
+|---|---:|---:|---:|
+| LUT logic (LUT2–LUT6) | 61.277 | 53.200 → **115 %, không vừa** | 230.400 → 27 % |
+| LUT dùng làm RAM (RAM32M, RAM64X1S) | ≈ 2.500 LUT | | |
+| Flip-flop | 45.274 | 106.400 → 43 % | 460.800 → 10 % |
+| BRAM (quy về BRAM36: 248 RAMB36 + 48 RAMB18) | 272 | 140 → **194 %, không vừa** | 312 → 87 % |
+| DSP | 121 | 220 → 55 % | 1.728 → 7 % |
+
+Vì vậy part mặc định của `export_vivado.py` là `xczu7ev-ffvc1156-2-e`. Muốn dùng board nhỏ kiểu PYNQ-Z2 thì phải giảm cấu hình
+(1×1 cluster nhỏ hơn khoảng 4 lần), và khi đó phải đo lại baseline chu kỳ với cùng cấu hình.
+
+### Bước 1: tạo thư mục nguồn (trong WSL)
+
+```bash
+cd ~/OpenEye_orig
+venv/bin/python tools/export_vivado.py                                   # cấu hình baseline, part xczu7ev-ffvc1156-2-e (ZCU104), 100 MHz
+venv/bin/python tools/export_vivado.py --part xc7z020clg400-1 --set CLUSTER_ROWS=1 --set CLUSTER_COLUMNS=1 --name z7020_1x1   # PYNQ-Z2, cấu hình nhỏ
+venv/bin/python tools/export_vivado.py --set CLUSTER_ROWS=4 --name rows4                         # đổi một tham số
+```
+
+Kết quả nằm ở `vivado/<name>/` (không đưa lên git, vì sinh lại được bất cứ lúc nào):
+
+```
+vivado/baseline/
+├── rtl/              39 file .v (hdl/*.v, thay dma_storage.v bằng bản sinh ra)
+├── include/          parameters_FPGA.vh, parameters_PE.vh, parameters_PE_cluster.vh, regmap_params.vh
+├── filelist.f        danh sách nguồn
+├── constraints.xdc   ràng buộc clock (cổng clk_i)
+├── synth_ooc.tcl     flow tổng hợp chạy batch
+├── config.json       cấu hình đã dùng (để ghi vào báo cáo)
+└── regmap_pack.py    cách đóng gói word cấu hình cho cấu hình này (tham khảo)
+```
+
+Vivado chạy trên Windows, nên chép thư mục này sang ổ Windows. Không nên mở trực tiếp qua `\\wsl.localhost`, vì Vivado chạy chậm và đôi khi lỗi đường dẫn:
+
+```bash
+mkdir -p /mnt/c/openeye_vivado && cp -r vivado/baseline /mnt/c/openeye_vivado/
+```
+
+### Bước 2a: chạy bằng Tcl (khuyên dùng, nhanh và lặp lại được)
+
+Mở **Vivado Tcl Shell** (Start menu), rồi chạy:
+
+```tcl
+cd C:/openeye_vivado/baseline
+source synth_ooc.tcl
+```
+
+hoặc từ cmd: `vivado -mode batch -source synth_ooc.tcl -tclargs xczu7ev-ffvc1156-2-e 10`. Hai tham số `-tclargs` là part và chu kỳ clock (ns), có thể bỏ qua.
+Kết quả nằm trong `reports/`: `utilization.txt`, `utilization_hier.txt` (tài nguyên theo từng module), `timing_summary.txt`,
+`timing_paths.txt` (20 đường găng), `OpenEye_FPGA_synth.dcp` (checkpoint, mở lại bằng `open_checkpoint`).
+Dòng cuối của log in ra `OPENEYE_RESULT ... WNS=... fmax~... MHz`.
+
+### Bước 2b: làm bằng giao diện (GUI)
+
+1. **Create Project** → RTL Project → tick **Do not specify sources at this time** → chọn part (ví dụ `xczu7ev-ffvc1156-2-e`; xem bảng ước lượng bên dưới để chọn chip đủ lớn).
+2. **Add Sources → Add or create design sources → Add Files**: chọn toàn bộ `rtl/*.v`. **Không** add `hdl/dma_storage.v` của repo; chỉ dùng bản trong `rtl/`.
+   Tick **Copy sources into project** nếu muốn project độc lập với thư mục xuất.
+3. Add thêm 4 file trong `include/`. Chuột phải từng file → **Set File Type → Verilog Header**. Hoặc:
+   **Settings → General → Verilog options → Include Directories** → thêm thư mục `include/`.
+4. Chọn tất cả file `.v` trong **Sources** → chuột phải → **Set File Type → SystemVerilog**. Simulator và Yosys đều đọc nguồn ở chế độ SystemVerilog.
+5. **Settings → General → Verilog options → Defines**: thêm `SYNTHESIS` và `NO_TRACE`. Thiếu `NO_TRACE` thì Vivado báo lỗi ở `$value$plusargs`
+   (đây là code trace chỉ dùng cho mô phỏng).
+6. Chuột phải `OpenEye_FPGA` → **Set as Top**.
+7. **Settings → Synthesis → More Options**: thêm `-mode out_of_context`. Lý do: thiết kế có khoảng 140 cổng (DMA 64 bit vào, 64 bit ra), không gán ra chân thật.
+   Ở chế độ OOC, Vivado không chèn I/O buffer và không báo lỗi thiếu chân.
+8. Add `constraints.xdc` (Add Sources → Add or create constraints).
+9. **Run Synthesis** → **Open Synthesized Design** → **Report Utilization** và **Report Timing Summary**.
+
+### Bước 3: đọc kết quả và ghi lại
+
+| Số liệu | Đọc ở đâu | Dùng để làm gì |
+|---|---|---|
+| LUT, FF, BRAM, DSP | `utilization.txt` | Mốc tài nguyên; so với dung lượng của chip |
+| Tài nguyên theo module | `utilization_hier.txt` | Biết PE, GLB, `psum_pipeline` hay bảng lượng tử chiếm bao nhiêu |
+| WNS (Worst Negative Slack) | `timing_summary.txt` | WNS ≥ 0: đạt clock mục tiêu. WNS < 0: không đạt |
+| fmax ≈ 1000 / (T − WNS) MHz | Dòng `OPENEYE_RESULT` | Đổi chu kỳ ra thời gian: `mnist1` 65.800 chu kỳ ở 100 MHz = 0,658 ms |
+| Đường găng | `timing_paths.txt` | Biết khối nào giới hạn tần số |
+
+Lưu ý:
+- fmax sau tổng hợp là **ước lượng lạc quan**: chưa có trễ đi dây. Sau place & route thường thấp hơn 10–30 %.
+  Muốn chính xác hơn, chạy tiếp trong Tcl shell: `opt_design; place_design; route_design; report_timing_summary`. Ở chế độ OOC vẫn chạy được.
+- Nếu tài nguyên vượt quá chip (ví dụ cấu hình baseline trên xc7z020), tổng hợp **vẫn ra báo cáo**, chỉ place & route mới thất bại.
+  Khi đó giảm cấu hình (`--set CLUSTER_ROWS=1`, `--set CLUSTER_COLUMNS=1`) hoặc chọn chip lớn hơn. Cần ghi rõ cấu hình đi kèm mọi số liệu.
+- Bản Vivado miễn phí (ML Standard) hỗ trợ Zynq-7000 và một số Zynq UltraScale+ nhỏ. **ZU19EG** mà tác giả gốc dùng cần license trả phí.
+  Kiểm tra danh sách thiết bị trước khi chọn part.
+- Lưu báo cáo vào repo: chép `reports/utilization.txt`, `reports/timing_summary.txt` và `config.json` vào `doc/synth/<ngày>_<cấu hình>/`.
+
+### Có phải tổng hợp lại sau mỗi lần sửa RTL hoặc tối ưu không? **Có, khi RTL hoặc cấu hình thay đổi.**
+
+| Thay đổi | Mô phỏng (cocotb) | Tổng hợp lại? |
+|---|---|---|
+| Sửa RTL (`hdl/*.v`), ví dụ sửa lỗi hoặc gửi bias theo filter | Bắt buộc chạy lại test và `run_profile --compare` | **Có.** Tài nguyên và fmax có thể đổi. Sinh lại thư mục bằng `export_vivado.py`, vì `rtl/` là bản chép |
+| Đổi tham số cấu hình (số cluster, `QUANT_AMOUNT`, `DMA_BITWIDTH`, ...) | Có | **Có**, với cùng `--set` như khi mô phỏng |
+| Sửa `regmap.yaml` | Có | **Có** (đổi `dma_storage.v` và `TRANSMISSIONS`) |
+| Chỉ sửa Python (bộ sinh stream, testbench, profiler, báo cáo) | Có | **Không**, phần cứng không đổi |
+| Chỉ sửa phần mềm runtime (`fpga/sw`) | Không | **Không** (chỉ biên dịch lại phần mềm) |
+
+Quy trình đề xuất cho mỗi thay đổi RTL:
+1. Test và `run_profile --compare` (chu kỳ).
+2. Yosys để so sánh nhanh, khoảng vài phút.
+3. Vivado ở các mốc quan trọng (trước và sau một tối ưu lớn) để lấy số chính thức: tài nguyên và fmax.
+
+Độ trễ thật = số chu kỳ ÷ fmax. Một tối ưu giảm 19 % số chu kỳ nhưng làm fmax giảm 25 % thì **chậm hơn**. Vì vậy mọi tối ưu cần cả hai con số.
 
 ## 7. Kết quả baseline chính (chi tiết: `doc/perf/baseline.md`)
 
@@ -841,3 +970,12 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   `~/tools/docenv/bin/python tools/report/make_progress_report.py` (đọc số liệu từ `doc/perf/`; môi trường `~/tools/docenv` có python-docx,
   matplotlib, nodejs, cài qua micromamba để không động vào venv của project).
 - README: mục 5.8 (độ rộng DMA), 8b (tổng hợp lỗi), 8c (kế hoạch gần).
+
+### 2026-10-12
+
+- README mục 8c: thiết kế "gửi bias theo filter" (phương án A/B/C), **chưa triển khai**, chờ đồng ý. Mục 8b: lỗi #12 (`current_filter` không tăng, mới đọc code).
+- **Chuẩn bị tổng hợp Vivado** (mục 6d): repo chưa đủ file để add thẳng (4 header được sinh tự động, `hdl/dma_storage.v` cũ,
+  wrapper AXI có 4 lỗi biên dịch). Thêm `tools/export_vivado.py`: sinh đồng bộ header và `dma_storage.v` theo cấu hình baseline,
+  viết `synth_ooc.tcl` (non-project, out-of-context). Đầu ra `vivado/` được đưa vào `.gitignore`. Header xuất ra giống hệt bản của phép đo `mnist1`.
+  Yosys tổng hợp đầy đủ thư mục xuất ra: khoảng 61k LUT, 45k FF, 272 BRAM36, 121 DSP, nên cấu hình baseline không vừa xc7z020; part mặc định đổi thành ZU7EV.
+  **RTL không đổi.**
