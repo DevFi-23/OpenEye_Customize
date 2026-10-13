@@ -254,6 +254,17 @@ module iact_stream_constructor #(
         rd_addr_2                  <= 0;
         rd_addr_3                  <= 0;
         rd_addr_4                  <= 0;
+        // The read-loop counters are counted in this block, so they are
+        // reset here as well. They used to be reset in the storage block
+        // below, which made them multi-driven: simulators let the last write
+        // win, but Vivado keeps the constant reset driver and drops the
+        // counting logic (Synth 8-6858/8-6859), so on the FPGA the counters
+        // stayed 0 and every layer with iact_read_limit_1..3 != 0 read wrong
+        // iact addresses.
+        rd_cycle_loop_cnt_0        <= 0;
+        rd_cycle_loop_cnt_1        <= 0;
+        rd_cycle_loop_cnt_2        <= 0;
+        rd_cycle_loop_cnt_3        <= 0;
       end else begin
         case (fsm_enc_current_state)
           IDLE: begin
@@ -472,10 +483,6 @@ reg enable_write_to_storage;
         wr_cycle_loop_cnt_0           <= 0;
         wr_cycle_loop_cnt_1           <= 0;
         wr_cycle_loop_cnt_2           <= 0;
-        rd_cycle_loop_cnt_0           <= 0;
-        rd_cycle_loop_cnt_1           <= 0;
-        rd_cycle_loop_cnt_2           <= 0;
-        rd_cycle_loop_cnt_3           <= 0;
         rd_cycle_loop_cnt_4           <= 0;
         iact_values_per_cluster_transmit <= 0;
         router_cycle                     <= 0;

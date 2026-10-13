@@ -743,7 +743,7 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 | 10 | `CLUSTER_ROWS=1`: một số cấu hình treo FSM (theo tài liệu upstream) | RTL | **Chưa sửa**, chưa tự kiểm chứng |
 | 11 | Lint đáng ngờ: `PE.v:2210` (cắt 7→5 bit), `data_pipeline_wght.v:394/396/424` (overhead 4 bit), `BLKANDNBLK` trong `psum_pipeline.v` | RTL | **Chưa sửa**, cần test (mục 9b) |
 | 12 | `current_filter` (chỉ số filter của bộ lượng tử) chỉ được reset về 0, **không bao giờ tăng**, nên mọi filter dùng hệ số lượng tử của filter 0 (lượng tử theo filter chưa hoạt động) | `hdl/psum_pipeline.v` | **Chưa sửa**, phát hiện bằng đọc code (2026-10-10), chưa kiểm chứng bằng test. Test hiện tại dùng hệ số giống nhau cho mọi filter nên không phát hiện được |
-| 13 | `rd_cycle_loop_cnt_0..3` bị lái từ 2 khối `always` (reset ở khối này, đếm ở khối kia). Vivado giữ giá trị reset nên trên FPGA các bộ đếm **luôn bằng 0**; mô phỏng không thấy | `hdl/iact_stream_constructor.v:233/437` | **Đã xác nhận bằng thí nghiệm** (2026-10-13, `doc/experiments/2026-10-13_bug13_stuck_counters.md`): giả lập phần cứng thì 6/9 case baseline FAIL (mọi case có `iact_read_limit_1..3` ≠ 0, gồm cả 3 layer MNIST), đối chứng PASS. **Chưa sửa**, chờ bạn đồng ý |
+| 13 | `rd_cycle_loop_cnt_0..3` bị lái từ 2 khối `always` (reset ở khối này, đếm ở khối kia). Vivado giữ giá trị reset nên trên FPGA các bộ đếm **luôn bằng 0**; mô phỏng không thấy | `hdl/iact_stream_constructor.v:233/437` | **Đã xác nhận bằng thí nghiệm** (2026-10-13, `doc/experiments/2026-10-13_bug13_stuck_counters.md`): giả lập phần cứng thì 6/9 case baseline FAIL (mọi case có `iact_read_limit_1..3` ≠ 0, gồm cả 3 layer MNIST), đối chứng PASS. **Đã sửa** (2026-10-13, được bạn đồng ý): 0 chu kỳ, 79 test hồi quy không đổi; chờ tổng hợp lại bằng Vivado để xác nhận CRITICAL WARNING biến mất (mục 9) |
 | 14 | `results_ready` vừa gán blocking vừa non-blocking; Vivado: "entire logic could be removed" | `hdl/psum_pipeline.v:485/522/900` | **Chưa sửa** (cùng lint `BLKANDNBLK` ở #11, nay Vivado xác nhận rủi ro) |
 | 15 | 12 thanh ghi có set và reset cùng mức ưu tiên (Synth 8-7137, "may cause simulation mismatches") | `psum_pipeline.v:322/776`, `OpenEye_Parallel.v:443/448`, `PE.v:1113` | **Chưa phân tích** |
 | 16 | Wrapper AXI `fpga/hdl/open_eye_axi_v1_0.v` không biên dịch được (thiếu module `cfg_reg`, `QUANT_AMOUNT` chưa khai báo, `BUFFER_WIDTH` gán 2 lần, `RAM_CELLS` không tồn tại) | `fpga/hdl` | **Chưa sửa**; chỉ cần khi đóng gói IP hoặc làm block design |
@@ -755,7 +755,7 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 | # | Việc | Loại | Vì sao | Trạng thái |
 |---|---|---|---|---|
 | A | Place & route (clock 4 ns) để có fmax chính thức | Vivado, không sửa RTL | Fmax sau tổng hợp là ước lượng lạc quan; mọi tối ưu cần cả chu kỳ lẫn fmax | **Xong 2026-10-13: đạt 250 MHz sau route** (WNS +0,025 ns); đường găng là dây tới 144 BRAM của bộ đệm psum (mục 6d) |
-| B | **Lỗi #13: phần cứng khác mô phỏng** ở `iact_stream_constructor` | Thí nghiệm, rồi sửa RTL | Nếu đúng như Vivado báo, bitstream hiện tại tính sai iact, nên mọi số đo trên board sẽ vô nghĩa | (1) Thí nghiệm **xong 2026-10-13: lỗi có thật**, 6/9 case sai trên phần cứng giả lập. (2) Sửa 4 dòng reset: **chờ bạn đồng ý** |
+| B | **Lỗi #13: phần cứng khác mô phỏng** ở `iact_stream_constructor` | Thí nghiệm, rồi sửa RTL | Nếu đúng như Vivado báo, bitstream hiện tại tính sai iact, nên mọi số đo trên board sẽ vô nghĩa | (1) Thí nghiệm **xong 2026-10-13: lỗi có thật**, 6/9 case sai trên phần cứng giả lập. (2) **Đã sửa 2026-10-13** (mục 9). Còn: bạn tổng hợp lại bằng Vivado (`C:/openeye_vivado/fix13_impl`) |
 | C | Gửi bias theo filter (1.1 bên dưới) | Sửa RTL | Khoảng −19 % chu kỳ ở `mnist1`, DMA pha bias giảm khoảng 900 lần, chi phí khoảng +2 % FF và 0 BRAM | Chờ đồng ý |
 | D | Thu nhỏ bộ đệm psum (`BUFFER_WIDTH_PSUM` 14 → 11/12) | Đổi tham số, không sửa RTL | 144/168 RAMB36 là bộ đệm psum, layer lớn nhất chỉ dùng khoảng 1.792/16.384 địa chỉ (ước tính); tiết kiệm khoảng 100–124 BRAM36 để thêm cluster hoặc bộ đệm | Cần kiểm chứng bằng 9 case. Sau route còn thấy lợi thêm: đường găng là dây tới các BRAM này, nên bộ đệm nhỏ hơn có thể tăng fmax |
 | E | DMA 128 bit | Băng thông | Cổng HP của ZU+ rộng 128 bit; 64 bit ở 250 MHz chỉ đạt khoảng 2 GB/s; giảm một nửa số chu kỳ nạp và đọc kết quả | 128 bit chưa từng được kiểm chứng |
@@ -904,6 +904,36 @@ BRAM hay DSP.
 - `model_test` (chạy cả model) bị tắt trong testbench.
 - **CI "Lint"** của upstream luôn fail vì các warning có sẵn trong RTL (repo gốc cũng fail ở mọi commit). Từ 2026-10-10, CI của `dev`
   dùng lint theo baseline (mục 9c), chỉ fail khi có warning mới. Chi tiết từng warning: mục 9b.
+
+### Sửa lỗi #13: bộ đếm vòng lặp đọc iact bị lái từ 2 khối `always` (2026-10-13, được bạn đồng ý)
+
+**Thay đổi** (`hdl/iact_stream_constructor.v`, chỉ chuyển chỗ 4 dòng, không thêm logic):
+- Trước: `rd_cycle_loop_cnt_0..3` được **đếm** trong khối `always` của bộ đọc/encode (dòng 233), nhưng được **reset** trong khối `always`
+  của bộ ghi/lưu trữ (dòng 437). Một thanh ghi bị gán ở 2 khối là "multi-driven".
+- Sau: 4 lệnh reset nằm trong nhánh reset của chính khối đang đếm (khối dòng 233). Khối dòng 437 không còn gán các bộ đếm này.
+  `rd_cycle_loop_cnt_4` không đổi: nó chỉ được gán trong khối dòng 437 và không được dùng (lint `UNUSEDSIGNAL`), nên không bị multi-driven.
+
+**Vì sao trước đây mô phỏng đúng mà phần cứng sai:**
+- Simulator (Icarus) cho 2 khối cùng ghi một biến. Khối reset chỉ ghi khi `rst_ni = 0`, còn khối đếm ghi khi chạy, nên kết quả trùng với ý người viết.
+- Công cụ tổng hợp phải tạo **một** flip-flop cho mỗi bit. Hai khối tạo ra 2 nguồn lái trên cùng một dây. Vivado (Synth 8-6858/8-6859) giữ nguồn hằng số
+  (giá trị reset 0) và bỏ logic đếm, nên trên FPGA các bộ đếm luôn bằng 0. Thí nghiệm ở `doc/experiments/2026-10-13_bug13_stuck_counters.md` cho thấy
+  khi đó 6/9 case baseline (mọi layer có `iact_read_limit_1..3` ≠ 0, gồm cả 3 layer MNIST) tính sai.
+- Verilator lint không bắt được vì `MULTIDRIVEN` chỉ cảnh báo khi 2 khối dùng clock khác nhau.
+
+**Kiểm chứng:**
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Yosys `check` riêng module `iact_stream_constructor` | Bản cũ: 32 cảnh báo "multiple conflicting drivers" (4 bộ đếm × 8 bit). Bản sửa: **0** |
+| 9 case baseline (`run_profile --compare doc/perf/baseline_2026-10-10`) | **9/9 PASS, số chu kỳ và số word DMA chênh lệch 0** ở cả 9 case |
+| 79 test hồi quy (16 Conv `test_conv_const.py` + 63 GEMM/Dense `test_gemm_layer.py`) | **Giống hệt từng test** so với lần chạy 2026-10-10: Conv 9 PASS / 7 FAIL, GEMM 40 PASS / 23 FAIL, 0 test đổi kết quả (các FAIL là lỗi có sẵn #5–#7) |
+| Lint baseline (Verilator 5.020) | 0 warning mới (`parallel` 38, `fpga` 478) |
+| Yosys `synth_xilinx` toàn thiết kế (so với lần chạy ngày 2026-10-12) | FF 45.274 → 45.402 (**+128 = 4 instance × 4 bộ đếm × 8 bit**, đúng các bộ đếm mà trước đây bị bỏ); LUT 61.277 → 61.456 (+179, +0,3 %); CARRY4 +33 (bộ cộng 8 bit); BRAM và DSP không đổi. Trên ZU7EV: +0,03 % FF, +0,08 % LUT. Yosys còn báo conflicting drivers cho `a`, `b` trong `OpenEye_FPGA.v`: đây là biến chạy vòng `for` dùng chung giữa các khối `always`, không có logic nào đọc nên không thành phần cứng. Lỗi cũ, vô hại, Vivado không báo |
+| Vivado (CRITICAL WARNING phải biến mất, tài nguyên, fmax) | **Chờ bạn chạy** `C:/openeye_vivado/fix13_impl` (`set run_impl 1`, clock 4 ns) |
+
+**Tốt hơn cũ ở đâu:** trên mô phỏng không có gì thay đổi (đúng như mong muốn: cùng số chu kỳ, cùng kết quả). Khác biệt nằm ở **phần cứng thật**:
+bitstream tạo từ RTL cũ tính sai mọi layer thực tế, còn RTL mới cho phần cứng làm đúng như mô phỏng. Bản sửa không tốn chu kỳ nào. Về tài nguyên,
+phần cứng chỉ có thêm đúng các bộ đếm mà thiết kế vốn cần (4 × 8 bit = 32 flip-flop cùng bộ cộng và so sánh), những thứ trước đây Vivado đã bỏ đi.
 
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
@@ -1110,3 +1140,6 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   (`rd_cycle_loop_cnt_0..3` luôn bằng 0) rồi chạy 9 case baseline. Kết quả: **6/9 FAIL** (3 case `32x3` và 3 case MNIST, mọi feature map sai), 3 case nhỏ PASS.
   Đối chứng (bản sao không sửa) PASS với số chu kỳ đúng như baseline. Quy luật: sai khi một trong `iact_read_limit_1..3` khác 0. Công cụ mới
   `tools/decode_iact_read_loops.py` giải mã các thanh ghi này từ stream DMA. Chi tiết: `doc/experiments/2026-10-13_bug13_stuck_counters.md`.
+- **Sửa lỗi #13** (`hdl/iact_stream_constructor.v`, được bạn đồng ý): 4 lệnh reset của `rd_cycle_loop_cnt_0..3` chuyển về khối `always` đang đếm.
+  Yosys `check`: 32 → 0 cảnh báo conflicting drivers. 9 case baseline PASS, 0 chu kỳ chênh lệch. 79 test Conv/GEMM giống hệt trước. Lint 0 warning mới.
+  Thư mục Vivado `C:/openeye_vivado/fix13_impl` đã xuất sẵn để tổng hợp lại. Chi tiết ở mục 9.
