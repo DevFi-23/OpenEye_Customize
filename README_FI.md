@@ -197,6 +197,21 @@ thì vừa tiết kiệm tài nguyên, vừa giảm DMA, vừa giúp simulation 
 
 - **Khi nào dùng `SERIAL=0`:** khi `OpenEye_Parallel` được dùng làm lõi tính toán độc lập, ví dụ trong ASIC hoặc một hệ thống
   tự cấp dữ liệu song song cho từng cluster. Hiện **không có luồng nào chạy được ở chế độ này**.
+- **Kiểm chứng (cập nhật 2026-10-13): `SERIAL=0` chưa được kiểm chứng là chạy đúng.**
+  - Bộ sinh địa chỉ GLB chưa có: `OpenEye_Parallel.v:790` ghi rõ "needs an address generator that does not exist yet",
+    và địa chỉ GLB để trống có chủ đích.
+  - `test/cocotb_parallel` đã cũ: 5/6 test fail vì lỗi Python (TypeError, testbench viết trước đợt refactor `src/open_eye`), không phải do kiểm tra kết quả.
+    Test duy nhất pass là `test_gemm_mode_plumbing` (chỉ kiểm tra đường nối). Upstream khuyên "do not use cocotb_parallel for system checks"
+    (`doc/test_status_handover.md` mục 4.3).
+  - Lint mục tiêu `parallel` (mặc định `SERIAL=0`) chỉ chứng minh RTL **biên dịch được**, không chứng minh tính đúng.
+- **Có phải định hướng ASIC không? Đúng, theo tài liệu upstream.** README gọi `OpenEye_Parallel.v` là "ASIC compute core";
+  `doc/OpenEye_FPGA_documentation.md` viết `OpenEye_FPGA` "adapts the core OpenEye_Parallel module, which was designed for ASIC".
+  `RAM_SP.v` có sẵn chỗ cắm SRAM macro (`OPENEYE_RAM_SPECIFIC`, OpenRAM) dành cho ASIC. Lưu ý hai điểm:
+  - Chính `OpenEye_FPGA` cũng chứa `OpenEye_Parallel`, nhưng với `SERIAL=1`. Vậy "lõi ASIC" là **module**; `SERIAL=0` là **chế độ dữ liệu song song**
+    (GLB có RAM riêng, mỗi cluster một cổng) phù hợp với chip ASIC kiểu Eyeriss v2, nơi có thể nối nhiều cổng rộng.
+  - Repo **không có** luồng ASIC (không có script OpenLane, thư viện cell hay SRAM macro). Chỉ có Yosys/nextpnr cho FPGA GateMate và Vivado.
+- **Ảnh hưởng tới hướng nghiên cứu:** mọi số đo hiện tại (chu kỳ, DMA, Vivado) là của `SERIAL=1`. Hoàn thiện `SERIAL=0` (bộ sinh địa chỉ GLB,
+  testbench mới) là một dự án riêng, lớn. Chỉ nên cân nhắc khi mục tiêu chuyển sang kiến trúc ASIC.
 - **Liên quan tới hướng nghiên cứu:** `SERIAL=0` giữ dữ liệu trong GLB của từng cluster, tức tái sử dụng dữ liệu trên chip nhiều hơn
   và giảm lưu lượng DMA. Về lâu dài đây có thể là một hướng kiến trúc, nhưng phải hoàn thiện phần RTL còn thiếu. Đây là việc lớn, không thuộc trước mắt.
 
@@ -627,6 +642,26 @@ vì Yosys không dùng URAM và đưa bộ nhân vào DSP, nên các số này p
   Synth 8-7137 (12 thanh ghi có set và reset cùng mức ưu tiên, "may cause simulation mismatches"), Synth 8-689 (`PE.v:2210/2211` lệch độ rộng, lint #11),
   Synth 8-6057 (URAM không có thanh ghi pipeline, có thể giới hạn fmax sau route). Bảng đầy đủ ở `SUMMARY.md` của thư mục trên.
 
+### Place & route (2026-10-13, clock 4 ns), **mốc fmax chính thức** (`doc/synth/2026-10-13_route4ns_zu7ev/`)
+
+| | Sau tổng hợp | **Sau route** |
+|---|---:|---:|
+| WNS ở 4 ns | +0,205 ns | **+0,025 ns, đạt 250 MHz** |
+| Hold (WHS) | +0,026 ns | +0,010 ns (đạt) |
+| fmax | khoảng 263 MHz | **khoảng 252 MHz** (cận dưới: công cụ ngừng tối ưu khi đã đạt mục tiêu) |
+| LUT / FF | 65.600 / 38.631 | 63.942 (27,8 %) / 38.667 (8,4 %) |
+| BRAM tile / URAM / DSP | 192 / 8 / 4 | 192 / 8 / 4 |
+
+- **Không có lỗi mới.** Không có ERROR. CRITICAL WARNING vẫn chỉ là lỗi #13 (ở bước tổng hợp, không có mã cảnh báo mới).
+  Ở các bước opt/place/route chỉ có cảnh báo của chế độ out-of-context: cổng không có vị trí partition pin, DRC kết nối bị bỏ qua, chưa đặt HD.CLK_SRC.
+  Các cảnh báo này là bình thường khi tổng hợp một khối đứng riêng.
+- **Thời gian thật ở 250 MHz:** `mnist1` 0,263 ms, `mnist2` 0,348 ms, `mnist3` 0,107 ms (bộ nhớ lý tưởng).
+- **Đường găng sau route khác sau tổng hợp:**
+  - 12 trên 20 đường chậm nhất đi từ thanh ghi của `psum_pipeline` tới chân BRAM của bộ đệm psum: 0 tầng logic, khoảng 98 % là dây.
+    Bộ đệm psum có 144 BRAM trải khắp chip nên dây dài. Thu nhỏ bộ đệm psum (hướng D, mục 8c) vì thế **vừa tiết kiệm BRAM vừa có thể tăng fmax**.
+  - 7 đường đi từ URAM của `wght_buffer` (không có thanh ghi pipeline ở ngõ ra) qua 12 tầng LUT tới PE.
+  - Đường của iact converter (đường găng sau tổng hợp) không còn trong 20 đường chậm nhất.
+
 ### Có phải tổng hợp lại sau mỗi lần sửa RTL hoặc tối ưu không? **Có, khi RTL hoặc cấu hình thay đổi.**
 
 | Thay đổi | Mô phỏng (cocotb) | Tổng hợp lại? |
@@ -719,10 +754,10 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 
 | # | Việc | Loại | Vì sao | Trạng thái |
 |---|---|---|---|---|
-| A | Place & route (clock 4 ns) để có fmax chính thức | Vivado, không sửa RTL | Fmax sau tổng hợp là ước lượng lạc quan; mọi tối ưu cần cả chu kỳ lẫn fmax | Chờ bạn chạy lại bằng thư mục `baseline_impl` (mục 6d) |
+| A | Place & route (clock 4 ns) để có fmax chính thức | Vivado, không sửa RTL | Fmax sau tổng hợp là ước lượng lạc quan; mọi tối ưu cần cả chu kỳ lẫn fmax | **Xong 2026-10-13: đạt 250 MHz sau route** (WNS +0,025 ns); đường găng là dây tới 144 BRAM của bộ đệm psum (mục 6d) |
 | B | **Lỗi #13: phần cứng khác mô phỏng** ở `iact_stream_constructor` | Thí nghiệm, rồi sửa RTL | Nếu đúng như Vivado báo, bitstream hiện tại tính sai iact, nên mọi số đo trên board sẽ vô nghĩa | Đề xuất: (1) thí nghiệm trên bản sao tạm, giả lập bộ đếm luôn 0 rồi chạy 9 case baseline (không sửa RTL của project); (2) sửa 4 dòng reset. **Cần bạn đồng ý** |
 | C | Gửi bias theo filter (1.1 bên dưới) | Sửa RTL | Khoảng −19 % chu kỳ ở `mnist1`, DMA pha bias giảm khoảng 900 lần, chi phí khoảng +2 % FF và 0 BRAM | Chờ đồng ý |
-| D | Thu nhỏ bộ đệm psum (`BUFFER_WIDTH_PSUM` 14 → 11/12) | Đổi tham số, không sửa RTL | 144/168 RAMB36 là bộ đệm psum, layer lớn nhất chỉ dùng khoảng 1.792/16.384 địa chỉ (ước tính); tiết kiệm khoảng 100–124 BRAM36 để thêm cluster hoặc bộ đệm | Cần kiểm chứng bằng 9 case |
+| D | Thu nhỏ bộ đệm psum (`BUFFER_WIDTH_PSUM` 14 → 11/12) | Đổi tham số, không sửa RTL | 144/168 RAMB36 là bộ đệm psum, layer lớn nhất chỉ dùng khoảng 1.792/16.384 địa chỉ (ước tính); tiết kiệm khoảng 100–124 BRAM36 để thêm cluster hoặc bộ đệm | Cần kiểm chứng bằng 9 case. Sau route còn thấy lợi thêm: đường găng là dây tới các BRAM này, nên bộ đệm nhỏ hơn có thể tăng fmax |
 | E | DMA 128 bit | Băng thông | Cổng HP của ZU+ rộng 128 bit; 64 bit ở 250 MHz chỉ đạt khoảng 2 GB/s; giảm một nửa số chu kỳ nạp và đọc kết quả | 128 bit chưa từng được kiểm chứng |
 | F | Pipeline đường găng iact converter (`OpenEye_FPGA.v` 943–950) | Sửa RTL (fmax) | Tính trước các tích tham số một lần mỗi layer | Chỉ làm nếu fmax sau route chưa đủ |
 | G | `USE_DSP=1` cho PE | Sửa RTL (tài nguyên) | Bộ nhân 48 PE đang dùng LUT, còn 1.724 DSP trống | Khi cần thêm cluster |
@@ -1060,3 +1095,14 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   Lưu ở `doc/synth/2026-10-12_synth4ns_zu7ev/` (báo cáo, danh sách cảnh báo, `SUMMARY.md`).
 - **Lỗi mới #13** (CRITICAL WARNING Synth 8-6858/8-6859): `rd_cycle_loop_cnt_0..3` trong `iact_stream_constructor.v` bị lái từ 2 khối `always`;
   trên FPGA chúng luôn bằng 0, mô phỏng không thấy. Thêm #14–#16 vào mục 8b. Mục 8c: bảng định hướng A–H sau Vivado. **RTL không đổi.**
+
+### 2026-10-13
+
+- **Place & route Vivado (clock 4 ns) xong:** đạt 250 MHz (WNS +0,025 ns, hold +0,010 ns), 63,9k LUT, 38,7k FF, 192 BRAM tile, 8 URAM, 4 DSP.
+  Không có lỗi mới (chỉ có cảnh báo của chế độ OOC). Đường găng sau route: dây từ `psum_pipeline` tới 144 BRAM của bộ đệm psum, và URAM `wght_buffer` → PE.
+  Lưu ở `doc/synth/2026-10-13_route4ns_zu7ev/`. Thời gian thật ở 250 MHz: `mnist1` 0,263 ms.
+- Mục 5.7: `SERIAL=0` **chưa được kiểm chứng** (thiếu bộ sinh địa chỉ GLB, `cocotb_parallel` cũ); `OpenEye_Parallel` là "ASIC compute core" theo upstream,
+  nhưng repo không có luồng ASIC.
+- Kiểm tra upstream (`upstream/main` = `c085224`, 2026-10-12): 3 commit mới chỉ đổi comment (`TRANS_WORDS`), tên khối generate
+  (`gen_router_iact_*` → `gen_router_psum_*` trong `OpenEye_Parallel.v`) và Makefile test. Không thay đổi chức năng, lỗi #13 chưa được sửa ở upstream.
+  Chưa gộp vào `dev`.
