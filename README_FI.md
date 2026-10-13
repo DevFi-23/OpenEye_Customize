@@ -743,7 +743,7 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 | 10 | `CLUSTER_ROWS=1`: một số cấu hình treo FSM (theo tài liệu upstream) | RTL | **Chưa sửa**, chưa tự kiểm chứng |
 | 11 | Lint đáng ngờ: `PE.v:2210` (cắt 7→5 bit), `data_pipeline_wght.v:394/396/424` (overhead 4 bit), `BLKANDNBLK` trong `psum_pipeline.v` | RTL | **Chưa sửa**, cần test (mục 9b) |
 | 12 | `current_filter` (chỉ số filter của bộ lượng tử) chỉ được reset về 0, **không bao giờ tăng**, nên mọi filter dùng hệ số lượng tử của filter 0 (lượng tử theo filter chưa hoạt động) | `hdl/psum_pipeline.v` | **Chưa sửa**, phát hiện bằng đọc code (2026-10-10), chưa kiểm chứng bằng test. Test hiện tại dùng hệ số giống nhau cho mọi filter nên không phát hiện được |
-| 13 | `rd_cycle_loop_cnt_0..3` bị lái từ 2 khối `always` (reset ở khối này, đếm ở khối kia). Vivado giữ giá trị reset nên trên FPGA các bộ đếm **luôn bằng 0**; mô phỏng không thấy | `hdl/iact_stream_constructor.v:233/437` | **Chưa sửa**, phát hiện bằng CRITICAL WARNING của Vivado (2026-10-12). Cần thí nghiệm giả lập phần cứng để đo ảnh hưởng (mục 8c) |
+| 13 | `rd_cycle_loop_cnt_0..3` bị lái từ 2 khối `always` (reset ở khối này, đếm ở khối kia). Vivado giữ giá trị reset nên trên FPGA các bộ đếm **luôn bằng 0**; mô phỏng không thấy | `hdl/iact_stream_constructor.v:233/437` | **Đã xác nhận bằng thí nghiệm** (2026-10-13, `doc/experiments/2026-10-13_bug13_stuck_counters.md`): giả lập phần cứng thì 6/9 case baseline FAIL (mọi case có `iact_read_limit_1..3` ≠ 0, gồm cả 3 layer MNIST), đối chứng PASS. **Chưa sửa**, chờ bạn đồng ý |
 | 14 | `results_ready` vừa gán blocking vừa non-blocking; Vivado: "entire logic could be removed" | `hdl/psum_pipeline.v:485/522/900` | **Chưa sửa** (cùng lint `BLKANDNBLK` ở #11, nay Vivado xác nhận rủi ro) |
 | 15 | 12 thanh ghi có set và reset cùng mức ưu tiên (Synth 8-7137, "may cause simulation mismatches") | `psum_pipeline.v:322/776`, `OpenEye_Parallel.v:443/448`, `PE.v:1113` | **Chưa phân tích** |
 | 16 | Wrapper AXI `fpga/hdl/open_eye_axi_v1_0.v` không biên dịch được (thiếu module `cfg_reg`, `QUANT_AMOUNT` chưa khai báo, `BUFFER_WIDTH` gán 2 lần, `RAM_CELLS` không tồn tại) | `fpga/hdl` | **Chưa sửa**; chỉ cần khi đóng gói IP hoặc làm block design |
@@ -755,7 +755,7 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 | # | Việc | Loại | Vì sao | Trạng thái |
 |---|---|---|---|---|
 | A | Place & route (clock 4 ns) để có fmax chính thức | Vivado, không sửa RTL | Fmax sau tổng hợp là ước lượng lạc quan; mọi tối ưu cần cả chu kỳ lẫn fmax | **Xong 2026-10-13: đạt 250 MHz sau route** (WNS +0,025 ns); đường găng là dây tới 144 BRAM của bộ đệm psum (mục 6d) |
-| B | **Lỗi #13: phần cứng khác mô phỏng** ở `iact_stream_constructor` | Thí nghiệm, rồi sửa RTL | Nếu đúng như Vivado báo, bitstream hiện tại tính sai iact, nên mọi số đo trên board sẽ vô nghĩa | Đề xuất: (1) thí nghiệm trên bản sao tạm, giả lập bộ đếm luôn 0 rồi chạy 9 case baseline (không sửa RTL của project); (2) sửa 4 dòng reset. **Cần bạn đồng ý** |
+| B | **Lỗi #13: phần cứng khác mô phỏng** ở `iact_stream_constructor` | Thí nghiệm, rồi sửa RTL | Nếu đúng như Vivado báo, bitstream hiện tại tính sai iact, nên mọi số đo trên board sẽ vô nghĩa | (1) Thí nghiệm **xong 2026-10-13: lỗi có thật**, 6/9 case sai trên phần cứng giả lập. (2) Sửa 4 dòng reset: **chờ bạn đồng ý** |
 | C | Gửi bias theo filter (1.1 bên dưới) | Sửa RTL | Khoảng −19 % chu kỳ ở `mnist1`, DMA pha bias giảm khoảng 900 lần, chi phí khoảng +2 % FF và 0 BRAM | Chờ đồng ý |
 | D | Thu nhỏ bộ đệm psum (`BUFFER_WIDTH_PSUM` 14 → 11/12) | Đổi tham số, không sửa RTL | 144/168 RAMB36 là bộ đệm psum, layer lớn nhất chỉ dùng khoảng 1.792/16.384 địa chỉ (ước tính); tiết kiệm khoảng 100–124 BRAM36 để thêm cluster hoặc bộ đệm | Cần kiểm chứng bằng 9 case. Sau route còn thấy lợi thêm: đường găng là dây tới các BRAM này, nên bộ đệm nhỏ hơn có thể tăng fmax |
 | E | DMA 128 bit | Băng thông | Cổng HP của ZU+ rộng 128 bit; 64 bit ở 250 MHz chỉ đạt khoảng 2 GB/s; giảm một nửa số chu kỳ nạp và đọc kết quả | 128 bit chưa từng được kiểm chứng |
@@ -1106,3 +1106,7 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
 - Kiểm tra upstream (`upstream/main` = `c085224`, 2026-10-12): 3 commit mới chỉ đổi comment (`TRANS_WORDS`), tên khối generate
   (`gen_router_iact_*` → `gen_router_psum_*` trong `OpenEye_Parallel.v`) và Makefile test. Không thay đổi chức năng, lỗi #13 chưa được sửa ở upstream.
   Chưa gộp vào `dev`.
+- **Thí nghiệm lỗi #13** (được bạn đồng ý; 2 git worktree tạm trong scratchpad, đã xoá; RTL của project không đổi): giả lập netlist của Vivado
+  (`rd_cycle_loop_cnt_0..3` luôn bằng 0) rồi chạy 9 case baseline. Kết quả: **6/9 FAIL** (3 case `32x3` và 3 case MNIST, mọi feature map sai), 3 case nhỏ PASS.
+  Đối chứng (bản sao không sửa) PASS với số chu kỳ đúng như baseline. Quy luật: sai khi một trong `iact_read_limit_1..3` khác 0. Công cụ mới
+  `tools/decode_iact_read_loops.py` giải mã các thanh ghi này từ stream DMA. Chi tiết: `doc/experiments/2026-10-13_bug13_stuck_counters.md`.
