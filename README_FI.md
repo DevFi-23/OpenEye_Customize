@@ -62,6 +62,39 @@ Mẹo:
   (công cụ build lấy qua micromamba ở `~/tools/vbuild`, không cần sudo). Lint giống CI: `tools/lint_check.py` (mục 9c).
 - Yosys 0.69 (micromamba, `~/tools/yosys/bin/yosys`) để ước lượng tài nguyên nhanh; Vivado 2024.2 chạy trên Windows (mục 6d).
 
+## 3b. Một lần mô phỏng chạy những gì (Python và RTL)
+
+Một test (ví dụ một case của `test_profile.py`) chạy qua 3 giai đoạn. **Python làm phần lớn công việc**: đóng vai host (CPU + DDR + AXI DMA),
+mô hình tham chiếu và dụng cụ đo. **Chỉ RTL là "phần cứng"**: mọi phép tính của bộ tăng tốc và mọi số chu kỳ đều do RTL tạo ra.
+Không có bước "dạy" (huấn luyện) nào: OpenEye chỉ làm suy luận (inference); weight là ngẫu nhiên, hằng số hoặc dạng dốc do testbench tạo.
+
+```
+A. Trước khi chạy simulator (pytest, Python thuần)
+   test_profile.py → test_conv_const._run_conv_const
+     ├─ đặt biến môi trường: cấu hình phần cứng (CLUSTER_ROWS, DMA_BITWIDTH, ...) và layer (kích thước, số filter, ...)
+     ├─ vh_file_creator → parameters_FPGA.vh, parameters_PE.vh, parameters_PE_cluster.vh   (tham số RTL lúc biên dịch)
+     ├─ generator (regmap.yaml) → regmap_params.vh, dma_storage.v
+     └─ cocotb_test: iverilog biên dịch hdl/*.v + header → OpenEye_FPGA.vvp, rồi chạy vvp có nhúng Python (cocotb)
+
+B. Trong lúc mô phỏng (Python và RTL chạy cùng một tiến trình, đồng bộ theo từng cạnh clock)
+   OpenEye_FPGA_tb.py
+     ├─ chuẩn bị dữ liệu (tốn 0 chu kỳ mô phỏng):
+     │    TensorFlow tạo layer (data_create) → DRAM.py giữ input, weight, bias (có thể thay bằng hằng/ramp)
+     │    layer_parameters.py tính tham số layer → các word cấu hình
+     │    test_utils_main.collect_results / make_ref: MÔ HÌNH THAM CHIẾU tính kết quả đúng bằng Python
+     │    test_utils_main.write_stream + *_mapper.py: đóng gói stream DMA (cấu hình → iact → weight → bias → quant)
+     ├─ các coroutine chạy song song với RTL:
+     │    Clock, reset
+     │    send_stream (hoặc send_words_through_memory khi bật mô hình bộ nhớ): mỗi chu kỳ đặt data_dma_i / enable_dma_i, xem ready_dma_o
+     │    profile_dma_phases: mỗi cạnh clock đọc trạng thái FSM, đếm chu kỳ/word → profile.json  (chỉ quan sát, không làm đổi chu kỳ)
+     │    probe_fsm_states: phát hiện treo;  trace_dma_input (tuỳ chọn)
+     │    compare_stream_Conv/Dense/...: nhận data_dma_o (ready_dma_i do testbench hoặc WriteChannel quyết định), so với tham chiếu
+     └─ assert → PASS/FAIL
+
+C. Sau mô phỏng (Python thuần)
+     run_profile.py gom profile.json → profile_report (bảng, --compare); check_dma_trace.py, decode_iact_read_loops.py khi cần
+```
+
 ## 4. Cấu trúc project
 
 Sơ đồ chỉ gồm những thư mục và file quan trọng (★ = do dự án riêng này thêm vào hoặc sửa; ☆ = sinh tự động, không có trong git).
