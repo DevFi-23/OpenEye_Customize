@@ -310,3 +310,7 @@ notes.md
 
 # Generated Vivado source folders (tools/export_vivado.py), reproducible
 /vivado/
+
+# Keep the Vivado reports (the upstream rules above ignore *.txt and *.json)
+!doc/synth/**/*.txt
+!doc/synth/**/*.json

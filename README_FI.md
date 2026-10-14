@@ -59,25 +59,73 @@ Mẹo:
 - Kết quả simulation nằm ở `test/.temp/<tên test>/` (log `cocotb_sim.log`, `profile.json`, file tham chiếu `demo/`).
 - `/tmp` bị xoá khi WSL khởi động lại. Thứ gì cần giữ thì phải nằm trong repo.
 - Verilator 5.020 (đúng phiên bản CI dùng) đã được build từ source vào `~/tools/verilator-5.020`
-  (công cụ build lấy qua micromamba ở `~/tools/vbuild`, không cần sudo). Chạy lint giống CI:
+  (công cụ build lấy qua micromamba ở `~/tools/vbuild`, không cần sudo). Lint giống CI: `tools/lint_check.py` (mục 9c).
+- Yosys 0.69 (micromamba, `~/tools/yosys/bin/yosys`) để ước lượng tài nguyên nhanh; Vivado 2024.2 chạy trên Windows (mục 6d).
 
-```bash
-~/tools/verilator-5.020/bin/verilator --lint-only -Wall -Ihdl/ +define+USE_INTERNAL_PARAMS_PE \
-  +define+USE_INTERNAL_PARAMS_PE_cluster hdl/lint_waivers.vlt hdl/OpenEye_Parallel.v
+## 4. Cấu trúc project
+
+Sơ đồ chỉ gồm những thư mục và file quan trọng (★ = do dự án riêng này thêm vào hoặc sửa; ☆ = sinh tự động, không có trong git).
+
 ```
-
-## 4. Cấu trúc project (những phần liên quan tới hướng nghiên cứu)
-
-| Đường dẫn | Nội dung |
-|---|---|
-| `hdl/OpenEye_FPGA.v` | Top-level FPGA: nhận dữ liệu qua DMA, FSM chính điều khiển mỗi layer |
-| `hdl/psum_pipeline.v` | FSM psum: nạp bias, thu kết quả, lượng tử hoá, gửi kết quả ra DMA |
-| `hdl/OpenEye_Parallel.v`, `OpenEye_Cluster.v`, `PE.v` | Mảng tính toán (cluster, PE) |
-| `src/open_eye/` | Thư viện Python: sinh stream DMA, tính kết quả tham chiếu, tiện ích testbench |
-| `src/open_eye/rtl_test_utils.py` | Các hàm cocotb: gửi stream, so sánh kết quả, **profiler** |
-| `src/open_eye/profile_report.py` | Công cụ báo cáo profile (bảng, CSV) |
-| `test/cocotb_fpga/` | Testbench top-level FPGA (`OpenEye_FPGA_tb.py`) và các bộ test pytest |
-| `doc/perf/` | Số liệu đo hiệu năng (baseline) |
+OpenEye_orig/
+├── README.md                     Tài liệu gốc của upstream (giữ nguyên)
+├── README_FI.md               ★  File này: nhật ký, hướng dẫn, kết quả
+├── hdl/                          RTL (Verilog) của bộ tăng tốc
+│   ├── OpenEye_FPGA.v         ★  Top-level FPGA: cổng DMA, FSM chính (nạp → convert → tính → đọc ra), buffer iact/weight/psum
+│   │                             (★ sửa GET_BIAS, lỗi #3)
+│   ├── psum_pipeline.v           FSM psum: nạp bias, thu kết quả, lượng tử hoá, gửi kết quả ra DMA
+│   ├── iact_stream_constructor.v ★ Đọc iact từ buffer và gửi tới các cluster (★ sửa bộ đếm, lỗi #13)
+│   ├── OpenEye_Parallel.v        Mảng tính toán: các cluster + router ("ASIC compute core", SERIAL=0/1)
+│   ├── OpenEye_Cluster.v, PE_cluster.v, PE.v   Cluster → nhóm PE → PE (MAC INT8, sparse)
+│   ├── router_*.v, GLB_cluster.v Router iact/weight/psum giữa các cluster, GLB của cluster
+│   ├── dma_storage.v             Bộ giải mã word cấu hình (BẢN CŨ: test và export luôn thay bằng bản sinh từ regmap.yaml)
+│   ├── RAM_*.v, SPad_*.v         Mô hình RAM/scratchpad (Vivado suy luận thành BRAM/URAM/LUTRAM)
+│   ├── include/regmap_params.vh ☆ Header sinh tự động (bản còn sót của lần chạy trước)
+│   └── lint_waivers.vlt          Các warning Verilator được bỏ qua có chủ đích
+├── fpga/
+│   ├── hdl/open_eye_axi_v1_0.v   Wrapper AXI (AXI-Lite + AXI4-Stream) cho Vivado IP; hiện không biên dịch được (lỗi #16)
+│   └── sw/                       Phần mềm chạy trên ARM: runtime AXI DMA (hal_xaxidma.c, openeye_runtime.c)
+├── src/open_eye/                 Thư viện Python (cài kiểu editable vào venv)
+│   ├── open_eye_parameters.py    Cấu hình phần cứng (đọc từ biến môi trường: CLUSTER_ROWS, IACT_RAM_CELLS, ...)
+│   ├── layer_parameters.py       Tính tham số của từng layer (số chu kỳ, giới hạn vòng lặp, ...)
+│   ├── *_mapper.py               Sinh stream DMA: conv, dense, iact, weight, psum (bias), pooling
+│   ├── generator.py              regmap.yaml → regmap_params.vh, dma_storage.v, đóng gói word cấu hình
+│   ├── vh_file_creator.py        Sinh parameters_FPGA.vh / parameters_PE.vh / parameters_PE_cluster.vh
+│   ├── test_utils_main.py        Tính kết quả tham chiếu (golden model)
+│   ├── rtl_test_utils.py      ★  Hàm cocotb: gửi stream, so sánh kết quả, profiler, trace DMA, driver bộ nhớ
+│   ├── memory_model.py        ★  Mô hình DDR + AXI DMA (mục 6c)
+│   └── profile_report.py      ★  Báo cáo và so sánh profile (mục 6.5)
+├── test/
+│   ├── cocotb_fpga/              Testbench top-level FPGA (OpenEye_FPGA_tb.py) và các bộ test
+│   │   ├── test_profile.py    ★  9 case đo độ trễ (mục 6.7)
+│   │   ├── test_conv_const.py    Test Conv (16 test dùng làm hồi quy)
+│   │   ├── test_gemm_layer.py    Test GEMM/Dense (63 test dùng làm hồi quy)
+│   │   └── regmap.yaml           Định nghĩa các thanh ghi cấu hình gửi qua DMA (nguồn của dma_storage.v)
+│   ├── cocotb_parallel/          Test của OpenEye_Parallel (SERIAL=0), đã cũ (mục 5.7)
+│   ├── test_memory_model.py   ★  16 unit test của mô hình bộ nhớ
+│   ├── test_profile_report.py ★  Unit test của công cụ báo cáo
+│   └── .temp/                 ☆  Thư mục chạy của từng test (log, header sinh ra, profile.json)
+├── tools/                     ★  Công cụ của dự án riêng
+│   ├── run_profile.py            Chạy các case đo song song, so sánh với baseline (mục 6)
+│   ├── lint_check.py, lint_baseline/   Lint theo baseline (mục 9c)
+│   ├── export_vivado.py          Xuất thư mục nguồn + Tcl cho Vivado (mục 6d)
+│   ├── check_dma_trace.py        Kiểm tra DUT nhận đúng stream DMA (mục 9)
+│   ├── decode_iact_read_loops.py Giải mã thanh ghi vòng lặp đọc iact từ stream DMA
+│   └── report/make_progress_report.py  Tạo báo cáo Word cho giáo viên hướng dẫn
+├── doc/
+│   ├── perf/                  ★  Số liệu đo chu kỳ: baseline_2026-10-10/ (mốc hiện tại), mem_typical_2026-10-10/, ...
+│   ├── synth/                 ★  Báo cáo Vivado theo từng lần chạy (mỗi thư mục có SUMMARY.md)
+│   ├── experiments/           ★  Báo cáo thí nghiệm (lỗi #13)
+│   ├── lint/                  ★  Output lint gốc
+│   ├── reports/               ★  Báo cáo tiến độ (Word)
+│   ├── OpenEye_FPGA_documentation.md, test_status_handover.md   Tài liệu của upstream
+│   └── demo_notebooks/           Notebook demo của upstream
+├── yosys/, nextpnr/              Flow tổng hợp mã nguồn mở của upstream (FPGA GateMate)
+├── dse_scripts/                  Script Vivado của upstream (trỏ tới project trên máy tác giả gốc, không dùng được)
+├── .github/workflows/lint.yml ★  CI lint theo baseline
+├── vivado/                    ☆  Thư mục do export_vivado.py tạo (trong .gitignore)
+└── venv/                      ☆  Python venv (cocotb, TensorFlow, open_eye)
+```
 
 ## 5. Giải thích khái niệm
 
@@ -115,8 +163,8 @@ không có trạng thái riêng cho việc này.
 - **Burst**: **một chuỗi beat liên tiếp** sinh ra từ một yêu cầu đọc hoặc ghi bộ nhớ (ví dụ AXI burst: một
   địa chỉ, rồi tối đa 256 beat). Mỗi burst có chi phí khởi đầu (độ trễ DDR, thường hàng chục đến hàng trăm
   chu kỳ), nên burst dài và ít thì hiệu quả hơn burst ngắn và nhiều.
-  Testbench hiện tại **không mô phỏng burst hay độ trễ bộ nhớ**: host luôn sẵn sàng và gửi liên tục.
-  Vì vậy số liệu hiện tại là trường hợp tốt nhất về phía bộ nhớ.
+  Mặc định testbench **không mô phỏng burst hay độ trễ bộ nhớ** (host luôn sẵn sàng, gửi liên tục), nên baseline là trường hợp tốt nhất
+  về phía bộ nhớ. Muốn có burst và độ trễ thì bật mô hình bộ nhớ (`run_profile.py --mem`, mục 6c).
 
 **Một burst gồm nhiều beat liên tiếp.** Ví dụ: chuyển 100 beat trong 1 burst tốn khoảng 100 + 1 × độ trễ; chia thành 100 burst
 thì tốn khoảng 100 + 100 × độ trễ.
@@ -128,8 +176,8 @@ thì tốn khoảng 100 + 100 × độ trễ.
   (`fpga/hdl/open_eye_axi_v1_0.v`). Runtime gửi **toàn bộ stream của một layer bằng một lệnh `XAxiDma_SimpleTransfer`**
   (`openeye_runtime.c`). Chính IP AXI DMA mới chia lệnh đó thành các burst AXI4 tới DDR; độ dài burst do cấu hình IP
   trong Vivado quyết định, và cấu hình này không nằm trong repo. Input `tlast` bị bỏ qua; output `tlast` = `last_data_o`.
-- Trong simulation (cocotb): **không có AXI DMA**. Testbench đẩy thẳng mỗi chu kỳ một word vào cổng stream, luôn sẵn sàng,
-  nên chưa mô phỏng burst và độ trễ DDR.
+- Trong simulation (cocotb): **không có AXI DMA thật**. Mặc định testbench đẩy thẳng mỗi chu kỳ một word vào cổng stream và luôn sẵn sàng;
+  mô hình bộ nhớ ở mục 6c thay phần này bằng một mô hình DDR + AXI DMA đơn giản.
 
 ### 5.3 Payload tối thiểu và hiệu suất bus
 
@@ -154,7 +202,9 @@ Hiện chỉ tính được cho layer `Convolution_Single`.
 
 **Baseline** là **phép đo mốc trước khi tối ưu**. Mỗi lần sửa RTL để tối ưu, ta chạy lại đúng các cấu hình đó
 và so sánh với baseline để biết thay đổi tốt hơn hay tệ hơn bao nhiêu. Không có baseline thì không chứng minh được
-tối ưu có tác dụng. Baseline hiện tại: `doc/perf/baseline.md` và `doc/perf/baseline_2026-10-09.csv`.
+tối ưu có tác dụng. Có hai loại baseline:
+- **Chu kỳ và DMA** (mô phỏng): `doc/perf/baseline_2026-10-10/` (9 case). `doc/perf/baseline.md` và `baseline_2026-10-09*` là mốc cũ (6 case).
+- **Phần cứng** (Vivado): `doc/synth/2026-10-14_route4ns_fix13_zu7ev/` (tài nguyên, fmax 250 MHz). Các thư mục `doc/synth` cũ hơn là lịch sử.
 
 ### 5.5 QUANT_AMOUNT
 
@@ -174,7 +224,7 @@ Riêng phần simulation trong cocotb: 5 giây so với 185 giây (37 lần), tr
 Nguyên nhân nằm ở cách RTL lưu bảng lượng tử:
 1. Toàn bộ bảng là **một thanh ghi duy nhất** `quant_reg` rộng `QUANT_AMOUNT × 40` bit (40.960 bit).
 2. Thanh ghi được nạp kiểu **thanh ghi dịch**: mỗi beat DMA dịch **toàn bộ** 40.960 bit
-   (`OpenEye_FPGA.v`, khoảng dòng 2020–2025). 640 beat tạo ra 640 lần thay đổi của một vector khổng lồ.
+   (`OpenEye_FPGA.v`, khoảng dòng 2026–2028). 640 beat tạo ra 640 lần thay đổi của một vector khổng lồ.
 3. Mỗi lần `quant_reg` thay đổi, Icarus phải tính lại **mọi lệnh `assign` đọc từ nó**: 3 × 1024 lệnh tách
    offset, exponent, mantissa trong `OpenEye_FPGA.v`, cộng thêm các bản "flat" và bản trong `psum_pipeline.v`.
    Tổng cộng hàng nghìn phép cắt bit trên vector 40 kbit, lặp lại sau mỗi beat.
@@ -196,7 +246,7 @@ thì vừa tiết kiệm tài nguyên, vừa giảm DMA, vừa giúp simulation 
 | Tình trạng | Chạy được (test FPGA pass ở các cấu hình hỗ trợ) | **Chưa hoàn thiện**: bộ sinh địa chỉ GLB chưa tồn tại (comment ở `OpenEye_Parallel.v:790`); testbench `cocotb_parallel` đã cũ và fail (`doc/test_status_handover.md` mục 4.3) |
 
 - **Khi nào dùng `SERIAL=0`:** khi `OpenEye_Parallel` được dùng làm lõi tính toán độc lập, ví dụ trong ASIC hoặc một hệ thống
-  tự cấp dữ liệu song song cho từng cluster. Hiện **không có luồng nào chạy được ở chế độ này**.
+  tự cấp dữ liệu song song cho từng cluster.
 - **Kiểm chứng (cập nhật 2026-10-13): `SERIAL=0` chưa được kiểm chứng là chạy đúng.**
   - Bộ sinh địa chỉ GLB chưa có: `OpenEye_Parallel.v:790` ghi rõ "needs an address generator that does not exist yet",
     và địa chỉ GLB để trống có chủ đích.
@@ -210,15 +260,15 @@ thì vừa tiết kiệm tài nguyên, vừa giảm DMA, vừa giúp simulation 
   - Chính `OpenEye_FPGA` cũng chứa `OpenEye_Parallel`, nhưng với `SERIAL=1`. Vậy "lõi ASIC" là **module**; `SERIAL=0` là **chế độ dữ liệu song song**
     (GLB có RAM riêng, mỗi cluster một cổng) phù hợp với chip ASIC kiểu Eyeriss v2, nơi có thể nối nhiều cổng rộng.
   - Repo **không có** luồng ASIC (không có script OpenLane, thư viện cell hay SRAM macro). Chỉ có Yosys/nextpnr cho FPGA GateMate và Vivado.
-- **Ảnh hưởng tới hướng nghiên cứu:** mọi số đo hiện tại (chu kỳ, DMA, Vivado) là của `SERIAL=1`. Hoàn thiện `SERIAL=0` (bộ sinh địa chỉ GLB,
-  testbench mới) là một dự án riêng, lớn. Chỉ nên cân nhắc khi mục tiêu chuyển sang kiến trúc ASIC.
-- **Liên quan tới hướng nghiên cứu:** `SERIAL=0` giữ dữ liệu trong GLB của từng cluster, tức tái sử dụng dữ liệu trên chip nhiều hơn
-  và giảm lưu lượng DMA. Về lâu dài đây có thể là một hướng kiến trúc, nhưng phải hoàn thiện phần RTL còn thiếu. Đây là việc lớn, không thuộc trước mắt.
+- **Ảnh hưởng tới hướng nghiên cứu:** mọi số đo hiện tại (chu kỳ, DMA, Vivado) là của `SERIAL=1`. `SERIAL=0` giữ dữ liệu trong GLB của từng
+  cluster (tái sử dụng trên chip nhiều hơn, ít DMA hơn), nên về lâu dài có thể là một hướng kiến trúc. Nhưng hoàn thiện nó (bộ sinh địa chỉ GLB,
+  testbench mới) là một dự án riêng, lớn; chỉ nên cân nhắc khi mục tiêu chuyển sang kiến trúc ASIC.
 
 ### 5.8 Độ rộng DMA: 32 bit hay 64 bit
 
 - **Phần cứng FPGA (`fpga/hdl/open_eye_axi_v1_0.v`): 64 bit.** `C_dma_i_TDATA_WIDTH = C_dma_o_TDATA_WIDTH = 64`; wrapper không truyền
-  `DMA_BITWIDTH` vào `OpenEye_FPGA`, nên lõi dùng giá trị mặc định `parameter DMA_BITWIDTH = 64` (`OpenEye_FPGA.v:123`).
+  `DMA_BITWIDTH` vào `OpenEye_FPGA`, nên lõi lấy giá trị trong `parameters_FPGA.vh` (header sinh tự động; `export_vivado.py` ghi 64), hoặc
+  `DMA_BITWIDTH = 64` (`OpenEye_FPGA.v:123`) khi định nghĩa `USE_INTERNAL_PARAMS`.
 - **Mô phỏng/đo hiệu suất:** giá trị lấy từ biến môi trường `DMA_BITWIDTH` (nếu không có thì mặc định 64 trong `OpenEyeParameters`) và được ghi
   vào `parameters_FPGA.vh`. Các case đo dùng **64 bit** để khớp với phần cứng, trừ case `32x3_f4_q32_dma32` (32 bit, để so sánh: chậm hơn 34 %).
   Lưu ý: `test/cocotb_fpga/Makefile` của upstream đặt `DMA_BITWIDTH = 32`, và notebook MNIST cũng dùng 32.
@@ -227,6 +277,27 @@ thì vừa tiết kiệm tài nguyên, vừa giảm DMA, vừa giúp simulation 
   wrapper, hiện chưa có), cùng bộ sinh stream Python và runtime (dữ liệu được đóng gói theo `DMA_BITWIDTH`).
 - **Giá trị nào chạy được:** 32 và 64 đã chạy đúng trong mô phỏng. Logic đọc kết quả xếp psum vào các ô 32 bit (`DMA_BITWIDTH // 32` psum mỗi beat),
   nên độ rộng phải là bội của 32. 128 bit **chưa được kiểm chứng** (có các hằng số như `WORDS_PER_CYCLE = 2` và comment giả định beat 64 bit).
+
+### 5.9 `IACT_RAM_CELLS`: số bank của bộ đệm iact (2026-10-14)
+
+- **Là gì:** số bank RAM của **bộ đệm activation đầu vào cho cả layer** trong `OpenEye_FPGA.v` (`BUFFER_A`, mỗi bank là một `RAM_SP`
+  64 bit × 2^`BUFFER_WIDTH` = 4.096 word; bit địa chỉ cao nhất chọn nửa ping/pong). Trong `GET_IACT` các word DMA được ghi lần lượt vào các bank
+  (word 1 → bank 0, word 2 → bank 1, ...); trong `CONVERT_IACT` các bank được đọc **song song** theo một cửa sổ trượt để cấp dữ liệu cho 4 `iact_stream_constructor`.
+- **Giá trị đang dùng: 4** (Makefile của upstream đặt `IACT_RAM_CELLS=4`; `open_eye_parameters.py` cũng mặc định 4). Dung lượng 4 × 4.096 × 8 byte = 128 KB
+  (64 KB mỗi nửa ping/pong, tức 65.536 pixel INT8), đọc 4 × 64 = 256 bit mỗi chu kỳ. Trên ZU7EV mỗi bank là 1 URAM → 4 URAM.
+- **`RAM_CELLS=32` trong các test Python không có tác dụng:** tên biến cũ, không ai đọc. Comment "32 RAM_SP cells" trong `OpenEye_FPGA.v` và bảng
+  tham số trong `doc/OpenEye_FPGA_documentation.md` cũng là mô tả cũ của upstream.
+- **Thí nghiệm `IACT_RAM_CELLS=32`** (chỉ đổi tham số, không sửa RTL; 6 case nhỏ, Yosys toàn thiết kế):
+
+| | 4 bank (hiện tại) | 32 bank | Ghi chú |
+|---|---:|---:|---|
+| 6 case nhỏ | 6/6 PASS | **6/6 PASS** | Chức năng vẫn đúng |
+| Tổng chu kỳ | mốc | **+0,4 % đến +4,9 %** (chậm hơn) | Chỉ pha `load_iact` tăng: stream iact được đệm cho đủ bội số của số bank (case `8x1`: 4 → 32 word, hiệu suất bus 100 % → 12 %). `convert` và `compute` không đổi |
+| Yosys: LUT / FF | 61.456 / 45.402 | 66.220 / 51.125 | **+4.764 LUT (+7,8 %), +5.723 FF (+12,6 %)**: thanh ghi và bộ chọn rộng theo số bank (ví dụ `iact_to_psum_shift_reg` 2 × 64 × N bit) |
+| Bộ nhớ | 4 URAM (Vivado) | 32 URAM (Vivado ước tính; Yosys: +224 RAMB36) | Dung lượng gấp 8 lần |
+
+  **Kết luận:** tăng lên 32 **không có lợi** cho các layer đang đo (chậm hơn một chút, tốn thêm khoảng 8 % LUT, 13 % FF, 28 URAM). Chỉ nên tăng khi một layer
+  có activation đầu vào **lớn hơn 64 KB** (ví dụ ảnh 224 × 224 × 3 = 150 KB), lúc đó 4 bank không chứa đủ.
 
 ## 6. Hướng dẫn chạy công cụ đo hiệu suất
 
@@ -395,9 +466,9 @@ Phần nằm giữa (`OpenEye_FPGA` và toàn bộ RTL bên trong) **là cùng m
 | Số chu kỳ của các pha nạp (`load_*`) và `readout` | Có, nhưng là **giới hạn dưới** | **Bằng hoặc lớn hơn.** Bằng nếu AXI DMA cấp đủ 1 beat mỗi chu kỳ; lớn hơn nếu DDR hoặc DMA bị ngắt quãng (độ trễ đầu burst, tranh chấp bus) |
 | Thứ tự và độ chồng của các pha | Có | Giống hệt (do FSM quyết định) |
 | Tổng độ trễ một layer | Giới hạn dưới | Lớn hơn: + thời gian chờ DMA + overhead phần mềm |
-| Độ trễ DDR, burst, ngắt quãng `tvalid` | **Không** | Có ảnh hưởng thật |
+| Độ trễ DDR, burst, ngắt quãng `tvalid` | **Ước lượng** bằng mô hình bộ nhớ (mục 6c, tham số chưa hiệu chỉnh theo board) | Có ảnh hưởng thật |
 | Overhead phần mềm (flush/invalidate cache, cấu hình DMA, polling, giữa các layer) | **Không** | Có; với layer nhỏ có thể lớn hơn cả thời gian tính |
-| Tần số clock tối đa (fmax), tài nguyên, công suất | **Không** | Chỉ biết sau khi tổng hợp và place & route (Vivado) |
+| Tần số clock tối đa (fmax), tài nguyên, công suất | **Không** (lấy từ Vivado, mục 6d: hiện 250 MHz) | Phụ thuộc kết quả place & route |
 
 **Kết luận:**
 - Các tối ưu về **băng thông** (giảm số beat, tăng hiệu suất bus) đo trên mô phỏng là **chính xác** và giữ nguyên khi lên FPGA.
@@ -427,7 +498,7 @@ Mô hình bộ nhớ thay phía host bằng một mô hình đơn giản của *
 | `rtl_test_utils.compare_stream_Conv` | Phía đọc kết quả: `ready_dma_i` do `WriteChannel` quyết định (chỉ với layer Conv) |
 | `rtl_test_utils.trace_dma_input` + `tools/check_dma_trace.py` | `OPENEYE_TRACE_DMA=1`: ghi mọi word DUT nhận và mọi lần đổi trạng thái vào `dma_in_trace.csv`; script so với stream testbench sinh ra |
 | `profile_dma_phases` | Thêm đếm `in_stall`/`out_stall` (cột `mem stall` trong báo cáo) và ghi cấu hình bộ nhớ vào `profile.json` (`config.MEMORY`) |
-| `test/test_memory_model.py` | 15 unit test so với công thức tính tay |
+| `test/test_memory_model.py` | 16 unit test so với công thức tính tay |
 
 ### Mô hình hoạt động thế nào
 **Đọc (MM2S):** stream của layer được chia thành các burst `burst_beats` word (không vượt ranh giới 4 KB).
@@ -575,14 +646,15 @@ hoặc từ cmd: `vivado -mode batch -source synth_ooc.tcl -tclargs xczu7ev-ffvc
 Thêm tham số thứ ba `impl` (`-tclargs xczu7ev-ffvc1156-2-e 4 impl`) thì script chạy tiếp opt/place/route và ghi thêm `utilization_route.txt`,
 `timing_summary_route.txt`, cùng dòng `OPENEYE_RESULT post-route`. Trong Tcl shell, gõ `set run_impl 1` trước `source synth_ooc.tcl` để làm tương tự.
 Muốn biết fmax thật thì đặt clock **chặt** (ví dụ 4 ns = 250 MHz). Khi slack dư nhiều, công cụ không cố tối ưu, nên fmax suy ra chỉ là cận dưới.
-Bản script hiện tại đọc ràng buộc clock **trước** `synth_design`, nên tổng hợp có tính đến timing. Lần chạy đầu ngày 2026-10-12 dùng bản cũ (clock đặt sau tổng hợp); vì vậy hãy xuất lại thư mục trước khi chạy tiếp.
+Script đọc ràng buộc clock **trước** `synth_design`, nên tổng hợp có tính đến timing. Mỗi lần RTL đổi phải **xuất lại** thư mục (thư mục cũ trên ổ C
+chứa bản chép RTL cũ và có thể cả bản `synth_ooc.tcl` cũ) và mở **một Vivado Tcl Shell mới**.
 Kết quả nằm trong `reports/`: `utilization.txt`, `utilization_hier.txt` (tài nguyên theo từng module), `timing_summary.txt`,
 `timing_paths.txt` (20 đường găng), `OpenEye_FPGA_synth.dcp` (checkpoint, mở lại bằng `open_checkpoint`).
 Dòng cuối của log in ra `OPENEYE_RESULT ... WNS=... fmax~... MHz`.
 
 ### Bước 2b: làm bằng giao diện (GUI)
 
-1. **Create Project** → RTL Project → tick **Do not specify sources at this time** → chọn part (ví dụ `xczu7ev-ffvc1156-2-e`; xem bảng ước lượng bên dưới để chọn chip đủ lớn).
+1. **Create Project** → RTL Project → tick **Do not specify sources at this time** → chọn part (ví dụ `xczu7ev-ffvc1156-2-e`; xem bảng ước lượng Yosys ở trên để chọn chip đủ lớn).
 2. **Add Sources → Add or create design sources → Add Files**: chọn toàn bộ `rtl/*.v`. **Không** add `hdl/dma_storage.v` của repo; chỉ dùng bản trong `rtl/`.
    Tick **Copy sources into project** nếu muốn project độc lập với thư mục xuất.
 3. Add thêm 4 file trong `include/`. Chuột phải từng file → **Set File Type → Verilog Header**. Hoặc:
@@ -607,80 +679,48 @@ Dòng cuối của log in ra `OPENEYE_RESULT ... WNS=... fmax~... MHz`.
 | Đường găng | `timing_paths.txt` | Biết khối nào giới hạn tần số |
 
 Lưu ý:
-- fmax sau tổng hợp là **ước lượng lạc quan**: chưa có trễ đi dây. Sau place & route thường thấp hơn 10–30 %.
-  Muốn chính xác hơn, chạy tiếp trong Tcl shell: `opt_design; place_design; route_design; report_timing_summary`. Ở chế độ OOC vẫn chạy được.
+- fmax sau tổng hợp là **ước lượng lạc quan** vì chưa có trễ đi dây; số chính thức lấy sau place & route (tuỳ chọn `impl`).
+  Với thiết kế này, sau route chỉ thấp hơn sau tổng hợp khoảng 2–5 % (264 → 252–258 MHz).
 - Nếu tài nguyên vượt quá chip (ví dụ cấu hình baseline trên xc7z020), tổng hợp **vẫn ra báo cáo**, chỉ place & route mới thất bại.
   Khi đó giảm cấu hình (`--set CLUSTER_ROWS=1`, `--set CLUSTER_COLUMNS=1`) hoặc chọn chip lớn hơn. Cần ghi rõ cấu hình đi kèm mọi số liệu.
 - Bản Vivado miễn phí (ML Standard) hỗ trợ Zynq-7000 và một số Zynq UltraScale+ nhỏ. **ZU19EG** mà tác giả gốc dùng cần license trả phí.
   Kiểm tra danh sách thiết bị trước khi chọn part.
 - Lưu báo cáo vào repo: chép `reports/utilization.txt`, `reports/timing_summary.txt` và `config.json` vào `doc/synth/<ngày>_<cấu hình>/`.
 
-### Kết quả Vivado đầu tiên (2026-10-12, mốc chính thức, chi tiết `doc/synth/2026-10-12_baseline_zu7ev/SUMMARY.md`)
+### Kết quả Vivado hiện tại: mốc phần cứng (2026-10-14, sau khi sửa lỗi #13)
 
-Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 10 ns, cấu hình baseline, RTL `8a5bbd2` (đã có bản sửa `GET_BIAS`).
+Chi tiết: `doc/synth/2026-10-14_route4ns_fix13_zu7ev/SUMMARY.md`. Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 4 ns (250 MHz),
+cấu hình ở bảng trên, RTL `5f1e66e` (đã có bản sửa `GET_BIAS` và lỗi #13).
 
-| Tài nguyên | Dùng | Tỉ lệ ZU7EV |
-|---|---:|---:|
-| LUT | 64.540 (logic 61.877, LUTRAM/SRL 2.663) | 28,0 % |
-| Flip-flop | 38.655 | 8,4 % |
-| Block RAM tile | 192 (RAMB36 168 + RAMB18 48) | **61,5 %** |
-| URAM | 8 | 8,3 % |
-| DSP | 4 | 0,2 % |
+| | Sau tổng hợp | **Sau route** | Tỉ lệ ZU7EV (sau route) |
+|---|---:|---:|---:|
+| WNS ở 4 ns / hold | +0,215 ns | **+0,117 ns** / +0,005 ns | đạt 250 MHz |
+| fmax = 1000 / (4 − WNS) | ~264 MHz | **~257 MHz** | |
+| LUT (logic + LUTRAM/SRL) | 65.727 | 63.961 | 27,8 % |
+| Flip-flop | 38.765 | 39.089 | 8,5 % |
+| Block RAM tile (RAMB36 168 + RAMB18 48) | 192 | 192 | **61,5 %** |
+| URAM / DSP | 8 / 4 | 8 / 4 | 8,3 % / 0,2 % |
 
-| Khối | Chiếm |
-|---|---|
-| Mảng PE (`OpenEye_Parallel`, 48 PE) | 84 % LUT, 85 % FF; mỗi PE khoảng 1.100 LUT và 655 FF. Bộ nhân của PE làm bằng LUT (`USE_DSP=0`) |
-| 8 bộ đệm psum (16.384 × 40 bit, `BUFFER_WIDTH_PSUM=14`) | **144 / 168 RAMB36**, tức 46 % BRAM của cả chip |
-| 4 `iact_stream_constructor` | 24 RAMB36 |
-| `router_configurator` / `psum_pipeline` / `dma_storage` | 2.477 / 2.438 / 2.130 LUT; 4 DSP nằm trong 4 bộ lượng tử |
+- **0 ERROR, 0 CRITICAL WARNING.** Các cảnh báo còn lại: Synth 8-7137 (lỗi #15), 8-6090 (lỗi #14), 8-689 (`PE.v:2210/2211`), 8-6057 (URAM không có
+  thanh ghi pipeline), các thanh ghi/cổng không dùng bị loại bỏ, và các cảnh báo bình thường của chế độ out-of-context ở bước route.
+- **Tài nguyên theo khối:** mảng PE (`OpenEye_Parallel`, 48 PE) chiếm khoảng 84 % LUT và 85 % FF, mỗi PE khoảng 1.100 LUT và 655 FF. Bộ nhân của PE làm bằng
+  LUT (`USE_DSP=0`); 4 DSP nằm ở 4 bộ lượng tử. 8 bộ đệm psum (16.384 × 40 bit) chiếm **144/168 RAMB36** (46 % BRAM của chip); 4 `iact_stream_constructor`
+  chiếm 24 RAMB36; 48 RAMB18 là SPad của 48 PE; 8 URAM là 4 bộ đệm iact (`IACT_RAM_CELLS=4`) và bộ đệm weight.
+- **Đường găng sau route:** bên trong mảng PE (SPad weight → logic PE), dây từ `psum_pipeline` tới 144 BRAM của bộ đệm psum (0 tầng logic, khoảng 98 % là dây),
+  `wght_enable_i_reg` → PE (12 tầng logic), `dma_storage` → `psum_pipeline`.
+- **Thời gian thật ở 250 MHz** (bộ nhớ lý tưởng): `mnist1` 65.800 chu kỳ = 0,263 ms, `mnist2` 0,348 ms, `mnist3` 0,107 ms.
 
-**Timing:** WNS +6,116 ns, hold +0,026 ns, không có vòng tổ hợp hay latch.
-Đường chậm nhất là 3,865 ns (17 tầng logic, 66 % là dây), nên **fmax sau tổng hợp ≈ 257 MHz**. Sau place & route thường thấp hơn 10–30 %.
-Đường găng nằm ở **logic điều khiển của bộ chuyển đổi iact** (`OpenEye_FPGA.v` khoảng dòng 943–950: 2 phép nhân giữa các tham số cấu hình,
-1 phép cộng và 1 phép so sánh trong cùng một chu kỳ). Đường găng không nằm ở MAC.
-Quy ra thời gian: `mnist1` 65.800 chu kỳ = 0,658 ms ở 100 MHz, 0,329 ms ở 200 MHz, 0,256 ms ở 257 MHz.
+### Lịch sử các lần chạy Vivado
 
-**So với ước lượng Yosys:** LUT logic lệch dưới 1 %, nên Yosys dùng tốt để so sánh LUT tương đối. BRAM, URAM và DSP lệch nhiều,
-vì Yosys không dùng URAM và đưa bộ nhân vào DSP, nên các số này phải lấy từ Vivado.
+| Ngày | Thư mục `doc/synth/` | Chạy gì | Kết quả chính |
+|---|---|---|---|
+| 2026-10-12 | `2026-10-12_baseline_zu7ev` | Tổng hợp, clock 10 ns | 64,5k LUT, 38,7k FF, 192 BRAM tile; fmax sau tổng hợp ~257 MHz. Phát hiện CRITICAL WARNING của lỗi #13 |
+| 2026-10-12 | `2026-10-12_synth4ns_zu7ev` | Tổng hợp lại ở 4 ns (place & route **không** chạy vì thư mục trên ổ C là bản cũ, chưa có tuỳ chọn `impl`) | Cùng netlist; danh sách cảnh báo đầy đủ, lỗi #13–#15 |
+| 2026-10-13 | `2026-10-13_route4ns_zu7ev` | Tổng hợp + place & route, 4 ns, **trước** khi sửa lỗi #13 | Đạt 250 MHz (WNS +0,025 ns); 63,9k LUT. Không dùng làm mốc vì phần cứng này tính sai (lỗi #13) |
+| 2026-10-14 | `2026-10-14_route4ns_fix13_zu7ev` | Tổng hợp + place & route, 4 ns, **sau** khi sửa lỗi #13 | **Mốc hiện tại** (bảng trên). CRITICAL WARNING 200 → 0; mỗi `iact_stream_constructor` +32 FF (đúng 4 bộ đếm × 8 bit) |
 
-### Lần chạy thứ hai (clock 4 ns) và CRITICAL WARNING (`doc/synth/2026-10-12_synth4ns_zu7ev/`)
-
-- **Place & route chưa chạy.** Thư mục trên ổ C được xuất **trước** khi script có tuỳ chọn `impl`, nên lệnh `set run_impl 1` không có tác dụng:
-  Vivado chỉ tổng hợp lại. Bản script cũ còn đặt clock sau tổng hợp, nên đây vẫn là cùng một netlist, chỉ được đánh giá ở 4 ns.
-  Kết quả: WNS +0,116 ns, đường chậm nhất 3,884 ns, fmax sau tổng hợp vẫn khoảng 257 MHz. Tài nguyên chênh ±15 LUT/FF (nhiễu).
-- **Cách chạy đúng:** trong WSL chạy `venv/bin/python tools/export_vivado.py --out /mnt/c/openeye_vivado --name baseline_impl`. Bản này có tuỳ chọn `impl`
-  và đặt clock trước tổng hợp. Sau đó mở **một Vivado Tcl Shell mới**, `cd C:/openeye_vivado/baseline_impl`, `set run_impl 1`,
-  `set argv [list xczu7ev-ffvc1156-2-e 4]; set argc 2`, `source synth_ooc.tcl`. Kiểm tra trong log có dòng `OPENEYE_RESULT post-route`.
-- **CRITICAL WARNING Synth 8-6858/8-6859 → lỗi #13 (nghiêm trọng, mô phỏng khác phần cứng).** Trong `iact_stream_constructor.v`,
-  4 bộ đếm `rd_cycle_loop_cnt_0..3` được **reset ở một khối `always`** (dòng 437–479) nhưng **đếm ở một khối `always` khác** (dòng 233–400).
-  Một thanh ghi có 2 nguồn lái (multi-driven). Simulator (Icarus, Verilator) để lệnh ghi sau cùng thắng, nên mô phỏng chạy "đúng ý".
-  Vivado thì giữ nguồn hằng số (giá trị reset 0) và **bỏ logic đếm**, nên trên FPGA 4 bộ đếm này **luôn bằng 0**.
-  Chúng điều khiển vòng lặp địa chỉ đọc iact (so với `rd_loop_limit_0..3`). Nếu giới hạn khác 0, địa chỉ đọc iact trên FPGA sẽ khác với mô phỏng.
-  Verilator không báo lỗi này vì `MULTIDRIVEN` chỉ cảnh báo khi các khối dùng clock khác nhau.
-  Cách sửa dự kiến: chuyển 4 dòng reset vào khối reset của khối `always` đầu tiên (0 chu kỳ, 0 tài nguyên). **Chưa sửa, chờ bạn đồng ý.**
-- Các cảnh báo khác đáng chú ý: Synth 8-6090 (`results_ready` trong `psum_pipeline.v` vừa gán blocking vừa non-blocking, chính là lint `BLKANDNBLK` #11),
-  Synth 8-7137 (12 thanh ghi có set và reset cùng mức ưu tiên, "may cause simulation mismatches"), Synth 8-689 (`PE.v:2210/2211` lệch độ rộng, lint #11),
-  Synth 8-6057 (URAM không có thanh ghi pipeline, có thể giới hạn fmax sau route). Bảng đầy đủ ở `SUMMARY.md` của thư mục trên.
-
-### Place & route (2026-10-13, clock 4 ns), **mốc fmax chính thức** (`doc/synth/2026-10-13_route4ns_zu7ev/`)
-
-| | Sau tổng hợp | **Sau route** |
-|---|---:|---:|
-| WNS ở 4 ns | +0,205 ns | **+0,025 ns, đạt 250 MHz** |
-| Hold (WHS) | +0,026 ns | +0,010 ns (đạt) |
-| fmax | khoảng 263 MHz | **khoảng 252 MHz** (cận dưới: công cụ ngừng tối ưu khi đã đạt mục tiêu) |
-| LUT / FF | 65.600 / 38.631 | 63.942 (27,8 %) / 38.667 (8,4 %) |
-| BRAM tile / URAM / DSP | 192 / 8 / 4 | 192 / 8 / 4 |
-
-- **Không có lỗi mới.** Không có ERROR. CRITICAL WARNING vẫn chỉ là lỗi #13 (ở bước tổng hợp, không có mã cảnh báo mới).
-  Ở các bước opt/place/route chỉ có cảnh báo của chế độ out-of-context: cổng không có vị trí partition pin, DRC kết nối bị bỏ qua, chưa đặt HD.CLK_SRC.
-  Các cảnh báo này là bình thường khi tổng hợp một khối đứng riêng.
-- **Thời gian thật ở 250 MHz:** `mnist1` 0,263 ms, `mnist2` 0,348 ms, `mnist3` 0,107 ms (bộ nhớ lý tưởng).
-- **Đường găng sau route khác sau tổng hợp:**
-  - 12 trên 20 đường chậm nhất đi từ thanh ghi của `psum_pipeline` tới chân BRAM của bộ đệm psum: 0 tầng logic, khoảng 98 % là dây.
-    Bộ đệm psum có 144 BRAM trải khắp chip nên dây dài. Thu nhỏ bộ đệm psum (hướng D, mục 8c) vì thế **vừa tiết kiệm BRAM vừa có thể tăng fmax**.
-  - 7 đường đi từ URAM của `wght_buffer` (không có thanh ghi pipeline ở ngõ ra) qua 12 tầng LUT tới PE.
-  - Đường của iact converter (đường găng sau tổng hợp) không còn trong 20 đường chậm nhất.
+Ước lượng Yosys so với Vivado: LUT logic lệch dưới 1 %, nên Yosys dùng tốt để so sánh LUT tương đối. BRAM, URAM và DSP lệch nhiều (Yosys không dùng URAM
+và đưa bộ nhân vào DSP), nên các số này phải lấy từ Vivado.
 
 ### Có phải tổng hợp lại sau mỗi lần sửa RTL hoặc tối ưu không? **Có, khi RTL hoặc cấu hình thay đổi.**
 
@@ -699,7 +739,7 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 
 Độ trễ thật = số chu kỳ ÷ fmax. Một tối ưu giảm 19 % số chu kỳ nhưng làm fmax giảm 25 % thì **chậm hơn**. Vì vậy mọi tối ưu cần cả hai con số.
 
-## 7. Kết quả baseline chính (chi tiết: `doc/perf/baseline.md`)
+## 7. Kết quả baseline chính (chi tiết: `doc/perf/baseline_2026-10-10.md`; mốc cũ 6 case: `doc/perf/baseline.md`)
 
 **Baseline hiện tại: `doc/perf/baseline_2026-10-10/`** (9 case, bộ nhớ lý tưởng).
 
@@ -729,7 +769,7 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 
 | Giai đoạn | Nội dung | Trạng thái |
 |---|---|---|
-| 0. Đo lường | Profiler, báo cáo, so sánh, baseline 9 case, mô hình bộ nhớ | **Gần xong**: còn 0.2 (Dense, nhiều layer) |
+| 0. Đo lường | Profiler, báo cáo, so sánh, baseline 9 case, mô hình bộ nhớ, mốc phần cứng Vivado | **Gần xong**: còn 0.2 (Dense, nhiều layer) |
 | 1. Giảm lưu lượng DMA | Bias theo filter, đóng gói weight, bảng quant theo F hoặc lưu BRAM, readout INT8 | Chưa làm. Đề xuất bắt đầu với bias |
 | 2. Che độ trễ | Double-buffering (`BRANCHES=2`): nạp lượt sau trong lúc lượt hiện tại tính toán | Chưa làm (cần sửa lỗi chọn nửa buffer iact trước) |
 | 3. Mô hình và DSE | Mô hình Python dự đoán chu kỳ và byte, roofline, quét cấu hình | Chưa làm |
@@ -747,7 +787,7 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 | **0.3 Cấu hình gần thực tế hơn**: 3 case kiểu MNIST (mục 6.7), baseline mới `baseline_2026-10-10` | **Xong** (2026-10-10) |
 | Mô hình bộ nhớ ngoài (độ trễ burst, giới hạn băng thông) | **Xong** (2026-10-10, mục 6c); tham số chưa hiệu chỉnh theo board |
 
-### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-12)
+### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-14)
 
 | # | Lỗi | Nơi | Trạng thái |
 |---|---|---|---|
@@ -761,21 +801,21 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 | 8 | 64 filter: `IndexError` trong `layer_parameters.read_data_from_layer` | Python | **Chưa sửa** |
 | 9 | Ảnh rộng 7 (có cột đệm): phần cứng ghi giá trị khác 0 vào ô đệm (giá trị thật vẫn đúng) | RTL/testbench | **Chưa sửa** |
 | 10 | `CLUSTER_ROWS=1`: một số cấu hình treo FSM (theo tài liệu upstream) | RTL | **Chưa sửa**, chưa tự kiểm chứng |
-| 11 | Lint đáng ngờ: `PE.v:2210` (cắt 7→5 bit), `data_pipeline_wght.v:394/396/424` (overhead 4 bit), `BLKANDNBLK` trong `psum_pipeline.v` | RTL | **Chưa sửa**, cần test (mục 9b) |
+| 11 | Lint đáng ngờ: `PE.v:2210` (cắt 7→5 bit), `data_pipeline_wght.v:394/396/424` (overhead 4 bit). Cấu hình đang dùng có `SPARSITY_EN=1` nên các đường này **đang được dùng** | RTL | **Chưa sửa**, cần test (mục 9b) |
 | 12 | `current_filter` (chỉ số filter của bộ lượng tử) chỉ được reset về 0, **không bao giờ tăng**, nên mọi filter dùng hệ số lượng tử của filter 0 (lượng tử theo filter chưa hoạt động) | `hdl/psum_pipeline.v` | **Chưa sửa**, phát hiện bằng đọc code (2026-10-10), chưa kiểm chứng bằng test. Test hiện tại dùng hệ số giống nhau cho mọi filter nên không phát hiện được |
-| 13 | `rd_cycle_loop_cnt_0..3` bị lái từ 2 khối `always` (reset ở khối này, đếm ở khối kia). Vivado giữ giá trị reset nên trên FPGA các bộ đếm **luôn bằng 0**; mô phỏng không thấy | `hdl/iact_stream_constructor.v:233/437` | **Đã xác nhận bằng thí nghiệm** (2026-10-13, `doc/experiments/2026-10-13_bug13_stuck_counters.md`): giả lập phần cứng thì 6/9 case baseline FAIL (mọi case có `iact_read_limit_1..3` ≠ 0, gồm cả 3 layer MNIST), đối chứng PASS. **Đã sửa** (2026-10-13, được bạn đồng ý): 0 chu kỳ, 79 test hồi quy không đổi; chờ tổng hợp lại bằng Vivado để xác nhận CRITICAL WARNING biến mất (mục 9) |
-| 14 | `results_ready` vừa gán blocking vừa non-blocking; Vivado: "entire logic could be removed" | `hdl/psum_pipeline.v:485/522/900` | **Chưa sửa** (cùng lint `BLKANDNBLK` ở #11, nay Vivado xác nhận rủi ro) |
+| 13 | `rd_cycle_loop_cnt_0..3` bị lái từ 2 khối `always` (reset ở khối này, đếm ở khối kia). Vivado giữ giá trị reset nên trên FPGA các bộ đếm **luôn bằng 0**; mô phỏng không thấy | `hdl/iact_stream_constructor.v:233/437` | **Đã xác nhận bằng thí nghiệm** (2026-10-13, `doc/experiments/2026-10-13_bug13_stuck_counters.md`): giả lập phần cứng thì 6/9 case baseline FAIL (mọi case có `iact_read_limit_1..3` ≠ 0, gồm cả 3 layer MNIST), đối chứng PASS. **Đã sửa** (`5f1e66e`, 2026-10-13, được bạn đồng ý): 0 chu kỳ, 79 test hồi quy không đổi; Vivado 2026-10-14: CRITICAL WARNING 200 → 0, vẫn đạt 250 MHz (mục 9) |
+| 14 | `results_ready` vừa gán blocking vừa non-blocking (lint `BLKANDNBLK`, 4 lỗi); Vivado Synth 8-6090: "entire logic could be removed" | `hdl/psum_pipeline.v:485/522/900` | **Chưa sửa** |
 | 15 | 12 thanh ghi có set và reset cùng mức ưu tiên (Synth 8-7137, "may cause simulation mismatches") | `psum_pipeline.v:322/776`, `OpenEye_Parallel.v:443/448`, `PE.v:1113` | **Chưa phân tích** |
 | 16 | Wrapper AXI `fpga/hdl/open_eye_axi_v1_0.v` không biên dịch được (thiếu module `cfg_reg`, `QUANT_AMOUNT` chưa khai báo, `BUFFER_WIDTH` gán 2 lần, `RAM_CELLS` không tồn tại) | `fpga/hdl` | **Chưa sửa**; chỉ cần khi đóng gói IP hoặc làm block design |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-12 sau khi tổng hợp Vivado)
 
-**Định hướng sau kết quả Vivado (mốc: 64,5k LUT, 38,7k FF, 192 BRAM tile, fmax sau tổng hợp khoảng 257 MHz):**
+**Định hướng sau kết quả Vivado (mốc 2026-10-14: 64,0k LUT, 39,1k FF, 192 BRAM tile, đạt 250 MHz sau route):**
 
 | # | Việc | Loại | Vì sao | Trạng thái |
 |---|---|---|---|---|
 | A | Place & route (clock 4 ns) để có fmax chính thức | Vivado, không sửa RTL | Fmax sau tổng hợp là ước lượng lạc quan; mọi tối ưu cần cả chu kỳ lẫn fmax | **Xong 2026-10-13: đạt 250 MHz sau route** (WNS +0,025 ns); đường găng là dây tới 144 BRAM của bộ đệm psum (mục 6d) |
-| B | **Lỗi #13: phần cứng khác mô phỏng** ở `iact_stream_constructor` | Thí nghiệm, rồi sửa RTL | Nếu đúng như Vivado báo, bitstream hiện tại tính sai iact, nên mọi số đo trên board sẽ vô nghĩa | (1) Thí nghiệm **xong 2026-10-13: lỗi có thật**, 6/9 case sai trên phần cứng giả lập. (2) **Đã sửa 2026-10-13** (mục 9). Còn: bạn tổng hợp lại bằng Vivado (`C:/openeye_vivado/fix13_impl`) |
+| B | **Lỗi #13: phần cứng khác mô phỏng** ở `iact_stream_constructor` | Thí nghiệm, rồi sửa RTL | Nếu đúng như Vivado báo, bitstream hiện tại tính sai iact, nên mọi số đo trên board sẽ vô nghĩa | (1) Thí nghiệm **xong 2026-10-13: lỗi có thật**, 6/9 case sai trên phần cứng giả lập. (2) **Đã sửa 2026-10-13** (mục 9). (3) **Vivado xác nhận 2026-10-14**: CRITICAL WARNING biến mất, vẫn đạt 250 MHz. **Xong** |
 | C | Gửi bias theo filter (1.1 bên dưới) | Sửa RTL | Khoảng −19 % chu kỳ ở `mnist1`, DMA pha bias giảm khoảng 900 lần, chi phí khoảng +2 % FF và 0 BRAM | Chờ đồng ý |
 | D | Thu nhỏ bộ đệm psum (`BUFFER_WIDTH_PSUM` 14 → 11/12) | Đổi tham số, không sửa RTL | 144/168 RAMB36 là bộ đệm psum, layer lớn nhất chỉ dùng khoảng 1.792/16.384 địa chỉ (ước tính); tiết kiệm khoảng 100–124 BRAM36 để thêm cluster hoặc bộ đệm | Cần kiểm chứng bằng 9 case. Sau route còn thấy lợi thêm: đường găng là dây tới các BRAM này, nên bộ đệm nhỏ hơn có thể tăng fmax |
 | E | DMA 128 bit | Băng thông | Cổng HP của ZU+ rộng 128 bit; 64 bit ở 250 MHz chỉ đạt khoảng 2 GB/s; giảm một nửa số chu kỳ nạp và đọc kết quả | 128 bit chưa từng được kiểm chứng |
@@ -783,14 +823,12 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 | G | `USE_DSP=1` cho PE | Sửa RTL (tài nguyên) | Bộ nhân 48 PE đang dùng LUT, còn 1.724 DSP trống | Khi cần thêm cluster |
 | H | Lỗi #14, #15 (cảnh báo "simulation mismatch") | Phân tích, có thể sửa RTL | Cùng loại rủi ro với #13 | Phân tích sau B |
 
-Thứ tự đề xuất: **A và B trước** (B ảnh hưởng tới độ tin cậy của mọi kết quả trên phần cứng), sau đó C, rồi D.
+Thứ tự đề xuất: A và B **đã xong**; tiếp theo là C (bias theo filter), rồi D.
 Mỗi thay đổi RTL: test, `run_profile --compare`, Yosys (so sánh nhanh LUT), Vivado ở các mốc quan trọng.
 
 **Kế hoạch theo giai đoạn (giữ nguyên từ 2026-10-10):**
 
-1. **Giai đoạn 1.1: gửi bias theo filter.** Hiện bias được gửi theo từng pixel output (hiệu suất bus khoảng 0 %; 22 % độ trễ của layer kiểu Conv1).
-   Sửa RTL (`GET_BIAS`, `psum_pipeline.v`) và bộ sinh stream Python. Ước tính `mnist1`: 14.336 → vài chục word, giảm khoảng 20 % độ trễ.
-   **Cần bạn đồng ý** vì sửa RTL.
+1. **Giai đoạn 1.1: gửi bias theo filter** (= hướng C; thiết kế ở dưới). **Cần bạn đồng ý** vì sửa RTL.
 2. **Giai đoạn 1.2: readout INT8.** Lượng tử kết quả trên chip trước khi gửi ra (đường này đã có cho write-back giữa các layer).
    Readout của `mnist1` chiếm 22 %; có thể giảm khoảng 4 lần số word.
 3. **Giai đoạn 1.3: tìm hiểu định dạng weight** (hiệu suất 15–30 %). Bước đầu chỉ phân tích, không sửa RTL; sau đó mới đề xuất cách đóng gói.
@@ -822,7 +860,7 @@ Mỗi thay đổi RTL: test, `run_profile --compare`, Yosys (so sánh nhanh LUT)
 
 Mỗi bước đều đánh giá bằng `tools/run_profile.py --compare doc/perf/baseline_2026-10-10`, kèm thêm `--mem typical` để thấy lợi ích khi có bộ nhớ thực tế hơn.
 
-## 9. Các lỗi upstream đã biết (ảnh hưởng tới việc đo)
+## 9. Các lỗi đã biết và các bản sửa RTL
 
 **Số channel vào và `NUM_GLB_IACT`** (đo ngày 2026-10-09: một layer Conv, input 8×1, 4 filter, ramp, 2×2 cluster, `QUANT_AMOUNT=32`):
 
@@ -840,7 +878,7 @@ Mỗi bước đều đánh giá bằng `tools/run_profile.py --compare doc/perf
 - MNIST Conv1 có 1 channel vào, nên chưa chạy được trên RTL hiện tại.
 
 **Lỗi `GET_BIAS` khi dữ liệu DMA tới không liên tục** (tìm ra, kiểm chứng và **đã sửa** ngày 2026-10-10, với sự đồng ý của bạn):
-- `hdl/OpenEye_FPGA.v:1974`: `GET_BIAS` chuyển sang `GET_QUANTIZE` khi `fsm_psum_cycle == trans_cycles_psum - 1`,
+- `hdl/OpenEye_FPGA.v:1978` (vị trí hiện tại): `GET_BIAS` chuyển sang `GET_QUANTIZE` khi `fsm_psum_cycle == trans_cycles_psum - 1`,
   **không kiểm tra `enable_dma_i_reg`**. Các trạng thái nạp khác thì có kiểm tra.
 - Hậu quả: nếu đúng chu kỳ đó không có word hợp lệ, word bias cuối không được nhận, bị `GET_QUANTIZE` coi là word đầu của bảng
   lượng tử, toàn bộ dữ liệu sau lệch 1 word, FSM treo. `fsm_psum_cycle` còn kẹt ở N−1, ảnh hưởng tới layer sau.
@@ -877,7 +915,7 @@ Kết luận:
 + if ((fsm_psum_cycle == trans_cycles_psum - 1) & enable_dma_i_reg) begin
 ```
 FSM chỉ rời `GET_BIAS` ở chu kỳ **thật sự nhận** word bias cuối, giống `GET_IACT`/`GET_WGHT`/`GET_QUANTIZE`.
-Đây là thay đổi RTL duy nhất so với upstream.
+Cùng với bản sửa lỗi #13 (bên dưới), đây là 2 thay đổi RTL so với upstream.
 
 **Kiểm chứng sau khi sửa:**
 
@@ -920,7 +958,6 @@ BRAM hay DSP.
   Trên FPGA thật xác suất mỗi layer nhỏ, nhưng khác 0, nên lỗi xảy ra **lúc có lúc không**, rất khó debug.
 
 **Khác:**
-- `CLUSTER_ROWS=1`: có cấu hình bị treo FSM (theo `doc/test_status_handover.md`).
 - `model_test` (chạy cả model) bị tắt trong testbench.
 - **CI "Lint"** của upstream luôn fail vì các warning có sẵn trong RTL (repo gốc cũng fail ở mọi commit). Từ 2026-10-10, CI của `dev`
   dùng lint theo baseline (mục 9c), chỉ fail khi có warning mới. Chi tiết từng warning: mục 9b.
@@ -949,7 +986,7 @@ BRAM hay DSP.
 | 79 test hồi quy (16 Conv `test_conv_const.py` + 63 GEMM/Dense `test_gemm_layer.py`) | **Giống hệt từng test** so với lần chạy 2026-10-10: Conv 9 PASS / 7 FAIL, GEMM 40 PASS / 23 FAIL, 0 test đổi kết quả (các FAIL là lỗi có sẵn #5–#7) |
 | Lint baseline (Verilator 5.020) | 0 warning mới (`parallel` 38, `fpga` 478) |
 | Yosys `synth_xilinx` toàn thiết kế (so với lần chạy ngày 2026-10-12) | FF 45.274 → 45.402 (**+128 = 4 instance × 4 bộ đếm × 8 bit**, đúng các bộ đếm mà trước đây bị bỏ); LUT 61.277 → 61.456 (+179, +0,3 %); CARRY4 +33 (bộ cộng 8 bit); BRAM và DSP không đổi. Trên ZU7EV: +0,03 % FF, +0,08 % LUT. Yosys còn báo conflicting drivers cho `a`, `b` trong `OpenEye_FPGA.v`: đây là biến chạy vòng `for` dùng chung giữa các khối `always`, không có logic nào đọc nên không thành phần cứng. Lỗi cũ, vô hại, Vivado không báo |
-| Vivado (CRITICAL WARNING phải biến mất, tài nguyên, fmax) | **Chờ bạn chạy** `C:/openeye_vivado/fix13_impl` (`set run_impl 1`, clock 4 ns) |
+| Vivado 2024.2, place & route 4 ns (2026-10-14, `doc/synth/2026-10-14_route4ns_fix13_zu7ev/`) | CRITICAL WARNING Synth 8-6858/8-6859: **200 → 0**. Vẫn đạt 250 MHz (WNS +0,117 ns). Mỗi `iact_stream_constructor` **+32 FF** (306 → 338), đúng 4 bộ đếm × 8 bit; tổng sau tổng hợp +134 FF, +127 LUT; BRAM, URAM, DSP không đổi |
 
 **Tốt hơn cũ ở đâu:** trên mô phỏng không có gì thay đổi (đúng như mong muốn: cùng số chu kỳ, cùng kết quả). Khác biệt nằm ở **phần cứng thật**:
 bitstream tạo từ RTL cũ tính sai mọi layer thực tế, còn RTL mới cho phần cứng làm đúng như mô phỏng. Bản sửa không tốn chu kỳ nào. Về tài nguyên,
@@ -957,7 +994,7 @@ phần cứng chỉ có thêm đúng các bộ đếm mà thiết kế vốn c�
 
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
-Output gốc đầy đủ: `doc/lint/verilator-5.020_2026-10-10.txt`. Mọi warning dưới đây đều có sẵn trong upstream; bản sửa `GET_BIAS` (mục 9) không thêm warning nào.
+Output gốc đầy đủ: `doc/lint/verilator-5.020_2026-10-10.txt`. Mọi warning dưới đây đều có sẵn trong upstream; hai bản sửa RTL (`GET_BIAS` và lỗi #13, mục 9) không thêm warning nào.
 
 ### Hai mục tiêu lint
 
@@ -984,7 +1021,8 @@ wire [4:0] first_spad_words_wght;                 // PE.v:662, chỉ 5 bit (tố
 - Commit upstream `546338e` tăng `WGHT_ADDR_ADDR` lên 64 entry, nên output thành 7 bit, nhưng dây trong `PE.v` vẫn 5 bit.
 - Giá trị lớn hơn 31 sẽ mất 2 bit cao. Dây này được dùng ở `PE.v:1366, 1398, 1408, 1414` (`if ((first_spad_words_wght - 1) > wght_addr_vec)`)
   để giới hạn địa chỉ weight trong **chế độ sparse**. Hậu quả có thể là đọc sai hoặc thiếu weight khi một PE có hơn 31 word địa chỉ weight.
-- Ảnh hưởng tới cấu hình đang đo: không, vì các test hiện dùng `SPARSITY_EN=0`. Sẽ quan trọng nếu bật sparsity.
+- Ảnh hưởng tới cấu hình đang đo: **có thể**. Phần cứng được sinh với `SPARSITY_EN=1` (đường sparse đang chạy), nhưng dữ liệu test là dense
+  (`USE_SPARSE_*=0`), nên trường hợp hơn 31 word địa chỉ weight có thể chưa được thử. (Sửa 2026-10-14: trước đây ghi nhầm là `SPARSITY_EN=0`.)
 
 **(2) `data_pipeline_wght.v:394, 396`: tổng overhead bị gói vào 4 bit cố định**
 ```verilog
@@ -999,7 +1037,8 @@ assign overhead_temp[w+1] = input_words_w[w+1][...] + overhead_temp[w];   // c�
   hai dòng này là một ứng viên. **Chưa kiểm chứng.**
 
 **(3) `data_pipeline_wght.v:424`: `overhead_output` (4 bit) nhận biểu thức 17/32 bit**
-- Kết quả sau khi trừ `filters_w` thường nhỏ, nhưng nếu phép trừ ra số âm thì bị cắt thành một số dương sai. Chỉ dùng khi `SPARSITY_EN=1`.
+- Kết quả sau khi trừ `filters_w` thường nhỏ, nhưng nếu phép trừ ra số âm thì bị cắt thành một số dương sai. Chỉ dùng khi `SPARSITY_EN=1`
+  (cấu hình đang dùng).
   Nên kiểm tra cùng với (2).
 
 #### A2. Tiềm ẩn (chỉ sai ở `SERIAL=0`, FPGA không bị ảnh hưởng)
@@ -1163,3 +1202,15 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
 - **Sửa lỗi #13** (`hdl/iact_stream_constructor.v`, được bạn đồng ý): 4 lệnh reset của `rd_cycle_loop_cnt_0..3` chuyển về khối `always` đang đếm.
   Yosys `check`: 32 → 0 cảnh báo conflicting drivers. 9 case baseline PASS, 0 chu kỳ chênh lệch. 79 test Conv/GEMM giống hệt trước. Lint 0 warning mới.
   Thư mục Vivado `C:/openeye_vivado/fix13_impl` đã xuất sẵn để tổng hợp lại. Chi tiết ở mục 9.
+
+### 2026-10-14
+
+- **Vivado sau khi sửa lỗi #13** (place & route, 4 ns): 0 ERROR, **CRITICAL WARNING 200 → 0**, đạt 250 MHz (WNS +0,117 ns), mỗi `iact_stream_constructor` +32 FF.
+  Đây là **mốc phần cứng hiện tại**: `doc/synth/2026-10-14_route4ns_fix13_zu7ev/`.
+- `.gitignore`: thêm ngoại lệ `!doc/synth/**/*.txt` và `*.json`. Trước đó các báo cáo Vivado (`*.txt`, `config.json`) bị `.gitignore` của upstream bỏ qua,
+  nên **chỉ các file `SUMMARY.md` được đưa lên GitHub**; nay đã đưa đủ.
+- Mục 5.9: `IACT_RAM_CELLS` (số bank của bộ đệm iact) và thí nghiệm `IACT_RAM_CELLS=32` (6/6 PASS, chậm hơn 0,4–4,9 %, +7,8 % LUT, +12,6 % FF).
+- **Rà soát README:** thêm sơ đồ thư mục (mục 4); gộp 3 mục kết quả Vivado cũ thành mục "Kết quả hiện tại" + bảng lịch sử (mục 6d); sửa các chỗ sai hoặc
+  lỗi thời: baseline hiện tại (5.4, 7), mô hình bộ nhớ đã có (5.2, 6b), số unit test (16), vị trí dòng code (`GET_BIAS` 1978, `quant_reg` 2026–2028),
+  nguồn `DMA_BITWIDTH` (5.8), "thay đổi RTL duy nhất" (nay là 2), `SPARSITY_EN` của cấu hình đang dùng là 1 chứ không phải 0 (9b, lỗi #11), bỏ các đoạn trùng
+  (5.7, 8c, `CLUSTER_ROWS=1` ở mục 9, `BLKANDNBLK` ở #11 và #14).
