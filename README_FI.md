@@ -285,7 +285,11 @@ thì vừa tiết kiệm tài nguyên, vừa giảm DMA, vừa giúp simulation 
   (word 1 → bank 0, word 2 → bank 1, ...); trong `CONVERT_IACT` các bank được đọc **song song** theo một cửa sổ trượt để cấp dữ liệu cho 4 `iact_stream_constructor`.
 - **Giá trị đang dùng: 4** (Makefile của upstream đặt `IACT_RAM_CELLS=4`; `open_eye_parameters.py` cũng mặc định 4). Dung lượng 4 × 4.096 × 8 byte = 128 KB
   (64 KB mỗi nửa ping/pong, tức 65.536 pixel INT8), đọc 4 × 64 = 256 bit mỗi chu kỳ. Trên ZU7EV mỗi bank là 1 URAM → 4 URAM.
-- **`RAM_CELLS=32` trong các test Python không có tác dụng:** tên biến cũ, không ai đọc. Comment "32 RAM_SP cells" trong `OpenEye_FPGA.v` và bảng
+- **Ba thứ cùng tên "RAM_CELLS", đừng nhầm:**
+  1. Biến môi trường `RAM_CELLS=32` trong các test Python (`os.environ["RAM_CELLS"]`): **không có tác dụng**, không code nào đọc. Thứ được đọc là `IACT_RAM_CELLS`.
+  2. Tham số Verilog `IACT_RAM_CELLS` của `OpenEye_FPGA` (= 4, từ `parameters_FPGA.vh`): **thật sự quyết định** số bank của `BUFFER_A`.
+  3. Tham số Verilog `RAM_CELLS` của module `iact_stream_constructor` (mặc định 32 ở dòng 65): được gán lại bằng `.RAM_CELLS(IACT_RAM_CELLS)` = 4 khi
+     khởi tạo trong `OpenEye_FPGA.v`, nhưng **bên trong module không dùng ở đâu** (lint `UNUSEDPARAM`). Giá trị 32 chỉ là mặc định khi không ai gán. Comment "32 RAM_SP cells" trong `OpenEye_FPGA.v` và bảng
   tham số trong `doc/OpenEye_FPGA_documentation.md` cũng là mô tả cũ của upstream.
 - **Thí nghiệm `IACT_RAM_CELLS=32`** (chỉ đổi tham số, không sửa RTL; 6 case nhỏ, Yosys toàn thiết kế):
 
