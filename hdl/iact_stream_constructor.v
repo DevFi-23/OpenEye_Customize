@@ -137,6 +137,12 @@ module iact_stream_constructor #(
   reg single_write_half, single_write_half_q, single_read_half;
   reg single_output_half;
   wire single_channel = !fully_connected_i && (iact_channels_per_pe_i == 1);
+  // Dense (FC) layers give every iact bank its own K slice: the writer
+  // rotates over the banks and advances the address once per rotation. A
+  // convolution reads the same serial window from every bank (bank r at
+  // ram_rd_addr + r*channel_div_trans), so it must broadcast each word to all
+  // banks and advance the address on every write, as before 23be043.
+  wire rotate_banks = fully_connected_i && (NUM_GLB_IACT > 1);
   wire [ADDRWIDTH-1:0] conv_row_words =
       needed_iact_router_cycles_i * NUM_GLB_IACT * channel_div_trans;
   reg                           ram_wr_en;
@@ -581,12 +587,8 @@ reg enable_write_to_storage;
             if (ram_wr_en) begin
               for (r = 0; r < NUM_GLB_IACT; r = r + 1) begin
                 for (w = 0; w < WORDS_PER_TRANS; w = w + 1) begin
-                  if (NUM_GLB_IACT == 1) begin
+                  if (!rotate_banks || (router_cycle == r)) begin
                     mem_data_payload_reg[r][w] <= single_channel ? storage_i[7:0] : storage_i[w*8+:8];
-                  end else begin
-                    if ((router_cycle == r)) begin
-                      mem_data_payload_reg[r][w] <= single_channel ? storage_i[7:0] : storage_i[w*8+:8];
-                    end
                   end
                 end
               end
@@ -640,7 +642,7 @@ reg enable_write_to_storage;
                 router_cycle    <= 0;
               end
 
-              if ((NUM_GLB_IACT == 1) | (router_cycle == 0) | (switching_cycle == 0)) begin
+              if (!rotate_banks | (router_cycle == 0) | (switching_cycle == 0)) begin
                 ram_wr_addr         <= wr_addr_0;
                 wr_addr_0           <= wr_addr_0 + wr_addr_inc_0;
                 wr_cycle_loop_cnt_0 <= wr_cycle_loop_cnt_0 + 1;
@@ -697,7 +699,10 @@ reg enable_write_to_storage;
     for (r_gen = 0; r_gen < NUM_GLB_IACT; r_gen = r_gen + 1) begin : BUFFER
       wire [BITS_PER_ROUTER-1:0]ram_data_i_w;
       wire [BITS_PER_ROUTER-1:0]ram_data_o_w;
-      wire [ADDRWIDTH-1:0] bank_addr = ram_wr_en_q ? ram_wr_addr :
+      // One-channel packing computes its own row-pair address into
+      // ram_wr_addr_q (row 2k low slot, row 2k+1 high slot of the same word);
+      // every other mode writes at ram_wr_addr.
+      wire [ADDRWIDTH-1:0] bank_addr = ram_wr_en_q ? (single_channel ? ram_wr_addr_q : ram_wr_addr) :
           (ram_rd_addr + (fully_connected_i ? 0 : r_gen * channel_div_trans));
       wire [WORDS_PER_TRANS-1:0] write_mask;
       wire [BITS_PER_ROUTER-1:0] write_data;

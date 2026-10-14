@@ -83,3 +83,40 @@ is mainly 33 % more iact bytes for such layers.
 2. Regression: 16 Conv + 63 GEMM/Dense tests (same verdict or better per test), 9 baseline cases (0 cycle change expected for
    the 4-channel, NUM_GLB_IACT=1 cases), lint baseline.
 3. Then MNIST Conv1 with its real single input channel becomes possible.
+
+## Fix applied (2026-10-14, approved by the user)
+
+`hdl/iact_stream_constructor.v` (12 lines added, 7 removed, no other RTL file):
+
+1. Bug #6: `bank_addr = ram_wr_en_q ? (single_channel ? ram_wr_addr_q : ram_wr_addr) : ...` - the one-channel row-pair
+   address is used again; every other mode keeps `ram_wr_addr`.
+2. Bug #7 (NUM_GLB_IACT=3): `wire rotate_banks = fully_connected_i && (NUM_GLB_IACT > 1);` - the writer only rotates over the
+   iact banks (data and address) for Dense layers; a convolution broadcasts each word to all banks and advances the address on
+   every write, as before 23be043. Dense behaviour is unchanged (`rotate_banks` equals the old condition for FC layers).
+
+### Verification
+
+| Check | Before the fix | After the fix |
+|---|---|---|
+| Reproducer 8x1, channels 1/2/3/4/8 x NUM_GLB_IACT 1/3 (10 cases) | 1 ch and NUM_GLB_IACT=3 fail | **8/8 PASS**; only the two 3-channel cases fail (Python packing, unchanged) |
+| `test_conv_const.py` (34 tests) | 19 PASS / 15 FAIL | **34/34 PASS** (15 FAIL -> PASS) |
+| `test_gemm_layer.py` (63 tests) | 40 PASS / 23 FAIL | 40 PASS / 23 FAIL, **identical per test** (the 23 are Dense bug #5) |
+| New `test_mnist_layers.py -k mapping` (10 tests) | - | 8 passed, 2 xfailed (3 channels) |
+| 9 baseline cases (`run_profile --compare baseline_2026-10-10`) | - | 9/9 PASS, **0 cycle and 0 DMA word change** |
+| Lint baseline | 478 (fpga) | 477: `UNUSEDSIGNAL ram_wr_addr_q` disappears (the one-channel address was computed but never used); 0 new; baseline lowered |
+| Yosys synth_xilinx (vs the bug #13 fix) | 61,456 LUT / 45,402 FF | 61,521 / 45,506 (**+65 LUT, +104 FF, +31 CARRY4**: the one-channel address logic is no longer dead); BRAM/DSP unchanged |
+
+The 28x4, 1-channel failure after the fix is value-for-value identical to upstream 5516278 (before 23be043), so the fix restores
+the earlier one-channel behaviour exactly.
+
+## Real MNIST layers (test/cocotb_fpga/test_mnist_layers.py::test_mnist_conv)
+
+| Layer | Result | Cause |
+|---|---|---|
+| Conv1 28x28, 1 -> 32 | FAIL (output rows equal in pairs) | **Bug #17 (new, older than 23be043):** the one-channel writer computes its own address (row + column, wrap at `conv_row_words`) and ignores the x passes of images wider than one pass (`iact_x_line_repetitions = 2` for width 28). Widths 8 and 16 pass, 28 fails; 28 wide with 2 channels passes. Same values on 5516278. |
+| Conv2 14x14, 32 -> 64 | FAIL: filters 0-31 correct, 32-63 wrong | **Bug #18 (new, pre-existing):** second filter pass wrong with many input channels. 64 filters with 4 channels pass (8x4, 7x7); 48 filters fail on 8x4 too. Same 1,568 mismatches for Conv3 on the RTL before this fix. |
+| Conv3 7x7, 64 -> 64 | FAIL: filters 32-63 wrong | Bug #18, plus bug #9 (padding cells of 7-wide images; 7x7 with 4 channels and 64 filters has correct values but the DMA stream check fails) |
+| FC 3136 -> 10 | not run | Dense layers with 10 outputs fail with bug #5 (`test_dense_ten_outputs`) |
+
+`QUANT_AMOUNT` must be at least the number of filters: the 64-filter layers need `QUANT_AMOUNT = 64` (bug #8 was this limit, not a
+code error). The synthesised configuration (`QUANT_AMOUNT = 32`) can therefore not run Conv2/Conv3 in one pass.

@@ -133,6 +133,7 @@ OpenEye_orig/
 │   │   ├── test_profile.py    ★  9 case đo độ trễ (mục 6.7)
 │   │   ├── test_conv_const.py    Test Conv (16 test dùng làm hồi quy)
 │   │   ├── test_gemm_layer.py    Test GEMM/Dense (63 test dùng làm hồi quy)
+│   │   ├── test_mnist_layers.py ★ Quét channel × NUM_GLB_IACT (hồi quy lỗi #6/#7) và 3 layer Conv MNIST thật (xfail: #17, #18)
 │   │   └── regmap.yaml           Định nghĩa các thanh ghi cấu hình gửi qua DMA (nguồn của dma_storage.v)
 │   ├── cocotb_parallel/          Test của OpenEye_Parallel (SERIAL=0), đã cũ (mục 5.7)
 │   ├── test_memory_model.py   ★  16 unit test của mô hình bộ nhớ
@@ -879,9 +880,9 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 | 3 | `GET_BIAS` rời trạng thái khi chưa nhận word bias cuối (treo khi DMA có khoảng trống) | `hdl/OpenEye_FPGA.v` | **Đã sửa** (`77f0477`), 0 chu kỳ, 0 tài nguyên |
 | 4 | CI lint luôn fail (38 warning có sẵn) | `.github` | **Đã xử lý** bằng lint baseline (`4a26867`); RTL không đổi |
 | 5 | Dense/FC: `FC activation write ... bank=1 addr=0` sai (23/63 test GEMM/Dense) | RTL hoặc testbench Dense | **Chưa sửa** (có sẵn ở upstream) |
-| 6 | Input 1 channel: chỉ ra bias | `hdl/iact_stream_constructor.v:700` | **Đã tìm ra nguyên nhân** (2026-10-14): hồi quy do upstream `23be043`; RAM dùng `ram_wr_addr` thay vì địa chỉ 1-channel `ram_wr_addr_q`. Đề xuất sửa 1 dòng, **chưa sửa** (chờ đồng ý). `doc/experiments/2026-10-14_channel_bugs.md` |
-| 7 | Input 3 channel và mọi `NUM_GLB_IACT=3`: giá trị sai | `iact_stream_constructor.v` (bank) + Python (3 channel) | **Đã tìm ra nguyên nhân** (2026-10-14): `NUM_GLB_IACT=3` là hồi quy do `23be043` (bộ ghi xoay bank kiểu Dense cho cả Conv); 3 channel là lỗi cũ do Python đóng gói 3 byte/pixel trong khi RTL đi theo cặp. Đề xuất: RTL chỉ xoay bank khi Dense; Python đệm số channel lẻ lên chẵn. **Chưa sửa** |
-| 8 | 64 filter: `IndexError` trong `layer_parameters.read_data_from_layer` | Python | **Chưa sửa** |
+| 6 | Input 1 channel: chỉ ra bias | `hdl/iact_stream_constructor.v` | **Đã sửa** (2026-10-14, được bạn đồng ý): hồi quy do upstream `23be043`; RAM nay dùng lại địa chỉ 1-channel `ram_wr_addr_q`. Ảnh rộng một lượt x đã đúng; ảnh rộng hơn còn lỗi #17 |
+| 7 | Input 3 channel và mọi `NUM_GLB_IACT=3`: giá trị sai | `iact_stream_constructor.v` (bank) + Python (3 channel) | **`NUM_GLB_IACT=3`: đã sửa** (2026-10-14, chỉ xoay bank khi Dense). **3 channel: chưa sửa** (lỗi cũ: Python đóng gói 3 byte/pixel, RTL đi theo cặp; đề xuất Python đệm số channel lẻ lên chẵn) |
+| 8 | 64 filter: `IndexError` trong `layer_parameters.read_data_from_layer` | Cấu hình | **Không phải lỗi code** (2026-10-14): bảng lượng tử có `QUANT_AMOUNT` entry, nên số filter phải ≤ `QUANT_AMOUNT`. Layer 64 filter cần `QUANT_AMOUNT=64` |
 | 9 | Ảnh rộng 7 (có cột đệm): phần cứng ghi giá trị khác 0 vào ô đệm (giá trị thật vẫn đúng) | RTL/testbench | **Chưa sửa** |
 | 10 | `CLUSTER_ROWS=1`: một số cấu hình treo FSM (theo tài liệu upstream) | RTL | **Chưa sửa**, chưa tự kiểm chứng |
 | 11 | Lint đáng ngờ: `PE.v:2210` (cắt 7→5 bit), `data_pipeline_wght.v:394/396/424` (overhead 4 bit). Cấu hình đang dùng có `SPARSITY_EN=1` nên các đường này **đang được dùng** | RTL | **Chưa sửa**, cần test (mục 9b) |
@@ -889,6 +890,8 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 | 13 | `rd_cycle_loop_cnt_0..3` bị lái từ 2 khối `always` (reset ở khối này, đếm ở khối kia). Vivado giữ giá trị reset nên trên FPGA các bộ đếm **luôn bằng 0**; mô phỏng không thấy | `hdl/iact_stream_constructor.v:233/437` | **Đã xác nhận bằng thí nghiệm** (2026-10-13, `doc/experiments/2026-10-13_bug13_stuck_counters.md`): giả lập phần cứng thì 6/9 case baseline FAIL (mọi case có `iact_read_limit_1..3` ≠ 0, gồm cả 3 layer MNIST), đối chứng PASS. **Đã sửa** (`5f1e66e`, 2026-10-13, được bạn đồng ý): 0 chu kỳ, 79 test hồi quy không đổi; Vivado 2026-10-14: CRITICAL WARNING 200 → 0, vẫn đạt 250 MHz (mục 9) |
 | 14 | `results_ready` vừa gán blocking vừa non-blocking (lint `BLKANDNBLK`, 4 lỗi); Vivado Synth 8-6090: "entire logic could be removed" | `hdl/psum_pipeline.v:485/522/900` | **Chưa sửa** |
 | 15 | 12 thanh ghi có set và reset cùng mức ưu tiên (Synth 8-7137, "may cause simulation mismatches") | `psum_pipeline.v:322/776`, `OpenEye_Parallel.v:443/448`, `PE.v:1113` | **Chưa phân tích** |
+| 17 | 1 channel với ảnh rộng hơn một lượt x (ví dụ MNIST Conv1 28×28): các hàng output đi theo cặp giống nhau | `iact_stream_constructor.v` (bộ ghi 1 channel) | **Chưa sửa** (lỗi cũ, có từ trước `23be043`): địa chỉ 1 channel (hàng + cột) không tính các lượt x. Rộng 8/16 đúng, rộng 28 sai |
+| 18 | Layer có nhiều channel (32/64) và 64 filter: filter 32–63 sai (lượt filter thứ hai); 48 filter sai cả với 4 channel | RTL (chưa khoanh vùng) | **Chưa sửa**, lỗi cũ (giống hệt trên RTL trước khi sửa). Chặn MNIST Conv2/Conv3 |
 | 16 | Wrapper AXI `fpga/hdl/open_eye_axi_v1_0.v` không biên dịch được (thiếu module `cfg_reg`, `QUANT_AMOUNT` chưa khai báo, `BUFFER_WIDTH` gán 2 lần, `RAM_CELLS` không tồn tại) | `fpga/hdl` | **Chưa sửa**; chỉ cần khi đóng gói IP hoặc làm block design |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-12 sau khi tổng hợp Vivado)
@@ -998,7 +1001,7 @@ Kết luận:
 + if ((fsm_psum_cycle == trans_cycles_psum - 1) & enable_dma_i_reg) begin
 ```
 FSM chỉ rời `GET_BIAS` ở chu kỳ **thật sự nhận** word bias cuối, giống `GET_IACT`/`GET_WGHT`/`GET_QUANTIZE`.
-Cùng với bản sửa lỗi #13 (bên dưới), đây là 2 thay đổi RTL so với upstream.
+Cùng với bản sửa lỗi #13 và bản sửa lỗi #6/#7 (bên dưới), đây là 3 thay đổi RTL so với upstream.
 
 **Kiểm chứng sau khi sửa:**
 
@@ -1074,6 +1077,46 @@ BRAM hay DSP.
 **Tốt hơn cũ ở đâu:** trên mô phỏng không có gì thay đổi (đúng như mong muốn: cùng số chu kỳ, cùng kết quả). Khác biệt nằm ở **phần cứng thật**:
 bitstream tạo từ RTL cũ tính sai mọi layer thực tế, còn RTL mới cho phần cứng làm đúng như mô phỏng. Bản sửa không tốn chu kỳ nào. Về tài nguyên,
 phần cứng chỉ có thêm đúng các bộ đếm mà thiết kế vốn cần (4 × 8 bit = 32 flip-flop cùng bộ cộng và so sánh), những thứ trước đây Vivado đã bỏ đi.
+
+### Sửa lỗi #6 và #7 (`NUM_GLB_IACT=3`) (2026-10-14, được bạn đồng ý)
+
+**Thay đổi** (`hdl/iact_stream_constructor.v`, 12 dòng thêm, 7 dòng bỏ; không file RTL nào khác):
+
+```verilog
+// mới: chỉ Dense mới xoay vòng các bank iact
+wire rotate_banks = fully_connected_i && (NUM_GLB_IACT > 1);
+
+// WRITE_TO_MEMORY, dữ liệu (cũ: NUM_GLB_IACT == 1 ? mọi bank : chỉ bank router_cycle)
+if (!rotate_banks || (router_cycle == r)) mem_data_payload_reg[r][w] <= ...;
+
+// WRITE_TO_MEMORY, địa chỉ (cũ: (NUM_GLB_IACT == 1) | ...)
+if (!rotate_banks | (router_cycle == 0) | (switching_cycle == 0)) begin ram_wr_addr <= wr_addr_0; ... end
+
+// địa chỉ RAM (cũ: ram_wr_en_q ? ram_wr_addr : ...)
+wire [ADDRWIDTH-1:0] bank_addr = ram_wr_en_q ? (single_channel ? ram_wr_addr_q : ram_wr_addr) : ...;
+```
+
+- **Lỗi #6 (1 channel):** chế độ 1 channel xếp 2 hàng ảnh vào 2 ô của **cùng** một word RAM và tự tính địa chỉ đó vào `ram_wr_addr_q`.
+  Commit upstream `23be043` đổi RAM sang `ram_wr_addr`, làm địa chỉ này thành tín hiệu không ai dùng (lint đã báo `UNUSEDSIGNAL 'ram_wr_addr_q'`).
+  Nay chế độ 1 channel dùng lại `ram_wr_addr_q`; các chế độ khác giữ `ram_wr_addr`.
+- **Lỗi #7 (`NUM_GLB_IACT=3`):** Conv đọc **cùng** một chuỗi pixel từ mọi bank (bank r lệch `r*channel_div_trans` địa chỉ), nên bộ ghi phải ghi mỗi word vào
+  **mọi** bank. `23be043` áp cách ghi xoay vòng của Dense cho cả Conv, làm một pixel bị chia sang 2 bank và 2 địa chỉ. Nay chỉ Dense
+  (`fully_connected_i`) mới xoay vòng; với Dense điều kiện mới giống hệt điều kiện cũ, nên Dense không đổi.
+
+**Kiểm chứng:**
+
+| Kiểm tra | Trước | Sau |
+|---|---|---|
+| 34 test Conv (`test_conv_const.py`) | 19 PASS / 15 FAIL | **34/34 PASS** |
+| 63 test GEMM/Dense (`test_gemm_layer.py`) | 40 / 23 | 40 / 23, **giống hệt từng test** (23 là lỗi Dense #5) |
+| Test mới `test_mnist_layers.py -k mapping` (1/2/3/4/8 channel × `NUM_GLB_IACT` 1/3) | 1 channel và `NUM_GLB_IACT=3` FAIL | 8 passed, 2 xfailed (3 channel, lỗi Python) |
+| 9 case baseline | – | 9/9 PASS, **0 chu kỳ, 0 word DMA thay đổi** |
+| Lint | 478 (fpga) | 477 (`UNUSEDSIGNAL ram_wr_addr_q` biến mất), 0 mới; baseline đã hạ |
+| Yosys (so với sau lỗi #13) | 61.456 LUT / 45.402 FF | **+65 LUT, +104 FF, +31 CARRY4** (logic địa chỉ 1 channel không còn bị xoá); BRAM/DSP không đổi |
+
+**Layer MNIST thật** (`test_mnist_layers.py::test_mnist_conv`, đánh dấu `xfail(strict)` để khi sửa xong sẽ tự báo): Conv1 FAIL do lỗi #17, Conv2 và Conv3
+FAIL do lỗi #18 (Conv3 thêm #9), FC 3136 → 10 chưa chạy được do lỗi Dense #5. Ba lỗi #17, #18, #9 đều có từ trước bản sửa này.
+Chi tiết: `doc/experiments/2026-10-14_channel_bugs.md`.
 
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
@@ -1303,4 +1346,8 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   Không đọc được log GitHub Actions của repo private khi chưa có token; upstream thì job "lint" fail ở mọi commit.
 - **Điều tra lỗi #6 và #7** (không sửa RTL; probe cocotb và bisect bằng 2 worktree tạm, đã xoá): 1 channel và `NUM_GLB_IACT=3` là **hồi quy do upstream `23be043`**
   ("Fixed many bugs for Dense Layer"); 3 channel là lỗi cũ do cách đóng gói của Python. Nguyên nhân và đề xuất sửa: `doc/experiments/2026-10-14_channel_bugs.md`.
+- **Sửa RTL lỗi #6 (1 channel) và #7 (`NUM_GLB_IACT=3`)** (được bạn đồng ý, `iact_stream_constructor.v`): 34/34 test Conv PASS (trước 19/34), GEMM/Dense
+  không đổi (40/63), 9 case baseline 0 chu kỳ thay đổi, lint 0 mới (1 cảnh báo biến mất), Yosys +65 LUT, +104 FF. Thêm `test/cocotb_fpga/test_mnist_layers.py`
+  (quét channel × `NUM_GLB_IACT`, và 3 layer Conv MNIST thật). Layer MNIST thật còn bị chặn bởi lỗi cũ #17 (1 channel ảnh rộng), #18 (lượt filter thứ hai
+  với nhiều channel), #9 và #5. Lỗi #8 hoá ra là giới hạn cấu hình (`QUANT_AMOUNT` ≥ số filter). Thư mục Vivado: `C:/openeye_vivado/fix67_impl`.
 

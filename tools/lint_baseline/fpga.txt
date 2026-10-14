@@ -189,7 +189,6 @@
 1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'padding_x'
 1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'padding_y'
 1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'pos'
-1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'ram_wr_addr_q'
 1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'rd_cycle_loop_cnt_4'
 1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'rd_loop_limit_4'
 1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'wght_counter'
