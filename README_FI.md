@@ -487,6 +487,38 @@ mỗi khi đổi pha và sau mỗi word ra, nên vẫn còn khi test FAIL hoặc
 Giới hạn: payload và hiệu suất bus chỉ tính cho `Convolution_Single` (việc 0.2 sẽ mở rộng cho Dense và lượt nhiều layer).
 **Chưa đo được MNIST nguyên model**: `model_test` bị tắt, RTL sai với 1 channel, và chuỗi nhiều layer chưa ổn định.
 
+### 6.11 Công thức tính (chi tiết)
+
+Mỗi cạnh lên của `clk_i`, profiler đọc 4 tín hiệu bắt tay của RTL (giá trị tại cạnh clock, cũng là giá trị RTL dùng ở cạnh đó):
+`v_in = enable_dma_i_reg` (bản đã qua thanh ghi của `enable_dma_i`), `r_in = ready_dma_o`, `v_out = enable_dma_o`, `r_out = ready_dma_i`.
+
+| Đại lượng (mỗi chu kỳ, cộng dồn vào pha của chu kỳ đó) | Công thức |
+|---|---|
+| `cycles` | +1 |
+| `in_offered` | `v_in` |
+| `in_accepted` (word vào thật sự được nhận) | `v_in · r_in` (đúng điều kiện RTL dùng để nhận word) |
+| `out_words` (word kết quả được gửi) | `v_out · r_out` |
+| `in_stall` (chỉ ở pha `load_*`) | `r_in · (1 − v_in)`: DUT sẵn sàng nhưng bộ nhớ chưa có word |
+| `out_stall` | `v_out · (1 − r_out)`: có kết quả nhưng phía ghi chưa nhận |
+
+- **Pha của chu kỳ:** `readout` nếu FSM psum ở `PSUM_SEND_RESULTS` (5) hoặc đang có `out_word`; ngược lại theo trạng thái FSM chính (bảng mục 5.1).
+- **Cửa sổ đo:** từ chu kỳ có `in_accepted` đầu tiên tới chu kỳ có `out_words` cuối cùng (cả hai đầu đều tính). Các chu kỳ sau word ra cuối nằm ở `pending`, không tính.
+  Vì vậy **độ trễ layer** = `total_cycles` = Σ `cycles` của mọi pha = số chu kỳ từ khi DUT nhận word cấu hình đầu tiên tới khi gửi xong kết quả cuối.
+  Không gồm: thời gian trước word đầu (reset, CPU cấu hình DMA), độ trễ của burst đầu tiên khi bật mô hình bộ nhớ, và overhead phần mềm.
+- **Báo cáo** (`profile_report`), với `W = DMA_BITWIDTH/8` byte mỗi word:
+  - `share` = `cycles(pha) / total_cycles`
+  - `compute` = `cycles(compute) / total_cycles`
+  - `DMA busy` = `Σ (in_accepted + out_words) / total_cycles` (tỉ lệ chu kỳ có word trên bus; tối đa có thể vượt 100 % nếu vào và ra cùng chu kỳ)
+  - `waiting for memory` = `Σ (in_stall + out_stall) / total_cycles`
+  - `bus eff.` = `payload(pha) / ((in_accepted + out_words) · W)`; payload theo mục 5.3 (chỉ cho `Convolution_Single`)
+  - `change` = `new − base`, phần trăm = `(new − base) / base`
+  - `total ... ns` = `total_cycles × CLOCK_NS`. **Chú ý:** `CLOCK_NS` là chu kỳ clock **giả định của mô phỏng** (10 hoặc 20 ns), không phải clock thật.
+- **Đổi ra thời gian thật:** `t = total_cycles / f_clk`, với `f_clk` lấy từ Vivado sau route (hiện 250 MHz, tức 4 ns/chu kỳ).
+  Ví dụ `mnist1`: 65.800 × 4 ns = 263,2 µs.
+- **Ví dụ kiểm tra tay** (`8x1_f4_q32_dma64`, baseline): pha 18 + 4 + 120 + 32 + 20 + 179 + 161 + 34 = **568** chu kỳ; word vào 194, ra 32, tổng 226 →
+  `DMA busy` = 226/568 = 39,8 %, `compute` = 161/568 = 28,3 %. Weight: payload 4 × 4 × 3 × 3 = 144 B, bus 120 × 8 = 960 B → 15 %.
+  Bias: 4 × 3 = 12 B / (32 × 8) = 5 %. Readout: 8 × 1 × 4 = 32 output × 3 B = 96 B / (32 × 8) = 38 %.
+
 ## 6b. Đo trên mô phỏng so với chạy trên FPGA thật
 
 **Đường dữ liệu thật:** CPU (ARM) → DDR → AXI DMA IP (MM2S) → AXI4-Stream 64 bit → `OpenEye_FPGA` → AXI4-Stream → AXI DMA (S2MM) → DDR.
