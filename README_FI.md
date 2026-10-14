@@ -182,7 +182,21 @@ Profiler gom các trạng thái như sau (`PROFILE_PHASES` trong `rtl_test_utils
 | `readout` | **FSM psum** (`psum_pipeline.v`) ở `PSUM_SEND_RESULTS` (5) | Gửi kết quả ra DMA |
 
 Ngoại lệ: `readout` được xác định theo **FSM psum**, vì lúc gửi kết quả thì FSM chính
-không có trạng thái riêng cho việc này.
+không có trạng thái riêng cho việc này: FSM chính vẫn ở `WAIT_FOR_RESULTS` (10), nên `compute` = các chu kỳ ở trạng thái 10 **trừ** những chu kỳ readout.
+
+**Vì sao 9 case đo chỉ thấy `... → compute → readout`, không thấy `writeback` và `pooling`:** đó là các layer `Convolution_Single`
+(`send_data_out = 1`), kết quả được gửi ra DMA. Hai pha còn lại chỉ xuất hiện ở các layer khác:
+- `writeback` (`RECEIVE_PSUMS_TO_IACT`): khi `send_data_out = 0`, ví dụ `Convolution_Stack` (2 layer nối tiếp). Kết quả được lượng tử hoá và ghi thẳng
+  vào bộ đệm iact làm input của layer sau, không đi qua DMA.
+- `pooling` (`MAXPOOLING_*`): layer max-pooling chạy trên chip. FSM đi `GET_ROUTER_CONFIG → GET_QUANTIZE → MAXPOOLING_READ ⇄ MAXPOOLING_SEND/WAIT`.
+Profiler định nghĩa đủ các pha để đo được cả những layer này (việc 0.2).
+
+**Các trạng thái của FSM chính** (`OpenEye_FPGA.v`, 15 giá trị 0–14): 0 `IDLE` (không dùng: sau reset FSM vào thẳng 1), 1 `GET_PARAMETERS`
+(TRANSMISSIONS word cấu hình + mask PE), 2 `GET_ROUTER_CONFIG`, 3 `GET_IACT`, 4 `GET_WGHT`, 5 `GET_BIAS` (bỏ qua nếu `skipPsum`), 6 `GET_QUANTIZE`,
+7 `START_CONVERTER`, 8 `CONVERT_IACT`, 9 `WAIT_CYCLE` (64 chu kỳ, phát lệnh gửi weight), 10 `WAIT_FOR_RESULTS` (mảng PE tính, FSM psum đọc kết quả ra;
+rời trạng thái khi word cuối `last_data_o` được nhận), 11 `RECEIVE_PSUMS_TO_IACT`, 12 `MAXPOOLING_READ`, 13 `MAXPOOLING_SEND`, 14 `MAXPOOLING_WAIT`.
+FSM psum (`psum_pipeline.v`): 0 `PSUM_IDLE`, 1 `WAIT_TO_SEND_READY_SIGNAL`, 2 `CALCULATE_PSUM` (đưa bias/psum cũ vào PE), 3 `PSUM_GET_RESULTS`,
+4 `WAIT_FOR_SENDING_RESULTS`, 5 `PSUM_SEND_RESULTS` (gửi ra DMA), 6 `SEND_PSUM_TO_IACT` (lượng tử, ghi lại làm iact).
 
 ### 5.2 Beat DMA và burst
 
@@ -865,8 +879,8 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 | 3 | `GET_BIAS` rời trạng thái khi chưa nhận word bias cuối (treo khi DMA có khoảng trống) | `hdl/OpenEye_FPGA.v` | **Đã sửa** (`77f0477`), 0 chu kỳ, 0 tài nguyên |
 | 4 | CI lint luôn fail (38 warning có sẵn) | `.github` | **Đã xử lý** bằng lint baseline (`4a26867`); RTL không đổi |
 | 5 | Dense/FC: `FC activation write ... bank=1 addr=0` sai (23/63 test GEMM/Dense) | RTL hoặc testbench Dense | **Chưa sửa** (có sẵn ở upstream) |
-| 6 | Input 1 channel: chỉ ra bias | RTL (đường iact) | **Chưa sửa** |
-| 7 | Input 3 channel và mọi `NUM_GLB_IACT=3`: giá trị sai | RTL (đường iact) | **Chưa sửa** |
+| 6 | Input 1 channel: chỉ ra bias | `hdl/iact_stream_constructor.v:700` | **Đã tìm ra nguyên nhân** (2026-10-14): hồi quy do upstream `23be043`; RAM dùng `ram_wr_addr` thay vì địa chỉ 1-channel `ram_wr_addr_q`. Đề xuất sửa 1 dòng, **chưa sửa** (chờ đồng ý). `doc/experiments/2026-10-14_channel_bugs.md` |
+| 7 | Input 3 channel và mọi `NUM_GLB_IACT=3`: giá trị sai | `iact_stream_constructor.v` (bank) + Python (3 channel) | **Đã tìm ra nguyên nhân** (2026-10-14): `NUM_GLB_IACT=3` là hồi quy do `23be043` (bộ ghi xoay bank kiểu Dense cho cả Conv); 3 channel là lỗi cũ do Python đóng gói 3 byte/pixel trong khi RTL đi theo cặp. Đề xuất: RTL chỉ xoay bank khi Dense; Python đệm số channel lẻ lên chẵn. **Chưa sửa** |
 | 8 | 64 filter: `IndexError` trong `layer_parameters.read_data_from_layer` | Python | **Chưa sửa** |
 | 9 | Ảnh rộng 7 (có cột đệm): phần cứng ghi giá trị khác 0 vào ô đệm (giá trị thật vẫn đúng) | RTL/testbench | **Chưa sửa** |
 | 10 | `CLUSTER_ROWS=1`: một số cấu hình treo FSM (theo tài liệu upstream) | RTL | **Chưa sửa**, chưa tự kiểm chứng |
@@ -941,8 +955,8 @@ Mỗi bước đều đánh giá bằng `tools/run_profile.py --compare doc/perf
 | 4 | **PASS** | FAIL: giá trị sai |
 
 - Chỉ có **2 hoặc 4 channel với `NUM_GLB_IACT=1`** là chạy đúng.
-- Giả thuyết, **chưa kiểm chứng**: RTL đóng gói `CHANNELS_PER_WORD = 4` channel vào một word, nên số channel không chia hết cho 4
-  (như 3) bị lệch dữ liệu, còn 1 channel đi theo một đường xử lý khác và hỏng theo kiểu khác (chỉ ra bias).
+- **Đã điều tra (2026-10-14, `doc/experiments/2026-10-14_channel_bugs.md`):** 1 channel và `NUM_GLB_IACT=3` là hồi quy do commit upstream `23be043`
+  (trước commit đó cả hai PASS); 3 channel là do Python xếp 3 byte mỗi pixel trong khi RTL truyền iact theo cặp (`PARALLEL_MACS=2`).
 - `NUM_GLB_IACT=3` sai với mọi số channel đã thử.
 - MNIST Conv1 có 1 channel vào, nên chưa chạy được trên RTL hiện tại.
 
@@ -1063,7 +1077,8 @@ phần cứng chỉ có thêm đúng các bộ đếm mà thiết kế vốn c�
 
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
-Output gốc đầy đủ: `doc/lint/verilator-5.020_2026-10-10.txt`. Mọi warning dưới đây đều có sẵn trong upstream; hai bản sửa RTL (`GET_BIAS` và lỗi #13, mục 9) không thêm warning nào.
+Output gốc đầy đủ: `doc/lint/verilator-5.020_2026-10-10.txt`; chạy lại đúng lệnh CI của upstream trên RTL hiện tại (2026-10-14, vẫn 38 warning, giống hệt):
+`doc/lint/verilator-5.020_upstream-ci_2026-10-14.txt`. Mọi warning dưới đây đều có sẵn trong upstream; hai bản sửa RTL (`GET_BIAS` và lỗi #13, mục 9) không thêm warning nào.
 
 ### Hai mục tiêu lint
 
@@ -1283,3 +1298,9 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   lỗi thời: baseline hiện tại (5.4, 7), mô hình bộ nhớ đã có (5.2, 6b), số unit test (16), vị trí dòng code (`GET_BIAS` 1978, `quant_reg` 2026–2028),
   nguồn `DMA_BITWIDTH` (5.8), "thay đổi RTL duy nhất" (nay là 2), `SPARSITY_EN` của cấu hình đang dùng là 1 chứ không phải 0 (9b, lỗi #11), bỏ các đoạn trùng
   (5.7, 8c, `CLUSTER_ROWS=1` ở mục 9, `BLKANDNBLK` ở #11 và #14).
+- Mục 5.1: giải thích vì sao 9 case không có pha `writeback`/`pooling`, liệt kê 15 trạng thái FSM chính và 7 trạng thái FSM psum.
+- Lint: chạy lại đúng lệnh CI của upstream (Verilator 5.020) trên RTL hiện tại: 38 warning, giống hệt danh sách 9b (2 bản sửa RTL không thêm warning).
+  Không đọc được log GitHub Actions của repo private khi chưa có token; upstream thì job "lint" fail ở mọi commit.
+- **Điều tra lỗi #6 và #7** (không sửa RTL; probe cocotb và bisect bằng 2 worktree tạm, đã xoá): 1 channel và `NUM_GLB_IACT=3` là **hồi quy do upstream `23be043`**
+  ("Fixed many bugs for Dense Layer"); 3 channel là lỗi cũ do cách đóng gói của Python. Nguyên nhân và đề xuất sửa: `doc/experiments/2026-10-14_channel_bugs.md`.
+
