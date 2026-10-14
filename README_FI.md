@@ -514,6 +514,26 @@ Yosys 0.69 `synth_xilinx -flatten -family xc7` chạy trên đúng thư mục `v
 Vì vậy part mặc định của `export_vivado.py` là `xczu7ev-ffvc1156-2-e`. Muốn dùng board nhỏ kiểu PYNQ-Z2 thì phải giảm cấu hình
 (1×1 cluster nhỏ hơn khoảng 4 lần), và khi đó phải đo lại baseline chu kỳ với cùng cấu hình.
 
+### Cấu hình phần cứng đang tổng hợp (mặc định của `export_vivado.py`, = cấu hình baseline độ trễ)
+
+| Tham số | Giá trị | Ý nghĩa |
+|---|---:|---|
+| `CLUSTER_ROWS` × `CLUSTER_COLUMNS` | 2 × 2 | 4 cluster |
+| `NUM_GLB_PSUM` × `NUM_GLB_WGHT` | 4 × 3 | 12 PE mỗi cluster (4 cột × 3 hàng) → **48 PE** |
+| `PARALLEL_MACS` | 2 (sinh tự động) | 2 phép nhân mỗi PE → **96 MAC/chu kỳ** (INT8) |
+| `SPARSITY_EN` | 1 (sinh tự động) | Bỏ qua giá trị 0 (sparse) |
+| `NUM_GLB_IACT` | 1 | 1 GLB iact mỗi cluster (`NUM_GLB_IACT=3` đang sai, lỗi #7) |
+| `DATA_PSUM_BITWIDTH` | 20 | Độ rộng psum |
+| `DMA_BITWIDTH` | 64 | Độ rộng stream AXI, khớp wrapper AXI |
+| `QUANT_AMOUNT` | 32 | Bảng lượng tử 32 entry (1 entry mỗi filter, tối đa 32 filter) |
+| `TRANS_WORDS`, `BUFFER_WIDTH`, `BRANCHES` | 8, 12, 1 | Số word truyền giữa các layer, độ sâu bộ đệm iact (2^12), 1 nhánh |
+| `BUFFER_WIDTH_PSUM`, `BUFFER_WIDTH_WGHT` | 14, 12 (mặc định) | Bộ đệm psum 16.384 địa chỉ (144 RAMB36), bộ đệm weight 4.096 |
+
+Lý do chọn: (1) **giống hệt cấu hình đã đo chu kỳ** (`test_profile.py`), nên fmax đổi trực tiếp chu kỳ ra thời gian; (2) đây là vùng cấu hình mà RTL
+**chạy đúng** trong test (`NUM_GLB_IACT=3` sai, `CLUSTER_ROWS=1` có thể treo, 1 channel sai); (3) 2×2 cluster là cấu hình nhỏ nhất vẫn có cả
+router theo hàng lẫn theo cột, và vừa ZU7EV với khoảng 28 % LUT. Lưu ý: `RAM_CELLS=32` trong `config.json` không có tác dụng, vì tham số thật tên
+`IACT_RAM_CELLS` (giá trị sinh ra là 4, giống trong mô phỏng).
+
 ### Bước 1: tạo thư mục nguồn (trong WSL)
 
 ```bash
