@@ -891,7 +891,8 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 | 14 | `results_ready` vừa gán blocking vừa non-blocking (lint `BLKANDNBLK`, 4 lỗi); Vivado Synth 8-6090: "entire logic could be removed" | `hdl/psum_pipeline.v:485/522/900` | **Chưa sửa** |
 | 15 | 12 thanh ghi có set và reset cùng mức ưu tiên (Synth 8-7137, "may cause simulation mismatches") | `psum_pipeline.v:322/776`, `OpenEye_Parallel.v:443/448`, `PE.v:1113` | **Chưa phân tích** |
 | 17 | 1 channel với ảnh rộng hơn một lượt x (ví dụ MNIST Conv1 28×28): các hàng output đi theo cặp giống nhau | `iact_stream_constructor.v` (bộ ghi 1 channel) | **Chưa sửa** (lỗi cũ, có từ trước `23be043`): địa chỉ 1 channel (hàng + cột) không tính các lượt x. Rộng 8/16 đúng, rộng 28 sai |
-| 18 | Layer có nhiều channel (32/64) và 64 filter: filter 32–63 sai (lượt filter thứ hai); 48 filter sai cả với 4 channel | RTL (chưa khoanh vùng) | **Chưa sửa**, lỗi cũ (giống hệt trên RTL trước khi sửa). Chặn MNIST Conv2/Conv3 |
+| 18 | Filter 32–63 sai (MNIST Conv2/Conv3); thực chất **mọi layer > 4 channel tính sai với weight thật** | `src/open_eye/conv_mapper.py` (Python) | **Đã tìm ra nguyên nhân** (2026-10-15, `doc/experiments/2026-10-15_bug18_weight_send.md`): khoá `used_wght_per_PE` bị lặp trong dict, giá trị chưa đóng gói (192) ghi đè giá trị đóng gói (96) mà RTL mong (từ `3e2e20f`); mỗi lần gửi weight đọc gấp đôi địa chỉ, lấy nhầm khối weight. Test hiện có dùng weight hằng nên không thấy. Đề xuất: xoá 1 dòng Python (không sửa RTL). Đã thử trên bản sao: Conv2/Conv3 thật đúng giá trị, baseline −16 % đến −25 % chu kỳ. **Chưa áp dụng** |
+| 18b | Số filter > 32 và không chia hết cho 32 (40, 48): sai từ cả filter 0 | Python/psum address generator | **Chưa điều tra xong**: Python báo 768 word ra nhưng tạo tham chiếu 1.024 dòng. MNIST không dùng |
 | 16 | Wrapper AXI `fpga/hdl/open_eye_axi_v1_0.v` không biên dịch được (thiếu module `cfg_reg`, `QUANT_AMOUNT` chưa khai báo, `BUFFER_WIDTH` gán 2 lần, `RAM_CELLS` không tồn tại) | `fpga/hdl` | **Chưa sửa**; chỉ cần khi đóng gói IP hoặc làm block design |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-12 sau khi tổng hợp Vivado)
@@ -1350,4 +1351,12 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   không đổi (40/63), 9 case baseline 0 chu kỳ thay đổi, lint 0 mới (1 cảnh báo biến mất), Yosys +65 LUT, +104 FF. Thêm `test/cocotb_fpga/test_mnist_layers.py`
   (quét channel × `NUM_GLB_IACT`, và 3 layer Conv MNIST thật). Layer MNIST thật còn bị chặn bởi lỗi cũ #17 (1 channel ảnh rộng), #18 (lượt filter thứ hai
   với nhiều channel), #9 và #5. Lỗi #8 hoá ra là giới hạn cấu hình (`QUANT_AMOUNT` ≥ số filter). Thư mục Vivado: `C:/openeye_vivado/fix67_impl`.
+
+### 2026-10-15
+
+- **Điều tra lỗi #18** (không sửa RTL, không sửa code của repo; probe cocotb, dữ liệu ngẫu nhiên, worktree tạm đã xoá): nguyên nhân là khoá `used_wght_per_PE`
+  bị lặp trong `conv_mapper.py` (từ 7/2026) cộng với RTL `3e2e20f` (9/2026) đổi cách đếm sang word đóng gói. Mọi lần gửi weight đọc gấp đôi số địa chỉ,
+  lấy nhầm weight của đợt channel khác. Weight hằng của các test che lỗi; với weight ngẫu nhiên mọi layer > 4 channel đều sai, kể cả case baseline `mnist2`.
+  Đề xuất sửa 1 dòng Python; thử trên bản sao: MNIST Conv2 thật PASS, Conv3 thật đúng mọi giá trị (còn lỗi #9 ở kiểm tra file), 9 case baseline PASS với
+  **−16,3 % / −24,7 % / −23,0 % chu kỳ** ở mnist1/2/3. **Chưa áp dụng, chờ đồng ý.** Lỗi mới #18b (40/48 filter).
 
