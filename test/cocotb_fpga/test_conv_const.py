@@ -85,7 +85,7 @@ def _run_conv_const(layer_mode, const_value, cluster_rows, num_glb_iact,
                     input_channels, request, ramp_iacts=False,
                     psum_width=20, trans_words=8, bias_step=0,
                     input_height=INPUT_SIZE_Y, asymmetric_kernel=False,
-                    quant_amount=1024, dma_bitwidth=None):
+                    quant_amount=1024, dma_bitwidth=None, random_data=False):
     """Build and simulate one constant-operand conv configuration."""
     # OpenEyeParameters and parameters.vh read these from the environment at
     # generation time, so they have to be set before create_vh_file_from_envvars.
@@ -161,8 +161,11 @@ def _run_conv_const(layer_mode, const_value, cluster_rows, num_glb_iact,
             "USE_SPARSE_WEIGHTS": "0",
             # The two hooks that make the arithmetic interpretable. The
             # reference is recomputed from the same DRAM, so it stays exact.
-            "OPENEYE_CONST_IACTS": str(const_value),
-            "OPENEYE_CONST_WGHTS": str(const_value),
+            # random_data=True keeps the random activations and weights of
+            # DRAMContents: constant weights give every channel and filter the
+            # same values and hid a wrong weight-chunk order (bug #18).
+            "OPENEYE_CONST_IACTS": "" if random_data else str(const_value),
+            "OPENEYE_CONST_WGHTS": "" if random_data else str(const_value),
             "OPENEYE_ASYMMETRIC_KERNEL": "1" if asymmetric_kernel else "",
             "OPENEYE_RAMP_IACTS": "1" if ramp_iacts else "",
             "OPENEYE_BIAS_STEP": str(bias_step) if bias_step else "",

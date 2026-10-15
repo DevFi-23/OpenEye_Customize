@@ -179,6 +179,11 @@ class ConvMapper(LayerMapper):
         "needed_psum_storage_cycles_reg": layer_params.psum_storage_cycles,
         "iact_channel_max_cycles": layer_params.diff_iact_layer,
         "input_activations": layer_params.used_iact_per_PE,
+        # Packed weight words per PE: the send loop of OpenEye_FPGA.v reads one
+        # packed word per clock (3e2e20f). A second "used_wght_per_PE" entry
+        # further down sent the unpacked count and, being later in the dict,
+        # won: every weight send read twice the addresses and took the weights
+        # of the wrong channel chunk (bug #18, doc/experiments/2026-10-15_*).
         "used_wght_per_PE": math.ceil(layer_params.used_wght_per_PE/params.PARALLEL_MACS),
         "filters": layer_params.used_psum_per_PE,
         "needed_x_cls_reg": layer_params.used_X_cluster,
@@ -204,7 +209,6 @@ class ConvMapper(LayerMapper):
         "iact_buffer_words_per_write": layer_params.iact_buffer_words_per_write,
         "iact_words_per_compute": layer_params.iact_words_per_compute,
         "pooling_mode": 0,
-        "used_wght_per_PE": layer_params.used_wght_per_PE,
         "overhang_discrepancy": layer_params.overhang_discrepancy,
         "psum_output_words": layer_params.psum_output_words,
         "iact_read_limit_0" : layer_params.iact_read_limit_0,

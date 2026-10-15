@@ -14,20 +14,30 @@
 
 2. test_mnist_conv: the three convolution layers of models/mnist_conv_net.py
    with their real shapes. The 64-filter layers need QUANT_AMOUNT >= 64 (one
-   quantisation entry per filter). All three still fail for reasons outside
-   the 2026-10-14 fixes (bugs #17, #18, #9 in README_FI 8b); they are marked
+   quantisation entry per filter). Known failures are marked
    xfail(strict) so that a fix shows up as XPASS and the mark has to be
-   removed. The FC layer (3136 -> 10) is not included: Dense layers with 10
+   removed. Conv2 passes since the bug #18 fix (2026-10-15); Conv1 fails with
+   bug #17, Conv3 computes every value correctly but fails the stream check of
+   bug #9. The FC layer (3136 -> 10) is not included: Dense layers with 10
    outputs fail with the open bug #5 (test_gemm_layer.py::test_dense_ten_outputs).
+
+3. test_random_data: random activations and weights (the constant-weight
+   hooks hid bug #18), each followed by tools/verify_conv_output.py, an
+   independent numpy recomputation that checks every DMA output word.
 
 The README_FI file documents the findings (sections 8b and 9). Usage:
     pytest test_mnist_layers.py -v -k mapping     # about 30 s per case
     pytest test_mnist_layers.py -v -k mnist       # 4-15 min per layer
+    pytest test_mnist_layers.py -v -k random      # 0.5-8 min per layer
 """
+
+import os
+import sys
 
 import pytest
 
 import test_conv_const as conv
+from open_eye import test_dir
 
 THREE_CHANNELS = pytest.mark.xfail(
     strict=True, reason="bug #7: Python packs 3 bytes per pixel, the RTL moves activations in pairs")
@@ -48,21 +58,60 @@ MNIST_LAYERS = {
     "conv1_28x28_c1_f32": pytest.param(
         (28, 28, 1, 32, 32), marks=pytest.mark.xfail(
             strict=True, reason="bug #17: one-channel packing ignores the x passes of images wider than one pass")),
-    "conv2_14x14_c32_f64": pytest.param(
-        (14, 14, 32, 64, 64), marks=pytest.mark.xfail(
-            strict=True, reason="bug #18: with 32+ input channels the filters 32-63 (second filter pass) are wrong")),
+    "conv2_14x14_c32_f64": (14, 14, 32, 64, 64),
     "conv3_7x7_c64_f64": pytest.param(
         (7, 7, 64, 64, 64), marks=pytest.mark.xfail(
-            strict=True, reason="bug #18 (filters 32-63 wrong) and bug #9 (padding cells of 7-wide images)")),
+            strict=True, reason="bug #9: padding slots of 7-wide rows are non-zero; every result value is correct "
+                                "(tools/verify_conv_output.py)")),
 }
+
+
+def _sim_dir(request):
+    """Simulation directory _run_conv_const uses for this test."""
+    nodeid = request.node.nodeid.replace("::", "_").replace("/", "_").replace("[", "_").replace("]", "_")
+    return os.path.join(test_dir, ".temp", nodeid)
+
+
+def _verify_independently(request):
+    """Recompute the layer with numpy and check every DUT output word (tools/verify_conv_output.py)."""
+    sys.path.insert(0, os.path.join(test_dir, os.pardir, "tools"))
+    import verify_conv_output
+    assert verify_conv_output.check(_sim_dir(request)), "independent word-by-word check failed"
 
 
 @pytest.mark.parametrize("layer", list(MNIST_LAYERS.values()), ids=list(MNIST_LAYERS))
 def test_mnist_conv(layer, request, monkeypatch):
     width, height, channels, filters, quant_amount = layer
     monkeypatch.setenv("OPENEYE_PROFILE", "1")
+    monkeypatch.setenv("OPENEYE_DUMP_VERIFY", "1")
     monkeypatch.setattr(conv, "INPUT_SIZE_X", width)
     monkeypatch.setattr(conv, "NUM_FILTERS", filters)
     conv._run_conv_const("Convolution_Single", 8, 2, num_glb_iact=1, input_channels=channels,
                          request=request, input_height=height, ramp_iacts=True,
                          asymmetric_kernel=True, quant_amount=quant_amount, dma_bitwidth=64)
+    _verify_independently(request)
+
+
+# Random activations and weights. Constant test weights are identical for every
+# channel and filter and hid bug #18 (weights of the wrong channel chunk).
+# id: (width, height, input channels, filters, QUANT_AMOUNT)
+RANDOM_LAYERS = {
+    "8x4_c8_f4": (8, 4, 8, 4, 32),
+    "8x4_c32_f32": (8, 4, 32, 32, 32),
+    "8x4_c8_f64": (8, 4, 8, 64, 64),
+    "8x4_c64_f64": (8, 4, 64, 64, 64),
+    "14x14_c32_f32": (14, 14, 32, 32, 32),
+    "mnist_conv2_14x14_c32_f64": (14, 14, 32, 64, 64),
+}
+
+
+@pytest.mark.parametrize("layer", list(RANDOM_LAYERS.values()), ids=list(RANDOM_LAYERS))
+def test_random_data(layer, request, monkeypatch):
+    width, height, channels, filters, quant_amount = layer
+    monkeypatch.setenv("OPENEYE_DUMP_VERIFY", "1")
+    monkeypatch.setattr(conv, "INPUT_SIZE_X", width)
+    monkeypatch.setattr(conv, "NUM_FILTERS", filters)
+    conv._run_conv_const("Convolution_Single", 8, 2, num_glb_iact=1, input_channels=channels,
+                         request=request, input_height=height, quant_amount=quant_amount,
+                         dma_bitwidth=64, random_data=True)
+    _verify_independently(request)

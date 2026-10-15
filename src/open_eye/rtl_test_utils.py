@@ -20,6 +20,7 @@ architecture and supports both parallel and serial modes of operation.
 
 import os
 import json
+import pickle
 import logging
 import math
 import cocotb
@@ -1073,6 +1074,39 @@ async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
         if out_word or phase != last_phase or cycle % 1024 == 0:
             dump()
         last_phase = phase
+
+
+def _plain(x):
+    """Multiprocessing proxies, numpy arrays and tuples -> plain nested lists/ints (picklable)."""
+    if hasattr(x, "_getvalue"):
+        x = x._getvalue()
+    if hasattr(x, "tolist"):
+        return x.tolist()
+    if isinstance(x, dict):
+        return {k: _plain(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_plain(v) for v in x]
+    return x
+
+
+def dump_conv_verify_data(layer_number, layer_params, dram, calculated_results, output_order, oep,
+                          path="verify_layer{}.pkl"):
+    """Write what tools/verify_conv_output.py needs for one convolution layer (opt-in: OPENEYE_DUMP_VERIFY=1).
+
+    The input feature map (dram.fmap[layer][c][x][y]), the integer weights
+    (dram.weights[layer][c][f][ky][kx]) and bias as the DUT receives them, the
+    testbench reference, and output_order (the [filter, x, y] of every psum
+    slot of the DMA output stream, None for padding).
+    """
+    data = {
+        "fmap": dram.fmap[layer_number], "weights": dram.weights[layer_number],
+        "bias": dram.bias[layer_number], "reference": calculated_results, "output_order": output_order,
+        "filters": layer_params.filters, "stride": (layer_params.strideX, layer_params.strideY),
+        "psum_bits": oep.DATA_PSUM_BITWIDTH, "dma_bits": oep.DMA_BITWIDTH,
+    }
+    with open(path.format(layer_number), "wb") as f:
+        pickle.dump(_plain(data), f)
+    logger.info("OPENEYE_DUMP_VERIFY: wrote %s", path.format(layer_number))
 
 
 async def trace_dma_input(ptp, dut, path="dma_in_trace.csv"):

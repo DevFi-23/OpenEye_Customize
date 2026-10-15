@@ -82,3 +82,54 @@ variants of the baseline cases, a new baseline snapshot.
 it tells the DUT `psum_output_words = 768` but writes a 1,024-line reference stream (2 passes x 32 filter slots). The psum
 address generator parameters (`psum_pagu_addr_inc_3` = 24, `psum_pagu_loop_limit_4` = 11) are the first suspects. MNIST uses
 32 and 64 filters and is not affected.
+
+## 6. Word-by-word verification of the fix (2026-10-15, before applying it)
+
+The testbench compares the DUT with a reference built by the same Python package that builds the input stream, so a mistake
+shared by both could pass. Every output word was therefore checked independently (scratch version of what is now
+`tools/verify_conv_output.py`): the layer is recomputed with numpy from the raw integers the DUT received
+(`dram.fmap`, `dram.weights`, `dram.bias`), each 64-bit DMA output word is split into its two 20-bit signed psum slots, each slot is
+placed at the (filter, x, y) given by `output_order`, and
+
+- every result slot must equal numpy (the transposed kernel orientation is printed as a control: it must differ),
+- every (filter, x, y) must be decoded exactly once (no missing or duplicated output),
+- the bits above the two psum slots must be 0, no word may contain X,
+- the testbench reference is compared with numpy as well.
+
+With random data a wrong value or a wrong position cannot match by chance (thousands of distinct values).
+
+| Case (W x H, channels -> filters) | Data | Result words identical to the reference | Values = numpy | Coverage | Testbench ref = numpy |
+|---|---|---|---|---|---|
+| 8x4, 8 -> 4 | random | 64/64 (+64 padding-only lines) | **128/128** | complete | yes |
+| 8x4, 32 -> 32 | random | 512/512 | **1,024/1,024** | complete | yes |
+| 8x4, 8 -> 64 | random | 1,024/1,024 | **2,048/2,048** | complete | yes |
+| 8x4, 64 -> 64 (former #18 case) | random | 1,024/1,024 | **2,048/2,048** | complete | yes |
+| 14x14, 32 -> 32 (= baseline mnist2) | random | 3,136/3,136 (+448 padding-only) | **6,272/6,272** | complete | yes |
+| 28x28, 4 -> 32 (= baseline mnist1) | random | 12,544/12,544 (+1,792 padding-only) | **25,088/25,088** | complete | yes |
+| MNIST Conv2 14x14, 32 -> 64 | random | 6,272/6,272 (+896 padding-only) | **12,544/12,544** | complete | yes |
+| MNIST Conv2 14x14, 32 -> 64 | ramp, asymmetric kernel | 6,272/6,272 | **12,544/12,544** | complete | yes |
+| MNIST Conv3 7x7, 64 -> 64 | random | 1,344/1,792 | **3,136/3,136** | complete | yes |
+
+No word contained X, no bit above the psum slots was set, no value exceeded 20 bit.
+
+Lines that differ from the reference file are of two kinds, neither is a result error:
+- **padding-only lines** (all slots of the reference are padding): the DUT sends the psums of PE slots that hold no output (bias
+  plus partial sums) where the reference has zeros. The testbench ignores all-zero reference lines on purpose; the host must
+  ignore these slots, and they cost readout bandwidth.
+- **Conv3 (7-wide rows):** the last psum of each row shares a word with a padding slot; the result slot is correct, the padding
+  slot is non-zero. This is bug #9 and the reason the Conv3 test still fails the stream-file check.
+
+## 7. Fix applied (2026-10-15, approved after the word-by-word check)
+
+`src/open_eye/conv_mapper.py`: the second `used_wght_per_PE` key removed (comment added at the remaining one). No RTL change.
+
+| Check after applying | Result |
+|---|---|
+| `test_conv_const.py` (34) | 34/34 PASS, unchanged |
+| `test_gemm_layer.py` (63) | 40 PASS / 23 FAIL, identical per test (Dense bug #5) |
+| `test_mnist_layers.py` (19, new) | mapping 8 passed + 2 xfailed (3 channels); MNIST Conv2 passed; Conv1 xfailed (#17), Conv3 xfailed (#9, all 3,136 values correct); 6 random-data tests passed, each with `tools/verify_conv_output.py` |
+| Baseline (9 cases) | 9/9 PASS, saved as `doc/perf/baseline_2026-10-15/` |
+
+New tools: `tools/verify_conv_output.py` (this check, permanent) with `OPENEYE_DUMP_VERIFY=1` in the testbench, and
+`_run_conv_const(..., random_data=True)`.
+

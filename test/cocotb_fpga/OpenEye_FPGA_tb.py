@@ -425,6 +425,12 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
             time_printer.timestamp("Layer parameters created. ", logger)
             calculated_results = tum.collect_results(layer_number, layer_parameters[layer_number], dram, openeye_parameter.SERIAL)
             output_order = tum.make_ref(openeye_parameter, layer_parameters[layer_number], layer_number, dram, calculated_results)
+            if os.environ.get("OPENEYE_DUMP_VERIFY") and "Convolution" in str(layer_parameters[layer_number].layer_name):
+                # Raw operands, reference and stream order for the independent
+                # check tools/verify_conv_output.py (recomputes the layer with
+                # numpy, compares every output word of the DUT).
+                rtl_test_utils.dump_conv_verify_data(layer_number, layer_parameters[layer_number], dram,
+                                                     calculated_results, output_order, openeye_parameter)
             if(logging.DEBUG >= log_level):
                 time_printer.timestamp("Reference data created. ", logger)
             dram_layer_content = [dram.fmap[layer_number], dram.weights[layer_number], dram.bias[layer_number]]
