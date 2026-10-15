@@ -107,7 +107,7 @@ OpenEye_orig/
 │   ├── OpenEye_FPGA.v         ★  Top-level FPGA: cổng DMA, FSM chính (nạp → convert → tính → đọc ra), buffer iact/weight/psum
 │   │                             (★ sửa GET_BIAS, lỗi #3)
 │   ├── psum_pipeline.v           FSM psum: nạp bias, thu kết quả, lượng tử hoá, gửi kết quả ra DMA
-│   ├── iact_stream_constructor.v ★ Đọc iact từ buffer và gửi tới các cluster (★ sửa bộ đếm, lỗi #13)
+│   ├── iact_stream_constructor.v ★ Đọc iact từ buffer và gửi tới các cluster (★ sửa bộ đếm lỗi #13; ghi 1 channel và NUM_GLB_IACT=3, lỗi #6/#7)
 │   ├── OpenEye_Parallel.v        Mảng tính toán: các cluster + router ("ASIC compute core", SERIAL=0/1)
 │   ├── OpenEye_Cluster.v, PE_cluster.v, PE.v   Cluster → nhóm PE → PE (MAC INT8, sparse)
 │   ├── router_*.v, GLB_cluster.v Router iact/weight/psum giữa các cluster, GLB của cluster
@@ -121,7 +121,7 @@ OpenEye_orig/
 ├── src/open_eye/                 Thư viện Python (cài kiểu editable vào venv)
 │   ├── open_eye_parameters.py    Cấu hình phần cứng (đọc từ biến môi trường: CLUSTER_ROWS, IACT_RAM_CELLS, ...)
 │   ├── layer_parameters.py       Tính tham số của từng layer (số chu kỳ, giới hạn vòng lặp, ...)
-│   ├── *_mapper.py               Sinh stream DMA: conv, dense, iact, weight, psum (bias), pooling
+│   ├── *_mapper.py               Sinh stream DMA: conv, dense, iact, weight, psum (bias), pooling (★ conv_mapper: sửa lỗi #18)
 │   ├── generator.py              regmap.yaml → regmap_params.vh, dma_storage.v, đóng gói word cấu hình
 │   ├── vh_file_creator.py        Sinh parameters_FPGA.vh / parameters_PE.vh / parameters_PE_cluster.vh
 │   ├── test_utils_main.py        Tính kết quả tham chiếu (golden model)
@@ -131,7 +131,7 @@ OpenEye_orig/
 ├── test/
 │   ├── cocotb_fpga/              Testbench top-level FPGA (OpenEye_FPGA_tb.py) và các bộ test
 │   │   ├── test_profile.py    ★  9 case đo độ trễ (mục 6.7)
-│   │   ├── test_conv_const.py    Test Conv (16 test dùng làm hồi quy)
+│   │   ├── test_conv_const.py ★  Test Conv (34 test dùng làm hồi quy; ★ thêm random_data)
 │   │   ├── test_gemm_layer.py    Test GEMM/Dense (63 test dùng làm hồi quy)
 │   │   ├── test_mnist_layers.py ★ Quét channel × NUM_GLB_IACT (lỗi #6/#7), 3 layer Conv MNIST thật, dữ liệu ngẫu nhiên + kiểm tra độc lập (lỗi #18)
 │   │   └── regmap.yaml           Định nghĩa các thanh ghi cấu hình gửi qua DMA (nguồn của dma_storage.v)
@@ -146,13 +146,13 @@ OpenEye_orig/
 │   ├── check_dma_trace.py        Kiểm tra DUT nhận đúng stream DMA (mục 9)
 │   ├── decode_iact_read_loops.py Giải mã thanh ghi vòng lặp đọc iact từ stream DMA
 │   ├── verify_conv_output.py     Kiểm tra độc lập từng word output của layer Conv (numpy)
-│   └── report/make_progress_report.py  Tạo báo cáo Word cho giáo viên hướng dẫn
+│   └── report/make_progress_report*.py  Tạo báo cáo Word cho giáo viên hướng dẫn (2026-10-10, 2026-10-15)
 ├── doc/
-│   ├── perf/                  ★  Số liệu đo chu kỳ: baseline_2026-10-10/ (mốc hiện tại), mem_typical_2026-10-10/, ...
+│   ├── perf/                  ★  Số liệu đo chu kỳ: baseline_2026-10-15/ (mốc hiện tại, sau lỗi #18), baseline_2026-10-10/ (mốc cũ), mem_typical_2026-10-10/, ...
 │   ├── synth/                 ★  Báo cáo Vivado theo từng lần chạy (mỗi thư mục có SUMMARY.md)
-│   ├── experiments/           ★  Báo cáo thí nghiệm (lỗi #13)
+│   ├── experiments/           ★  Báo cáo thí nghiệm và điều tra lỗi (#13, #6/#7, #18)
 │   ├── lint/                  ★  Output lint gốc
-│   ├── reports/               ★  Báo cáo tiến độ (Word)
+│   ├── reports/               ★  Báo cáo tiến độ (Word): BaoCao_TienDo_OpenEye_2026-10-10.docx, BaoCao_TienDo_OpenEye_2026-10-15.docx
 │   ├── OpenEye_FPGA_documentation.md, test_status_handover.md   Tài liệu của upstream
 │   └── demo_notebooks/           Notebook demo của upstream
 ├── yosys/, nextpnr/              Flow tổng hợp mã nguồn mở của upstream (FPGA GateMate)
@@ -469,12 +469,16 @@ Mọi case: một layer `Convolution_Single`, kernel 3×3, ramp activation, 2×2
 
 | Layer thật | Case dùng | Lý do khác |
 |---|---|---|
-| Conv1: 28×28, 1 → 32 | 28×28, **4** → 32 | RTL sai với 1 channel vào (mục 9) |
-| Conv2: 14×14, 32 → **64** | 14×14, 32 → **32** | Bộ sinh dữ liệu Python lỗi với 64 filter (`layer_parameters.read_data_from_layer`, IndexError) |
-| Conv3: **7×7**, 64 → 64 | **8×8**, 32 → 32 | 7×7 có cột đệm; phần cứng ghi giá trị khác 0 vào ô đệm nên kiểm tra chuỗi DMA FAIL (giá trị thật vẫn đúng). 64 → 32 như trên |
+| Conv1: 28×28, 1 → 32 | 28×28, **4** → 32 | 1 channel với ảnh rộng 28 còn lỗi #17 (lỗi #6 đã sửa ngày 2026-10-14, nhưng chỉ đúng cho ảnh rộng một lượt x) |
+| Conv2: 14×14, 32 → **64** | 14×14, 32 → **32** | Ban đầu: `IndexError` với 64 filter. Thực ra là giới hạn cấu hình (#8): 64 filter cần `QUANT_AMOUNT=64`. Giữ 32 để không đổi mốc |
+| Conv3: **7×7**, 64 → 64 | **8×8**, 32 → 32 | 7×7 có cột đệm; phần cứng ghi giá trị khác 0 vào ô đệm nên kiểm tra chuỗi DMA FAIL (giá trị thật vẫn đúng, lỗi #9). 64 → 32 như trên |
 
 Khảo sát ngày 2026-10-10 (đều `QUANT_AMOUNT=32`, `NUM_GLB_IACT=1`): **PASS**: 8/16/32 channel, 32 filter, 14×14, 28×28, 8×8.
 **FAIL**: 64 filter (lỗi Python), 7×7 (ô đệm).
+
+**Cập nhật 2026-10-15:** 9 case vẫn giữ kích thước "thu nhỏ" để mốc so sánh liên tục. Các layer MNIST **đúng kích thước thật** được kiểm tra riêng trong
+`test/cocotb_fpga/test_mnist_layers.py::test_mnist_conv`: Conv2 (14×14, 32 → 64, `QUANT_AMOUNT=64`) **PASS** từ sau bản sửa lỗi #18; Conv3 đúng mọi giá trị
+nhưng còn lỗi #9; Conv1 còn lỗi #17. Lưu ý: trước bản sửa lỗi #18, các case > 4 channel chỉ "PASS" vì weight hằng số che lỗi (mục 9).
 
 ### 6.8 Thêm một case mới
 
@@ -493,6 +497,7 @@ Chạy thử với `-k tên_case`; nếu PASS thì thêm vào snapshot bằng `-
 | Mọi thứ chậm bất thường | Case `QUANT_AMOUNT=1024` (mục 5.6), hoặc chạy quá nhiều job song song | `-k q32`, giảm `--jobs` |
 | Nghi ngờ DUT nhận sai dữ liệu (thừa, thiếu, lệch thứ tự) | — | Chạy với `OPENEYE_TRACE_DMA=1`, rồi `python3 tools/check_dma_trace.py test/.temp/<thư mục case>` |
 | Số liệu lạ | Đọc nhầm `profile.json` cũ | `run_profile.py` luôn xoá file cũ trước khi chạy; nếu chạy pytest trực tiếp thì tự xoá |
+| Muốn chắc kết quả đúng thật, không chỉ "PASS" | Testbench so với tham chiếu do cùng gói Python tạo ra; weight hằng số có thể che lỗi (lỗi #18) | Chạy với dữ liệu ngẫu nhiên (`random_data=True`) và `OPENEYE_DUMP_VERIFY=1`, rồi `tools/verify_conv_output.py` (mục 6.12) |
 
 ### 6.10 Profiler hoạt động thế nào
 
@@ -503,7 +508,7 @@ Coroutine cocotb lấy mẫu **mỗi cạnh lên của clock**. Với mỗi chu 
 mỗi khi đổi pha và sau mỗi word ra, nên vẫn còn khi test FAIL hoặc treo.
 
 Giới hạn: payload và hiệu suất bus chỉ tính cho `Convolution_Single` (việc 0.2 sẽ mở rộng cho Dense và lượt nhiều layer).
-**Chưa đo được MNIST nguyên model**: `model_test` bị tắt, RTL sai với 1 channel, và chuỗi nhiều layer chưa ổn định.
+**Chưa đo được MNIST nguyên model**: `model_test` bị tắt, Conv1 thật còn lỗi #17, Conv3 lỗi #9, layer FC lỗi #5, và chuỗi nhiều layer chưa ổn định.
 
 ### 6.11 Công thức tính (chi tiết)
 
@@ -536,6 +541,25 @@ Mỗi cạnh lên của `clk_i`, profiler đọc 4 tín hiệu bắt tay của R
 - **Ví dụ kiểm tra tay** (`8x1_f4_q32_dma64`, baseline): pha 18 + 4 + 120 + 32 + 20 + 179 + 161 + 34 = **568** chu kỳ; word vào 194, ra 32, tổng 226 →
   `DMA busy` = 226/568 = 39,8 %, `compute` = 161/568 = 28,3 %. Weight: payload 4 × 4 × 3 × 3 = 144 B, bus 120 × 8 = 960 B → 15 %.
   Bias: 4 × 3 = 12 B / (32 × 8) = 5 %. Readout: 8 × 1 × 4 = 32 output × 3 B = 96 B / (32 × 8) = 38 %.
+
+### 6.12 Kiểm tra độc lập từng word (`tools/verify_conv_output.py`, 2026-10-15)
+
+**Vì sao cần:** testbench so DUT với tham chiếu do cùng gói Python (`layer_parameters`, mapper) tạo ra, và các test cũ dùng weight hằng số, nên một lỗi chung của
+hai bên hoặc một lỗi "đọc nhầm weight" (lỗi #18) vẫn PASS.
+
+**Cách làm:**
+1. Chạy layer Conv với `OPENEYE_DUMP_VERIFY=1`: testbench ghi `verify_layer0.pkl` vào thư mục mô phỏng (input, weight, bias đúng như DUT nhận; tham chiếu;
+   `output_order` = (filter, x, y) của từng ô psum trong stream ra, `None` cho ô đệm).
+2. `venv/bin/python tools/verify_conv_output.py test/.temp/<thư mục mô phỏng> [...]`. Công cụ:
+   - tính lại cả layer bằng numpy (hướng kernel theo Keras: `dram.weights[c][f][ky][kx] = kernel[kx][ky][c][f]`), độc lập với code tham chiếu của OpenEye;
+   - tách mỗi word 64 bit của DUT (`demo/layer_0_0/output.txt`) thành 2 psum 20 bit có dấu, đặt vào vị trí theo `output_order`, so **từng giá trị**;
+   - kiểm tra mỗi (filter, x, y) xuất hiện **đúng một lần**, không có `X`, bit phía trên 2 psum bằng 0, tham chiếu của testbench cũng bằng numpy;
+   - in thêm kết quả với kernel chuyển vị làm đối chứng (phải khác hẳn, chứng tỏ phép so sánh có khả năng phân biệt);
+   - phân loại các dòng khác file tham chiếu: dòng đệm thuần (DUT gửi psum của ô PE không dùng) hay dòng có kết quả.
+3. Mã thoát 0 khi mọi giá trị đúng và đủ vị trí.
+
+Dữ liệu ngẫu nhiên: `_run_conv_const(..., random_data=True)` bỏ các hook hằng số/dốc. Các test `test_mnist_layers.py::test_random_data` và `test_mnist_conv` tự
+chạy công cụ sau mô phỏng.
 
 ## 6b. Đo trên mô phỏng so với chạy trên FPGA thật
 
@@ -859,12 +883,13 @@ dài 96 thay vì 192 chu kỳ.
 
 | Giai đoạn | Nội dung | Trạng thái |
 |---|---|---|
-| 0. Đo lường | Profiler, báo cáo, so sánh, baseline 9 case, mô hình bộ nhớ, mốc phần cứng Vivado | **Gần xong**: còn 0.2 (Dense, nhiều layer) |
+| 0. Đo lường | Profiler, báo cáo, so sánh, baseline 9 case, mô hình bộ nhớ, mốc phần cứng Vivado, kiểm tra độc lập từng word | **Gần xong**: còn 0.2 (Dense, nhiều layer) |
+| 0b. Sửa lỗi tính đúng (phát sinh) | Lỗi làm phần cứng/mô phỏng tính sai: #3, #13, #6, #7, #18 | **Đã sửa** (2026-10-10 → 2026-10-15); còn #17, #9, #5, #18b, 3 channel |
 | 1. Giảm lưu lượng DMA | Bias theo filter, đóng gói weight, bảng quant theo F hoặc lưu BRAM, readout INT8 | Chưa làm. Đề xuất bắt đầu với bias |
 | 2. Che độ trễ | Double-buffering (`BRANCHES=2`): nạp lượt sau trong lúc lượt hiện tại tính toán | Chưa làm (cần sửa lỗi chọn nửa buffer iact trước) |
 | 3. Mô hình và DSE | Mô hình Python dự đoán chu kỳ và byte, roofline, quét cấu hình | Chưa làm |
 
-**Giai đoạn 0: trạng thái chi tiết** (cập nhật 2026-10-10)
+**Giai đoạn 0: trạng thái chi tiết** (cập nhật 2026-10-15)
 
 | Việc | Trạng thái |
 |---|---|
@@ -876,8 +901,11 @@ dài 96 thay vì 192 chu kỳ.
 | **0.2 Mở rộng phạm vi đo**: payload/hiệu suất cho layer Dense (FC) và cho lượt 2 layer (pha `writeback`), tách số liệu theo từng layer (đã có `layer_starts` nhưng báo cáo chưa dùng) | **Chưa.** Bias, bảng quant và readout INT8 đều ảnh hưởng tới Dense và write-back giữa các layer |
 | **0.3 Cấu hình gần thực tế hơn**: 3 case kiểu MNIST (mục 6.7), baseline mới `baseline_2026-10-10` | **Xong** (2026-10-10) |
 | Mô hình bộ nhớ ngoài (độ trễ burst, giới hạn băng thông) | **Xong** (2026-10-10, mục 6c); tham số chưa hiệu chỉnh theo board |
+| Mốc phần cứng: tổng hợp + place & route Vivado (`tools/export_vivado.py`) | **Xong** (2026-10-12 → 2026-10-15, mục 6d): 250 MHz, 64,2k LUT, 39,2k FF, 192 BRAM tile |
+| Kiểm tra độc lập từng word + test dữ liệu ngẫu nhiên | **Xong** (2026-10-15, mục 6.12) |
+| Baseline sau các bản sửa | **Xong**: `doc/perf/baseline_2026-10-15/` |
 
-### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-14)
+### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-15)
 
 | # | Lỗi | Nơi | Trạng thái |
 |---|---|---|---|
@@ -896,34 +924,36 @@ dài 96 thay vì 192 chu kỳ.
 | 13 | `rd_cycle_loop_cnt_0..3` bị lái từ 2 khối `always` (reset ở khối này, đếm ở khối kia). Vivado giữ giá trị reset nên trên FPGA các bộ đếm **luôn bằng 0**; mô phỏng không thấy | `hdl/iact_stream_constructor.v:233/437` | **Đã xác nhận bằng thí nghiệm** (2026-10-13, `doc/experiments/2026-10-13_bug13_stuck_counters.md`): giả lập phần cứng thì 6/9 case baseline FAIL (mọi case có `iact_read_limit_1..3` ≠ 0, gồm cả 3 layer MNIST), đối chứng PASS. **Đã sửa** (`5f1e66e`, 2026-10-13, được bạn đồng ý): 0 chu kỳ, 79 test hồi quy không đổi; Vivado 2026-10-14: CRITICAL WARNING 200 → 0, vẫn đạt 250 MHz (mục 9) |
 | 14 | `results_ready` vừa gán blocking vừa non-blocking (lint `BLKANDNBLK`, 4 lỗi); Vivado Synth 8-6090: "entire logic could be removed" | `hdl/psum_pipeline.v:485/522/900` | **Chưa sửa** |
 | 15 | 12 thanh ghi có set và reset cùng mức ưu tiên (Synth 8-7137, "may cause simulation mismatches") | `psum_pipeline.v:322/776`, `OpenEye_Parallel.v:443/448`, `PE.v:1113` | **Chưa phân tích** |
+| 16 | Wrapper AXI `fpga/hdl/open_eye_axi_v1_0.v` không biên dịch được (thiếu module `cfg_reg`, `QUANT_AMOUNT` chưa khai báo, `BUFFER_WIDTH` gán 2 lần, `RAM_CELLS` không tồn tại) | `fpga/hdl` | **Chưa sửa**; chỉ cần khi đóng gói IP hoặc làm block design |
 | 17 | 1 channel với ảnh rộng hơn một lượt x (ví dụ MNIST Conv1 28×28): các hàng output đi theo cặp giống nhau | `iact_stream_constructor.v` (bộ ghi 1 channel) | **Chưa sửa** (lỗi cũ, có từ trước `23be043`): địa chỉ 1 channel (hàng + cột) không tính các lượt x. Rộng 8/16 đúng, rộng 28 sai |
 | 18 | Filter 32–63 sai (MNIST Conv2/Conv3); thực chất **mọi layer > 4 channel tính sai với weight thật** | `src/open_eye/conv_mapper.py` (Python) | **Đã sửa** (2026-10-15, được bạn đồng ý; xoá khoá `used_wght_per_PE` bị lặp). Kiểm chứng từng word bằng tính toán numpy độc lập (mục 9). Conv2 MNIST thật PASS, Conv3 đúng mọi giá trị; baseline −16 % đến −25 % chu kỳ |
 | 18b | Số filter > 32 và không chia hết cho 32 (40, 48): sai từ cả filter 0 | Python/psum address generator | **Chưa điều tra xong**: Python báo 768 word ra nhưng tạo tham chiếu 1.024 dòng. MNIST không dùng |
-| 16 | Wrapper AXI `fpga/hdl/open_eye_axi_v1_0.v` không biên dịch được (thiếu module `cfg_reg`, `QUANT_AMOUNT` chưa khai báo, `BUFFER_WIDTH` gán 2 lần, `RAM_CELLS` không tồn tại) | `fpga/hdl` | **Chưa sửa**; chỉ cần khi đóng gói IP hoặc làm block design |
 
-### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-12 sau khi tổng hợp Vivado)
+### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-15)
 
-**Định hướng sau kết quả Vivado (mốc 2026-10-14: 64,0k LUT, 39,1k FF, 192 BRAM tile, đạt 250 MHz sau route):**
+**Định hướng (mốc phần cứng 2026-10-15: 64,2k LUT, 39,2k FF, 192 BRAM tile, đạt 250 MHz sau route; mốc chu kỳ `baseline_2026-10-15`):**
 
 | # | Việc | Loại | Vì sao | Trạng thái |
 |---|---|---|---|---|
 | A | Place & route (clock 4 ns) để có fmax chính thức | Vivado, không sửa RTL | Fmax sau tổng hợp là ước lượng lạc quan; mọi tối ưu cần cả chu kỳ lẫn fmax | **Xong 2026-10-13: đạt 250 MHz sau route** (WNS +0,025 ns); đường găng là dây tới 144 BRAM của bộ đệm psum (mục 6d) |
 | B | **Lỗi #13: phần cứng khác mô phỏng** ở `iact_stream_constructor` | Thí nghiệm, rồi sửa RTL | Nếu đúng như Vivado báo, bitstream hiện tại tính sai iact, nên mọi số đo trên board sẽ vô nghĩa | (1) Thí nghiệm **xong 2026-10-13: lỗi có thật**, 6/9 case sai trên phần cứng giả lập. (2) **Đã sửa 2026-10-13** (mục 9). (3) **Vivado xác nhận 2026-10-14**: CRITICAL WARNING biến mất, vẫn đạt 250 MHz. **Xong** |
-| C | Gửi bias theo filter (1.1 bên dưới) | Sửa RTL | Khoảng −19 % chu kỳ ở `mnist1`, DMA pha bias giảm khoảng 900 lần, chi phí khoảng +2 % FF và 0 BRAM | Chờ đồng ý |
+| B2 | Lỗi #6/#7 (1 channel, `NUM_GLB_IACT=3`) và #18 (weight đọc gấp đôi) | Sửa RTL (#6/#7), Python (#18) | Kết quả sai | **Xong 2026-10-14/15** (mục 9), Vivado xác nhận |
+| C | Gửi bias theo filter (1.1 bên dưới) | Sửa RTL | Bias chiếm **26 %** chu kỳ `mnist1` sau bản sửa #18; ước tính −23 % chu kỳ, DMA pha bias giảm khoảng 900 lần, chi phí khoảng +2 % FF và 0 BRAM | Chờ đồng ý |
+| C2 | MNIST đầy đủ: lỗi #17 (Conv1), #9 (Conv3), #5 (FC) | Python (đệm channel) hoặc RTL | Chạy cả mạng thật, đo độ trễ end-to-end | Chưa làm |
 | D | Thu nhỏ bộ đệm psum (`BUFFER_WIDTH_PSUM` 14 → 11/12) | Đổi tham số, không sửa RTL | 144/168 RAMB36 là bộ đệm psum, layer lớn nhất chỉ dùng khoảng 1.792/16.384 địa chỉ (ước tính); tiết kiệm khoảng 100–124 BRAM36 để thêm cluster hoặc bộ đệm | Cần kiểm chứng bằng 9 case. Sau route còn thấy lợi thêm: đường găng là dây tới các BRAM này, nên bộ đệm nhỏ hơn có thể tăng fmax |
 | E | DMA 128 bit | Băng thông | Cổng HP của ZU+ rộng 128 bit; 64 bit ở 250 MHz chỉ đạt khoảng 2 GB/s; giảm một nửa số chu kỳ nạp và đọc kết quả | 128 bit chưa từng được kiểm chứng |
 | F | Pipeline đường găng iact converter (`OpenEye_FPGA.v` 943–950) | Sửa RTL (fmax) | Tính trước các tích tham số một lần mỗi layer | Chỉ làm nếu fmax sau route chưa đủ |
 | G | `USE_DSP=1` cho PE | Sửa RTL (tài nguyên) | Bộ nhân 48 PE đang dùng LUT, còn 1.724 DSP trống | Khi cần thêm cluster |
 | H | Lỗi #14, #15 (cảnh báo "simulation mismatch") | Phân tích, có thể sửa RTL | Cùng loại rủi ro với #13 | Phân tích sau B |
 
-Thứ tự đề xuất: A và B **đã xong**; tiếp theo là C (bias theo filter), rồi D.
+Thứ tự đề xuất: A, B, B2 **đã xong**; tiếp theo là C (bias theo filter) và C2 (MNIST đầy đủ), rồi D.
 Mỗi thay đổi RTL: test, `run_profile --compare`, Yosys (so sánh nhanh LUT), Vivado ở các mốc quan trọng.
 
-**Kế hoạch theo giai đoạn (giữ nguyên từ 2026-10-10):**
+**Kế hoạch theo giai đoạn (số liệu cập nhật theo `baseline_2026-10-15`):**
 
 1. **Giai đoạn 1.1: gửi bias theo filter** (= hướng C; thiết kế ở dưới). **Cần bạn đồng ý** vì sửa RTL.
 2. **Giai đoạn 1.2: readout INT8.** Lượng tử kết quả trên chip trước khi gửi ra (đường này đã có cho write-back giữa các layer).
-   Readout của `mnist1` chiếm 22 %; có thể giảm khoảng 4 lần số word.
+   Readout của `mnist1` chiếm 26 %; có thể giảm khoảng 4 lần số word.
 3. **Giai đoạn 1.3: tìm hiểu định dạng weight** (hiệu suất 15–30 %). Bước đầu chỉ phân tích, không sửa RTL; sau đó mới đề xuất cách đóng gói.
 4. **Việc 0.2:** đo layer Dense và lượt nhiều layer. Bị chặn một phần bởi lỗi #5; cần quyết định có điều tra hoặc sửa lỗi #5 không.
 5. **Giai đoạn 2:** chạy chồng pha nạp và pha tính toán (double-buffering), sau khi Giai đoạn 1 xong.
@@ -945,7 +975,8 @@ Mỗi thay đổi RTL: test, `run_profile --compare`, Yosys (so sánh nhanh LUT)
   (`trans_cycles_psum`), `src/open_eye/vh_file_creator.py`/`open_eye_parameters.py` (tham số). Có thể cần thêm thanh ghi cấu hình
   (`test/cocotb_fpga/regmap.yaml`) cho số hàng, số lượt x, `block_length`. Giữ cách cũ khi tham số tắt, áp dụng trước cho Conv (Dense và
   Depthwise giữ nguyên).
-- Ước tính (bộ nhớ lý tưởng): `mnist1` pha bias 14.336 → khoảng 16 word DMA + 1.792 chu kỳ sinh lại, tức khoảng −12.500 chu kỳ (khoảng −19 %);
+- Ước tính (bộ nhớ lý tưởng, theo `baseline_2026-10-15`): `mnist1` pha bias 14.336 → khoảng 16 word DMA + 1.792 chu kỳ sinh lại, tức khoảng −12.500 chu kỳ
+  (khoảng −23 % trên 55.048; trước bản sửa #18 là −19 % trên 65.800);
   `32x3_f16`: 768 → khoảng 8 + 96, khoảng −18 %. Với bộ nhớ `typical` lợi hơn (mỗi word DMA tốn khoảng 1,44 chu kỳ). Lưu lượng DMA của pha bias
   giảm khoảng 900 lần.
 - Chi phí ước tính: bảng bias tối đa 32 × 20–32 bit (khoảng 640–1.024 flip-flop, hoặc vài chục LUT nếu dùng LUTRAM), khoảng 4 bộ đếm (khoảng 40 flip-flop),
@@ -968,7 +999,8 @@ Mỗi bước đều đánh giá bằng `tools/run_profile.py --compare doc/perf
 - **Đã điều tra (2026-10-14, `doc/experiments/2026-10-14_channel_bugs.md`):** 1 channel và `NUM_GLB_IACT=3` là hồi quy do commit upstream `23be043`
   (trước commit đó cả hai PASS); 3 channel là do Python xếp 3 byte mỗi pixel trong khi RTL truyền iact theo cặp (`PARALLEL_MACS=2`).
 - `NUM_GLB_IACT=3` sai với mọi số channel đã thử.
-- MNIST Conv1 có 1 channel vào, nên chưa chạy được trên RTL hiện tại.
+- **Sau bản sửa ngày 2026-10-14:** 1/2/4/8 channel × `NUM_GLB_IACT` 1 và 3 đều đúng (`test_mnist_layers.py -k mapping`); chỉ 3 channel còn sai (Python).
+  MNIST Conv1 (1 channel, rộng 28) còn lỗi #17.
 
 **Lỗi `GET_BIAS` khi dữ liệu DMA tới không liên tục** (tìm ra, kiểm chứng và **đã sửa** ngày 2026-10-10, với sự đồng ý của bạn):
 - `hdl/OpenEye_FPGA.v:1978` (vị trí hiện tại): `GET_BIAS` chuyển sang `GET_QUANTIZE` khi `fsm_psum_cycle == trans_cycles_psum - 1`,
@@ -1400,4 +1432,12 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   Thêm `tools/verify_conv_output.py` + `OPENEYE_DUMP_VERIFY=1` (kiểm tra độc lập từng word), tham số `random_data` cho `_run_conv_const`, test dữ liệu ngẫu nhiên.
 - **Vivado sau bản sửa #6/#7** (bạn chạy `fix67_impl`): 0 CRITICAL WARNING, đạt 250 MHz (WNS +0,048 ns), +103 FF, +201 LUT. Mốc phần cứng hiện tại:
   `doc/synth/2026-10-15_route4ns_fix67_zu7ev/`.
+- **Báo cáo tiến độ lần 2** (Word): `doc/reports/BaoCao_TienDo_OpenEye_2026-10-15.docx` (+ `phan_bo_do_tre_2026-10-15.png`,
+  `so_sanh_chu_ky_2026-10-15.png`), tạo bằng `~/tools/docenv/bin/python tools/report/make_progress_report_2026-10-15.py` (dùng chung hàm định dạng
+  với script của báo cáo 10/10; số liệu đọc từ `doc/perf/baseline_2026-10-15/` và `baseline_2026-10-10/`, số Vivado lấy từ
+  `doc/synth/2026-10-15_route4ns_fix67_zu7ev/`). Nội dung: tóm tắt, công cụ mới, kết quả Vivado, mốc đo mới và so sánh trước/sau lỗi #18, kiểm tra độc
+  lập từng word, kiểm thử hồi quy, lỗi đã sửa / chưa sửa, kế hoạch sắp tới, hạn chế.
+- **Rà soát README** cho đúng trạng thái sau các bản sửa: mục 6.7 (lý do chọn 9 case, mốc mới), 6.9, 6.10, mục mới 6.12 (kiểm tra độc lập từng word),
+  sơ đồ thư mục, mục 8 (thêm bước "0b. Sửa lỗi tính đúng"), 8b, 8c (bias 26 % / readout 26 % của `mnist1`, ước tính bias −23 % trên 55.048 chu kỳ,
+  việc C2 chạy đủ MNIST), mục 9 (trạng thái channel sau bản sửa).
 
