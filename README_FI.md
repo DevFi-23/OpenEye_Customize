@@ -150,7 +150,7 @@ OpenEye_orig/
 ├── doc/
 │   ├── perf/                  ★  Số liệu đo chu kỳ: baseline_2026-10-15/ (mốc hiện tại, sau lỗi #18), baseline_2026-10-10/ (mốc cũ), mem_typical_2026-10-10/, ...
 │   ├── synth/                 ★  Báo cáo Vivado theo từng lần chạy (mỗi thư mục có SUMMARY.md)
-│   ├── experiments/           ★  Báo cáo thí nghiệm và điều tra lỗi (#13, #6/#7, #18)
+│   ├── experiments/           ★  Báo cáo thí nghiệm và điều tra lỗi (#13, #6/#7, #18, #14)
 │   ├── lint/                  ★  Output lint gốc
 │   ├── reports/               ★  Báo cáo tiến độ (Word): BaoCao_TienDo_OpenEye_2026-10-10.docx, BaoCao_TienDo_OpenEye_2026-10-15.docx
 │   ├── OpenEye_FPGA_documentation.md, test_status_handover.md   Tài liệu của upstream
@@ -922,7 +922,7 @@ dài 96 thay vì 192 chu kỳ.
 | 11 | Lint đáng ngờ: `PE.v:2210` (cắt 7→5 bit), `data_pipeline_wght.v:394/396/424` (overhead 4 bit). Cấu hình đang dùng có `SPARSITY_EN=1` nên các đường này **đang được dùng** | RTL | **Chưa sửa**, cần test (mục 9b) |
 | 12 | `current_filter` (chỉ số filter của bộ lượng tử) chỉ được reset về 0, **không bao giờ tăng**, nên mọi filter dùng hệ số lượng tử của filter 0 (lượng tử theo filter chưa hoạt động) | `hdl/psum_pipeline.v` | **Chưa sửa**, phát hiện bằng đọc code (2026-10-10), chưa kiểm chứng bằng test. Test hiện tại dùng hệ số giống nhau cho mọi filter nên không phát hiện được |
 | 13 | `rd_cycle_loop_cnt_0..3` bị lái từ 2 khối `always` (reset ở khối này, đếm ở khối kia). Vivado giữ giá trị reset nên trên FPGA các bộ đếm **luôn bằng 0**; mô phỏng không thấy | `hdl/iact_stream_constructor.v:233/437` | **Đã xác nhận bằng thí nghiệm** (2026-10-13, `doc/experiments/2026-10-13_bug13_stuck_counters.md`): giả lập phần cứng thì 6/9 case baseline FAIL (mọi case có `iact_read_limit_1..3` ≠ 0, gồm cả 3 layer MNIST), đối chứng PASS. **Đã sửa** (`5f1e66e`, 2026-10-13, được bạn đồng ý): 0 chu kỳ, 79 test hồi quy không đổi; Vivado 2026-10-14: CRITICAL WARNING 200 → 0, vẫn đạt 250 MHz (mục 9) |
-| 14 | `results_ready` vừa gán blocking vừa non-blocking (lint `BLKANDNBLK`, 4 lỗi); Vivado Synth 8-6090: "entire logic could be removed" | `hdl/psum_pipeline.v:485/522/900` | **Chưa sửa** |
+| 14 | `results_ready` vừa gán blocking vừa non-blocking (lint `BLKANDNBLK`, 4 lỗi); Vivado Synth 8-6090: "entire logic could be removed" | `hdl/psum_pipeline.v:429/449-457/507/522` | **Đã phân tích, chưa sửa** (2026-10-16, `doc/experiments/2026-10-16_bug14_results_ready.md`): phần cứng Vivado hiện tại **không bị ảnh hưởng** (netlist Vivado chạy trong hệ thống: 9/9 ca PASS, chu kỳ giống hệt mốc, từng giá trị = numpy). Nhưng ý nghĩa code phụ thuộc công cụ: **Yosys tạo ra mạch treo ở mọi layer**, Verilator từ chối. Đề xuất tách phần tổ hợp khỏi thanh ghi (mục 9), chờ đồng ý |
 | 15 | 12 thanh ghi có set và reset cùng mức ưu tiên (Synth 8-7137, "may cause simulation mismatches") | `psum_pipeline.v:322/776`, `OpenEye_Parallel.v:443/448`, `PE.v:1113` | **Chưa phân tích** |
 | 16 | Wrapper AXI `fpga/hdl/open_eye_axi_v1_0.v` không biên dịch được (thiếu module `cfg_reg`, `QUANT_AMOUNT` chưa khai báo, `BUFFER_WIDTH` gán 2 lần, `RAM_CELLS` không tồn tại) | `fpga/hdl` | **Chưa sửa**; chỉ cần khi đóng gói IP hoặc làm block design |
 | 17 | 1 channel với ảnh rộng hơn một lượt x (ví dụ MNIST Conv1 28×28): các hàng output đi theo cặp giống nhau | `iact_stream_constructor.v` (bộ ghi 1 channel) | **Chưa sửa** (lỗi cũ, có từ trước `23be043`): địa chỉ 1 channel (hàng + cột) không tính các lượt x. Rộng 8/16 đúng, rộng 28 sai |
@@ -1186,6 +1186,67 @@ Công cụ chính thức: `tools/verify_conv_output.py` + `OPENEYE_DUMP_VERIFY=1
 | 9 case baseline | 9/9 PASS, lưu thành `doc/perf/baseline_2026-10-15/` |
 | Vivado | Không cần (không đổi RTL) |
 
+### Phân tích lỗi #14: `results_ready` vừa gán blocking vừa non-blocking (2026-10-16, không sửa RTL)
+
+Chi tiết và script: `doc/experiments/2026-10-16_bug14_results_ready.md`, `doc/experiments/2026-10-16_bug14/`.
+
+**Code.** Trong khối `always` lớn của `hdl/psum_pipeline.v`, thanh ghi `results_ready` được gán theo hai kiểu:
+- `WAIT_TO_SEND_READY_SIGNAL` (dòng 429): `results_ready = 0;` (blocking).
+- `CALCULATE_PSUM` (449–457): nếu đang 0 thì `results_ready = 1;` rồi AND lần lượt `psum_ready_o_reg` của các PE đầu chuỗi psum
+  (blocking); dòng 460 dùng ngay giá trị này trong **cùng chu kỳ**. Khi thoát: `results_ready <= 1;` (485).
+- `PSUM_GET_RESULTS`: `results_ready <= 1;` (507, non-blocking, viết trước), rồi `results_ready = results_ready & psum_enable_o...`
+  (522, blocking, viết sau); dòng 536 dùng giá trị blocking.
+
+**Ý nghĩa theo chuẩn Verilog (mô phỏng).** Gán blocking có hiệu lực ngay; gán non-blocking được áp ở cuối chu kỳ, sau mọi gán blocking,
+nên **non-blocking thắng dù viết trước**. Vì vậy biến này đóng hai vai:
+- trong `CALCULATE_PSUM`: một cờ "dính" (thanh ghi). Chu kỳ đầu tiên mọi PE đầu chuỗi cùng báo sẵn sàng thì cờ lên 1, được dùng ngay
+  chu kỳ đó và giữ 1;
+- trong `PSUM_GET_RESULTS`: một tín hiệu tổ hợp "mọi PE đầu chuỗi đang gửi kết quả". FSM chỉ đếm kết quả ở chu kỳ đó, còn giá trị thanh ghi
+  bị ép về 1 mỗi chu kỳ.
+
+**Mỗi công cụ hiểu thế nào:**
+
+| Công cụ | Cách hiểu | Bằng chứng |
+|---|---|---|
+| Icarus (mọi test) | Đúng chuẩn, như trên | mốc so sánh |
+| **Vivado 2024.2** (phần cứng hiện tại) | **Giống mô phỏng**. Cảnh báo 8-6090 chỉ là cảnh báo chung, không xoá logic nào | 3 thí nghiệm bên dưới |
+| **Yosys 0.69** | **Theo thứ tự dòng code: lệnh blocking viết sau đè lệnh non-blocking viết trước** | ví dụ 2 dòng: Icarus cho `r = 1`, Yosys cho `r = r & a` |
+| Verilator 5.020 | Từ chối: `%Error-BLKANDNBLK ... Unsupported` (4 lỗi) + 3 cảnh báo `BLKSEQ` | lint |
+
+**Thí nghiệm (không sửa RTL):**
+
+| # | Thí nghiệm | Kết quả |
+|---|---|---|
+| E1 | Mở checkpoint tổng hợp fix67 (chính phần cứng hiện tại) | Có thanh ghi `results_ready_reg` (FDCE) + 4 LUT, đầu vào là đúng các tín hiệu `psum_ready_o_reg`, `psum_enable_o`, `router_mode_psum`: **không bị xoá** |
+| E2 | Module nhỏ chép đúng kiểu gán này, so netlist Vivado với RTL, 200.000 chu kỳ ngẫu nhiên | **0 sai khác**. Đối chứng (mô hình coi mọi lệnh là non-blocking): 24.585 sai khác, nên phép so phân biệt được |
+| E3 | Netlist Yosys của module nhỏ | 13.820 / 200.000 chu kỳ sai khác |
+| E4 | Tổng hợp `psum_pipeline` bằng Vivado với đúng tham số phần cứng, thay vào mô phỏng hệ thống (phần còn lại vẫn RTL) | **9/9 ca PASS** (7 ca mốc dạng dốc + 2 ca ngẫu nhiên); chu kỳ từng pha **giống hệt** mốc 2026-10-15 (568 … 55.048 / 65.528 / 20.584); kiểm tra độc lập: mọi giá trị = numpy |
+| E5 | Làm như E4 với netlist Yosys | **Treo ngay ở layer nhỏ nhất** (8×1): FSM chính kẹt ở trạng thái 10, FSM psum kẹt ở `PSUM_GET_RESULTS` với `fsm_psum_cycle = 0` |
+| E6 | Probe trên RTL | Mỗi lần vào `PSUM_GET_RESULTS`, kết quả cần 16–28 chu kỳ để ra khỏi chuỗi delay của PE, trong lúc đó điều kiện AND = 0. Theo chuẩn (và Vivado) thanh ghi được ép về 1 nên FSM chỉ chờ; theo Yosys thanh ghi nhận 0 ở chu kỳ đầu rồi **giữ 0 mãi**, nên không bao giờ đếm được kết quả |
+
+**Kết luận:**
+- **Phần cứng FPGA hiện tại (Vivado 2024.2) chạy đúng**, không có kết quả sai do lỗi này.
+- Lỗi thật là **code không khả chuyển**: cùng file, Yosys tạo ra mạch treo ở mọi layer, Verilator không chạy được. Điều này chặn flow Yosys của repo
+  (`yosys/`, `nextpnr/`, GateMate), mọi flow ASIC dựa trên Yosys, và mô phỏng bằng Verilator (nhanh hơn Icarus nhiều lần). Một phiên bản Vivado khác
+  cũng có thể hiểu khác mà vẫn đúng chuẩn.
+- Hai cách sửa "dễ thấy" lại **sai**: đổi hết sang `<=` thì cờ không bao giờ lên 1 (treo, chính là mô hình đối chứng của E2).
+
+**Đề xuất sửa (chưa làm, chờ đồng ý):** tách phần tổ hợp ra khỏi khối FSM, giữ nguyên biểu thức và thời điểm từng chu kỳ:
+- `generate` tính cho mỗi PE đầu chuỗi `psum_ready_o_reg[i] | not_chain_start` và `psum_enable_o[i] | not_chain_start`, rồi
+  `all_psum_ready = &...`, `all_psum_enable = &...` (đúng các biểu thức cũ, chỉ chuyển ra ngoài);
+- `results_ready_calc = results_ready | ((psum_ready_i_reg != 0) & all_psum_ready)` (cờ dính, dùng ngay trong chu kỳ);
+- trong FSM chỉ còn gán non-blocking: `WAIT_TO_SEND_READY_SIGNAL`: `results_ready <= 0`; `CALCULATE_PSUM`: `results_ready <= results_ready_calc`
+  và điều kiện `results_ready_calc & (psum_ready_i_reg != 0)`; `PSUM_GET_RESULTS`: bỏ dòng 522, điều kiện `results_ready & all_psum_enable`.
+
+Vẫn 1 flip-flop, cùng hàm logic, không thêm chu kỳ. Các phương án bị loại: đổi hết sang `<=` (treo); đổi hết sang `=` (chạy được nhưng thanh ghi gán
+blocking, vẫn còn `BLKSEQ`); thêm biến tạm blocking trong khối FSM (diff nhỏ hơn nhưng vẫn trộn tổ hợp với tuần tự); thay cờ bằng
+`fsm_psum_cycle != 0` (tiết kiệm 1 FF nhưng dựa vào các bất biến dễ bị phá).
+
+**Kiểm chứng dự kiến sau khi sửa:** chạy song song bản cũ và bản mới trong cùng mô phỏng, so mọi đầu ra mỗi chu kỳ (9 ca mốc + 1 triệu chu kỳ đầu vào
+ngẫu nhiên); netlist Vivado và **netlist Yosys** của bản mới trong hệ thống (Yosys phải PASS, hiện đang treo); hồi quy 34 Conv + 63 GEMM/Dense +
+19 MNIST/ngẫu nhiên + 9 ca mốc (0 chu kỳ thay đổi); lint: hết 4 `BLKANDNBLK` và 3 `BLKSEQ` của `psum_pipeline.v`; Vivado: hết 10 cảnh báo 8-6090,
+tài nguyên và fmax không đổi.
+
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
 Output gốc đầy đủ: `doc/lint/verilator-5.020_2026-10-10.txt`; chạy lại đúng lệnh CI của upstream trên RTL hiện tại (2026-10-14, vẫn 38 warning, giống hệt):
@@ -1441,3 +1502,10 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   sơ đồ thư mục, mục 8 (thêm bước "0b. Sửa lỗi tính đúng"), 8b, 8c (bias 26 % / readout 26 % của `mnist1`, ước tính bias −23 % trên 55.048 chu kỳ,
   việc C2 chạy đủ MNIST), mục 9 (trạng thái channel sau bản sửa).
 
+### 2026-10-16
+
+- **Phân tích lỗi #14** (`results_ready` vừa gán blocking vừa non-blocking; không sửa RTL): mở checkpoint tổng hợp fix67, tổng hợp riêng
+  `psum_pipeline` bằng Vivado (chạy batch từ WSL, thư mục `C:/openeye_vivado/bug14_check`) và Yosys, rồi thay netlist vào mô phỏng hệ thống.
+  Vivado hiểu đúng như mô phỏng (9/9 ca PASS, chu kỳ giống hệt mốc, từng giá trị = numpy), nên **phần cứng hiện tại không bị ảnh hưởng**. Yosys hiểu khác:
+  **mạch treo ở mọi layer**; Verilator từ chối. Đề xuất cách sửa giữ nguyên từng chu kỳ (tách phần tổ hợp ra khỏi thanh ghi), chờ đồng ý. Chi tiết: mục 9,
+  `doc/experiments/2026-10-16_bug14_results_ready.md`.
