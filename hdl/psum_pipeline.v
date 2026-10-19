@@ -164,6 +164,9 @@ module psum_pipeline #(
   reg [DMA_BITWIDTH-1:0] data_dma_o_q1;
   reg [DMA_BITWIDTH-1:0] data_dma_o_q2;
   reg [2:0] data_dma_o_counter;
+  // CALCULATE_PSUM: sticky flag, set in the first cycle every chain-start PE reports
+  // psum_ready (results_ready_calc below). PSUM_GET_RESULTS: held at 1. Written with
+  // non-blocking assignments only (bug #14, see all_psum_ready / all_psum_enable).
   reg results_ready;
   reg [7:0] psum_cycle_loop_limit;
   reg [7:0] psum_cycle_count;
@@ -208,6 +211,37 @@ module psum_pipeline #(
       end
     end
   end
+
+  // Handshake of the psum chains: only the PE at the start of a chain counts
+  // (router_mode_psum bit 2, or every PE when CLUSTER_ROWS == 1). These AND
+  // terms used to be accumulated with blocking assignments into the
+  // results_ready register inside the FSM block, which also gets non-blocking
+  // assignments. Simulation and Vivado let the non-blocking write win, Yosys
+  // lets the later blocking write win (its netlist hangs in PSUM_GET_RESULTS)
+  // and Verilator rejects it (BLKANDNBLK). Bug #14, doc/experiments/2026-10-16_bug14_results_ready.md.
+  localparam PSUM_GLB_PAIRS = (NUM_GLB_PSUM+1)/2;
+  wire [CLUSTERS*PSUM_GLB_PAIRS-1:0] chain_ready_terms;
+  wire [CLUSTERS*PSUM_GLB_PAIRS-1:0] chain_enable_terms;
+  genvar rr_cc, rr_cr, rr_g;
+  generate
+    for (rr_cc = 0; rr_cc < CLUSTER_COLUMNS; rr_cc = rr_cc + 1) begin : gen_rr_cc
+      for (rr_cr = 0; rr_cr < CLUSTER_ROWS; rr_cr = rr_cr + 1) begin : gen_rr_cr
+        for (rr_g = 0; rr_g < PSUM_GLB_PAIRS; rr_g = rr_g + 1) begin : gen_rr_g
+          localparam integer TERM = (rr_cc*CLUSTER_ROWS + rr_cr)*PSUM_GLB_PAIRS + rr_g;
+          localparam integer GLB  = rr_cc*NUM_GLB_PSUM + rr_cr*CLUSTER_COLUMNS*NUM_GLB_PSUM + rr_g*2;
+          localparam integer MODE = rr_cc*NUM_GLB_PSUM*ROUTER_MODES_PSUM + rr_cr*CLUSTER_COLUMNS*NUM_GLB_PSUM*ROUTER_MODES_PSUM
+                                  + rr_g*ROUTER_MODES_PSUM*2 + 2;
+          wire not_chain_start = (router_mode_psum[MODE] == 0) & (CLUSTER_ROWS != 1);
+          assign chain_ready_terms[TERM]  = psum_ready_o_reg[GLB] | not_chain_start;
+          assign chain_enable_terms[TERM] = psum_enable_o[GLB]    | not_chain_start;
+        end
+      end
+    end
+  endgenerate
+  wire all_psum_ready  = &chain_ready_terms;   // CALCULATE_PSUM: every chain start reports psum_ready
+  wire all_psum_enable = &chain_enable_terms;  // PSUM_GET_RESULTS: every chain start streams a result
+  // Next value of the sticky CALCULATE_PSUM flag, also used in the cycle it is set.
+  wire results_ready_calc = results_ready | ((psum_ready_i_reg != 0) & all_psum_ready);
   reg                                                 ready_dma_i_q1;
   reg                                                 ready_dma_i_q2;
   assign current_shift = quant_exp[current_filter];
@@ -426,7 +460,7 @@ module psum_pipeline #(
         end
 
         WAIT_TO_SEND_READY_SIGNAL: begin
-          results_ready = 0;
+          results_ready <= 0;
           if ((wght_enable_i_reg == 0) & (iact_enable_i_oep_w == 0)) begin
             fsm_psum_cycle <= fsm_psum_cycle + 1;
           end
@@ -446,18 +480,8 @@ module psum_pipeline #(
             psum_ready_i_reg <= psum_ready_i_reg;
           end
           psum_buffer_en_r <= {(((NUM_GLB_PSUM*CLUSTERS)+1)/2){1'd1}};
-          if ((results_ready == 0) & (psum_ready_i_reg != 0)) begin
-            results_ready = 1;
-            for (cc_psum = 0; cc_psum < CLUSTER_COLUMNS; cc_psum = cc_psum + 1) begin
-              for (cr_psum = 0; cr_psum < CLUSTER_ROWS; cr_psum = cr_psum + 1) begin
-                for (g_psum = 0; g_psum < (NUM_GLB_PSUM+1)/2; g_psum = g_psum + 1) begin
-                  results_ready = results_ready & (psum_ready_o_reg[cc_psum*NUM_GLB_PSUM+cr_psum*CLUSTER_COLUMNS*NUM_GLB_PSUM+g_psum*2] |
-                   ((router_mode_psum[cc_psum * NUM_GLB_PSUM * ROUTER_MODES_PSUM + cr_psum * CLUSTER_COLUMNS * NUM_GLB_PSUM * ROUTER_MODES_PSUM + g_psum * ROUTER_MODES_PSUM * 2 + 2] == 0) & (CLUSTER_ROWS != 1)));
-                end
-              end
-            end
-          end
-          if (results_ready & (psum_ready_i_reg != 0)) begin
+          results_ready <= results_ready_calc;
+          if (results_ready_calc & (psum_ready_i_reg != 0)) begin
             fsm_psum_cycle  <= fsm_psum_cycle + 1;
             psum_data_i_reg <= psum_buffer_data_r;
             for (cc_psum = 0; cc_psum < CLUSTER_COLUMNS; cc_psum = cc_psum + 1) begin
@@ -519,10 +543,8 @@ module psum_pipeline #(
                 if (psum_buffer_en_w[cc_psum*((NUM_GLB_PSUM+1)/2)+cr_psum*CLUSTER_COLUMNS*((NUM_GLB_PSUM+1)/2)+g_psum]) begin
                   psum_buffer_addr_array[cc_psum][cr_psum][g_psum] <= psum_buffer_addr_array[cc_psum][cr_psum][g_psum] + 1;
                 end
-                results_ready = results_ready & (psum_enable_o[cc_psum*NUM_GLB_PSUM+cr_psum*CLUSTER_COLUMNS*NUM_GLB_PSUM+g_psum * 2] |
-                ((router_mode_psum[cc_psum * NUM_GLB_PSUM * ROUTER_MODES_PSUM + cr_psum * CLUSTER_COLUMNS * NUM_GLB_PSUM * ROUTER_MODES_PSUM + g_psum * ROUTER_MODES_PSUM * 2 + 2] == 0) & (CLUSTER_ROWS != 1)));
-                // Row-major, as OpenEye_Parallel drives psum_enable_o and as the
-                // results_ready term above already reads it. The column-major
+                // Row-major, as OpenEye_Parallel drives psum_enable_o and as
+                // chain_enable_terms (all_psum_enable) reads it. The column-major
                 // form looked at bit 8 for cluster (col 1, row 0) whose enable
                 // sits at bit 4, so that cluster never captured its result.
                 if (psum_enable_o[cc_psum*NUM_GLB_PSUM+cr_psum*CLUSTER_COLUMNS*NUM_GLB_PSUM+g_psum * 2] != 0) begin
@@ -533,7 +555,8 @@ module psum_pipeline #(
               end
             end
           end
-          if (results_ready) begin
+          // results_ready is 1 here; count only the cycles in which every chain start streams.
+          if (results_ready & all_psum_enable) begin
             psum_router_set_reg <= 0;
             fsm_psum_cycle      <= fsm_psum_cycle + 1;
           end

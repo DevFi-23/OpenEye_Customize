@@ -103,7 +103,7 @@ cycles and is used in the same cycle (sticky, 0 extra latency).
 - **Two "obvious" fixes are wrong:** turning every assignment into `<=` never sets the flag (hang, control model of E2); keeping
   the mix but reordering it changes the Yosys result but not the portability problem.
 
-## 6. Proposed fix (not applied)
+## 6. Proposed fix (applied 2026-10-19, section 8)
 
 Separate the combinational part from the register; keep the expressions and the cycle timing exactly:
 
@@ -160,6 +160,35 @@ Rejected alternatives:
 4. Lint: 4 `BLKANDNBLK` errors and 3 `BLKSEQ` warnings of `psum_pipeline.v` disappear (lower the baseline); Yosys resources;
    Vivado: the 10 Synth 8-6090 warnings disappear, resources and fmax unchanged within noise.
 
+## 8. Fix applied (2026-10-19, approved)
+
+`hdl/psum_pipeline.v` (+41 / -18 lines, no other file) exactly as in section 6: a `generate` block computes
+`chain_ready_terms` / `chain_enable_terms` with the old expressions, `all_psum_ready = &chain_ready_terms`,
+`all_psum_enable = &chain_enable_terms`, `results_ready_calc = results_ready | ((psum_ready_i_reg != 0) & all_psum_ready)`;
+the FSM block only writes `results_ready` with `<=`:
+
+| State | Change |
+|---|---|
+| `WAIT_TO_SEND_READY_SIGNAL` | `results_ready = 0` -> `results_ready <= 0` |
+| `CALCULATE_PSUM` | blocking AND loop removed; `results_ready <= results_ready_calc`; condition `results_ready_calc & (psum_ready_i_reg != 0)` |
+| `PSUM_GET_RESULTS` | blocking AND line removed; condition `results_ready & all_psum_enable` |
+
+### Verification
+
+| Check | Result |
+|---|---|
+| Lock-step in the system: old and new `psum_pipeline` side by side (generated wrapper, 19 outputs compared with `!==` at every falling clock edge, `$fatal` on the first difference), all 125 tests of `test_conv_const.py` (34), `test_gemm_layer.py` (63), `test_mnist_layers.py` (19), `test_profile.py` (9) | **125/125: 0 mismatches**, 767,343 compared cycles (Conv 57,947; GEMM/Dense 58,380; MNIST/random 499,625; baseline 151,391). The 23 GEMM/Dense tests again with `OPENEYE_SKIP_FC_WRITE_CHECK=1` (run to the end): 0 mismatches in 24,804 cycles |
+| Same lock-step, mutant with the `CALCULATE_PSUM` decision one cycle late | detected: `LOCKSTEP MISMATCH` (psum_buffer_addr) and FAIL, so the comparison discriminates |
+| Module-level random lock-step (hardware generics, inputs biased so that the FSM reaches `CALCULATE_PSUM` and `PSUM_GET_RESULTS`) | 300,000 cycles, **0 mismatches**; all 7 psum FSM states visited (`CALCULATE_PSUM` 5,344 cycles, flag set 765 times; `PSUM_GET_RESULTS` 252,961 cycles of which 41,404 waiting). A first 1M-cycle run (also 0 mismatches) never reached these two states and does not count |
+| Regression verdicts | Identical to before the fix: Conv 34/34 PASS; GEMM/Dense 40 PASS / 23 FAIL (all 23 raised by the live FC write check of the testbench: 17 value, 6 destination asserts, bug #5); MNIST/random 15 passed + 4 xfailed (3 channels x2, #17, #9); baseline 9 PASS. **With the live FC check off: 23/23 GEMM/Dense PASS** |
+| 9 baseline cases (`tools/run_profile.py --compare doc/perf/baseline_2026-10-15`) | 9/9 PASS, **0 cycles and 0 DMA words difference** in every phase of every case |
+| Vivado netlist of the new module in the system (E4 again): 8x1, 32x3 16 f, mnist3, random 8x4x32 -> 32 | 4/4 PASS, cycles 568 / 3,556 / 20,584 / 12,200 = baseline / RTL, every value = numpy |
+| **Yosys netlist of the new module in the system** (E5 again, hung before) | **4/4 PASS**, same cycles, every value = numpy |
+| Verilator 5.020 lint (`tools/lint_check.py`) | fpga 477 -> 470: the 4 `BLKANDNBLK` errors and the 3 `BLKSEQ` warnings of `psum_pipeline.v` gone, 0 new; baseline lowered |
+| Verilator 5.020 full build to C++ (`--cc --build`) | old RTL: stops with 4 `BLKANDNBLK` errors; new RTL: **builds** (0 errors). No cocotb run on Verilator yet |
+| Yosys `synth_xilinx`, `psum_pipeline` alone (hardware generics) | FF 1,996 -> 1,996; LUT 4,115 -> 4,117; DSP 9 -> 9 |
+| Vivado 2024.2 full design, synth + place and route at 4 ns (`doc/synth/2026-10-19_route4ns_fix14_zu7ev/`) | 0 ERROR / 0 CRITICAL; Synth 8-6090 10 -> 0, no other warning ID changed; WNS +0.219 / **+0.097 ns** (fix67: +0.192 / +0.048); LUT 64,162 -> 64,050, FF 39,192 -> 39,184 after route; BRAM / URAM / DSP unchanged |
+
 ## Scripts (`2026-10-16_bug14/`)
 
 - `inspect.tcl`: opens the fix67 checkpoint, reports `results_ready` (E1).
@@ -167,3 +196,7 @@ Rejected alternatives:
 - `two_line.v`: E3.
 - `run_gate.py <case> [gate|yosys|rtl|probe]`: runs a layer with the RTL, the Vivado netlist or the Yosys netlist of
   `psum_pipeline`, or with `probe14.py` (E4-E6). Needs `glbl.v`, the UNISIM models and the netlists next to it (paths at the top).
+- `synth_fix14.tcl`: out-of-context Vivado synthesis of the fixed module (section 8).
+- `make_lockstep.py` + `lockstep_plugin.py`: lock-step wrapper; `PYTHONPATH=<dir> pytest -p lockstep_plugin ...` compiles it
+  instead of `hdl/psum_pipeline.v` (section 8).
+- `make_random_tb.py`: module-level random lock-step testbench (section 8).

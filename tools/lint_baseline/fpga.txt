@@ -1,8 +1,6 @@
 # Verilator 5.020 lint baseline. count<TAB>code | file | message
 # Regenerate with: python3 tools/lint_check.py --update
-4	BLKANDNBLK | hdl/psum_pipeline.v | Unsupported: Blocked and non-blocking assignments to same variable: 'OpenEye_FPGA.psum_pipeline_inst.results_ready'
 10	BLKSEQ | hdl/OpenEye_FPGA.v | Blocking assignment '=' in sequential logic process
-3	BLKSEQ | hdl/psum_pipeline.v | Blocking assignment '=' in sequential logic process
 1	EOFNEWLINE | hdl/quantization_unit.v | Missing newline at end of file (POSIX 3.206).
 1	EOFNEWLINE | hdl/ring_buffer_pipelined.v | Missing newline at end of file (POSIX 3.206).
 1	EOFNEWLINE | hdl/router_configurator.v | Missing newline at end of file (POSIX 3.206).
