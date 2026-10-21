@@ -911,7 +911,16 @@ module PE #(
   // the config stream sent two cycles later, making raw_wght_w effectively
   // always 0 for any config where cycle 3 doesn't happen to set bit 8.
   assign channel_reg_C0          = stream_data[12:9];
-  assign filters_reg_M0          = stream_data[5:0];
+  // filters_reg_M0 is as wide as data_pipeline_wght.first_spad_max_i
+  // ($clog2(WGHT_ADDR_ADDR+1)+1 bits, upstream 2bf497d); the config field is
+  // 6 bits, so zero-extend it explicitly (8 bits for WGHT_ADDR_ADDR=64,
+  // exactly 6 for WGHT_ADDR_ADDR=16).
+  localparam integer FILTERS_M0_BITS = $clog2(WGHT_ADDR_ADDR+1) + 1;
+  if (FILTERS_M0_BITS > 6) begin : gen_filters_m0_zext
+    assign filters_reg_M0 = {{(FILTERS_M0_BITS-6){1'b0}}, stream_data[5:0]};
+  end else begin : gen_filters_m0_fit
+    assign filters_reg_M0 = stream_data[FILTERS_M0_BITS-1:0];
+  end
   assign iact_addr_max_reg       = stream_data[21:18];
   assign iact_x_line_repetitions = stream_data[25:22];
   assign raw_wght_w              = stream_data[26];

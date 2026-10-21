@@ -48,16 +48,17 @@ git push origin dev
 vào nhánh main của upstream, nên `dev` đã có nội dung đó. **Upstream không động tới các file mà mình đã sửa lỗi** (`psum_pipeline.v`,
 `iact_stream_constructor.v`, phần `GET_BIAS` của `OpenEye_FPGA.v`, `conv_mapper.py`), nên các bản sửa #3, #6/#7, #13, #14, #18 vẫn chỉ có ở `dev`.
 
-| Commit | Thay đổi | So với `dev` | Nên lấy? |
+| Commit | Thay đổi | So với `dev` | Trạng thái |
 |---|---|---|---|
-| `b6fa369` | Sửa comment `TRANS_WORDS` trong `OpenEye_FPGA.v` ("số word mỗi lần truyền từ layer sang layer") | Chỉ comment | **Nên**, không rủi ro |
-| `2c8c324` | `OpenEye_Parallel.v`: 4 khối generate của router **psum** đặt nhầm tên `gen_router_iact_*` → `gen_router_psum_*` | Chỉ đổi tên hierarchy; không xung đột thật (hai vòng `for` không tên khác nhau); không file nào của mình tham chiếu các tên này | **Nên**: tên trong báo cáo Vivado và khi debug đúng hơn |
-| `fc9ace3` | `test/cocotb_fpga/Makefile`: đổi cấu hình mặc định khi chạy bằng `make` (`Convolution_Single`, 16 filter, `NUM_GLB_PSUM=4`, `QUANT_AMOUNT=64`, `TRANS_WORDS=4`, `STRIDE_ENABLED=1`, ...) | Mình chạy test qua pytest (`test_*.py`), không dùng Makefile | Tuỳ, không ảnh hưởng |
-| `2bf497d` | `PE.v`: `first_spad_words_wght` 5 → `$clog2(WGHT_ADDR_ADDR+1)` bit (= 7), `filters_reg_M0` 6 → 8 bit, cho khớp cổng của `data_pipeline_wght` | **Chính là lỗi #11 phần `PE.v:2210`** (cắt 7 → 5 bit). Probe 48 PE trên 7 layer (4–64 channel, 4–64 filter): giá trị lớn nhất của `first_spad_words_o` là **13**, chưa bao giờ ≥ 32, nên **không đổi kết quả** ở các cấu hình hiện tại; đây là lỗi tiềm ẩn. Lint: −2 cảnh báo cổng, +1 cảnh báo mới (`assign filters_reg_M0 = stream_data[5:0]` 6 → 8 bit) | **Nên**, kèm sửa nhỏ: mở rộng 0 tường minh để không sinh cảnh báo mới. Đụng 48 PE nên cần chạy lại Vivado |
-| `18772d6` | `rtl_test_utils.py`: tắt các `assert` của `check_fc_activation_writes` (comment và bọc trong chuỗi `"""..."""`), ghi chú "For Claude to rewrite: kiểm tra sau khi ghi xong thay vì kiểm tra trực tiếp" | Đúng là nguyên nhân 23 test GEMM/Dense FAIL: tắt bằng công tắc `OPENEYE_SKIP_FC_WRITE_CHECK` (đã có trong `dev`) thì 23/23 PASS (lỗi #5 là báo động giả, mục 8b) | **Không lấy nguyên văn**: cách bọc chuỗi tắt luôn cả phần so giá trị. Nên viết lại kiểm tra: đọc nội dung RAM iact **sau khi** pha ghi kết thúc rồi mới so |
+| `b6fa369` | Sửa comment `TRANS_WORDS` trong `OpenEye_FPGA.v` ("số word mỗi lần truyền từ layer sang layer") | Chỉ comment | **Đã lấy** (2026-10-21, `0cacda1`) |
+| `2c8c324` | `OpenEye_Parallel.v`: 4 khối generate của router **psum** đặt nhầm tên `gen_router_iact_*` → `gen_router_psum_*` | Chỉ đổi tên hierarchy; không xung đột thật (hai vòng `for` không tên khác nhau); không file nào của mình tham chiếu các tên này | **Đã lấy** (2026-10-21, `22614d2`) |
+| `fc9ace3` | `test/cocotb_fpga/Makefile`: đổi cấu hình mặc định khi chạy bằng `make` (`Convolution_Single`, 16 filter, `NUM_GLB_PSUM=4`, `QUANT_AMOUNT=64`, `TRANS_WORDS=4`, `STRIDE_ENABLED=1`, ...) | Mình chạy test qua pytest (`test_*.py`), không dùng Makefile | Chưa lấy (không ảnh hưởng) |
+| `2bf497d` | `PE.v`: `first_spad_words_wght` 5 → `$clog2(WGHT_ADDR_ADDR+1)` bit (= 7), `filters_reg_M0` 6 → 8 bit, cho khớp cổng của `data_pipeline_wght` | **Chính là lỗi #11 phần `PE.v:2210`** (cắt 7 → 5 bit). Probe 48 PE trên 7 layer (4–64 channel, 4–64 filter): giá trị lớn nhất của `first_spad_words_o` là **13**, chưa bao giờ ≥ 32, nên **không đổi kết quả** ở các cấu hình hiện tại; đây là lỗi tiềm ẩn. Lint: −2 cảnh báo cổng, +1 cảnh báo mới (`assign filters_reg_M0 = stream_data[5:0]` 6 → 8 bit) | **Đã lấy** (2026-10-21, `9c0c8dc`) + mở rộng 0 tường minh (commit riêng) |
+| `18772d6` | `rtl_test_utils.py`: tắt các `assert` của `check_fc_activation_writes` (comment và bọc trong chuỗi `"""..."""`), ghi chú "For Claude to rewrite: kiểm tra sau khi ghi xong thay vì kiểm tra trực tiếp" | Đúng là nguyên nhân 23 test GEMM/Dense FAIL: tắt bằng công tắc `OPENEYE_SKIP_FC_WRITE_CHECK` (đã có trong `dev`) thì 23/23 PASS (lỗi #5 là báo động giả, mục 8b) | **Không lấy** |
 
-Cách lấy đề xuất: `git cherry-pick b6fa369 2c8c324 2bf497d` (có thể thêm `fc9ace3`), **không** merge cả `upstream/main` để tránh `18772d6`.
-Làm thành một bước riêng, sau bản sửa #14, kèm hồi quy và Vivado (vì `PE.v` thay đổi). Bước này cần bạn đồng ý vì sửa RTL.
+Commit mới hơn, xem ngày 2026-10-21: `81173dc` (2026-10-20, Barsch32) làm cho `hdl/config/regmap.yaml` giống hệt `test/cocotb_fpga/regmap.yaml`. Không chương trình nào đọc bản `hdl/config` (chỉ được nhắc trong comment), nên vô hại; **chưa lấy** vì không nằm trong 3 commit đã duyệt.
+
+**Đã làm (2026-10-21, được bạn đồng ý):** `git cherry-pick -x b6fa369 2c8c324 2bf497d` (giữ tác giả gốc, mỗi commit ghi lại hash upstream nên sau này `git merge upstream/main` nhận ra), cộng một commit riêng mở rộng 0 tường minh cho `filters_reg_M0`. Kiểm chứng: mục 9, `doc/experiments/2026-10-21_upstream_cherry_pick.md`.
 
 ## 3. Môi trường và cách chạy
 
@@ -167,7 +168,7 @@ OpenEye_orig/
 ├── doc/
 │   ├── perf/                  ★  Số liệu đo chu kỳ: baseline_2026-10-15/ (mốc hiện tại, sau lỗi #18), baseline_2026-10-10/ (mốc cũ), mem_typical_2026-10-10/, ...
 │   ├── synth/                 ★  Báo cáo Vivado theo từng lần chạy (mỗi thư mục có SUMMARY.md)
-│   ├── experiments/           ★  Báo cáo thí nghiệm và điều tra lỗi (#13, #6/#7, #18, #14 + script lockstep)
+│   ├── experiments/           ★  Báo cáo thí nghiệm và điều tra lỗi (#13, #6/#7, #18, #14, cherry-pick upstream + script lockstep)
 │   ├── lint/                  ★  Output lint gốc
 │   ├── reports/               ★  Báo cáo tiến độ (Word): BaoCao_TienDo_OpenEye_2026-10-10.docx, BaoCao_TienDo_OpenEye_2026-10-15.docx
 │   ├── OpenEye_FPGA_documentation.md, test_status_handover.md   Tài liệu của upstream
@@ -271,7 +272,7 @@ và so sánh với baseline để biết thay đổi tốt hơn hay tệ hơn ba
 tối ưu có tác dụng. Có hai loại baseline:
 - **Chu kỳ và DMA** (mô phỏng): `doc/perf/baseline_2026-10-15/` (9 case, sau bản sửa lỗi #18). `baseline_2026-10-10` (đo khi lỗi #18 còn: weight đọc gấp đôi,
   case > 4 channel tính sai với weight thật), `doc/perf/baseline.md` và `baseline_2026-10-09*` là mốc cũ.
-- **Phần cứng** (Vivado): `doc/synth/2026-10-19_route4ns_fix14_zu7ev/` (tài nguyên, fmax 250 MHz). Các thư mục `doc/synth` cũ hơn là lịch sử.
+- **Phần cứng** (Vivado): `doc/synth/2026-10-21_route4ns_up3_zu7ev/` (tài nguyên, fmax 250 MHz). Các thư mục `doc/synth` cũ hơn là lịch sử.
 
 ### 5.5 QUANT_AMOUNT
 
@@ -815,28 +816,29 @@ Lưu ý:
   Kiểm tra danh sách thiết bị trước khi chọn part.
 - Lưu báo cáo vào repo: chép `reports/utilization.txt`, `reports/timing_summary.txt` và `config.json` vào `doc/synth/<ngày>_<cấu hình>/`.
 
-### Kết quả Vivado hiện tại: mốc phần cứng (2026-10-19, sau khi sửa lỗi #13, #6/#7 và #14)
+### Kết quả Vivado hiện tại: mốc phần cứng (2026-10-21, sau các bản sửa #13, #6/#7, #14 và 3 commit upstream)
 
-Chi tiết: `doc/synth/2026-10-19_route4ns_fix14_zu7ev/SUMMARY.md`. Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 4 ns (250 MHz),
-cấu hình ở bảng trên, RTL = `dev` có bản sửa #14. Bản sửa lỗi #18 chỉ là Python, không đổi phần cứng. Lần này Vivado được chạy batch từ WSL
-(`cmd.exe /c ... vivado.bat -mode batch -source synth_ooc.tcl -tclargs xczu7ev-ffvc1156-2-e 4 impl`).
+Chi tiết: `doc/synth/2026-10-21_route4ns_up3_zu7ev/SUMMARY.md`. Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 4 ns (250 MHz),
+cấu hình ở bảng trên, RTL = `dev` sau khi lấy upstream `b6fa369`, `2c8c324`, `2bf497d` (+ mở rộng 0 tường minh). Bản sửa lỗi #18 chỉ là Python, không đổi
+phần cứng. Vivado được chạy batch từ WSL (`cmd.exe /c ... vivado.bat -mode batch -source synth_ooc.tcl -tclargs xczu7ev-ffvc1156-2-e 4 impl`).
 
 | | Sau tổng hợp | **Sau route** | Tỉ lệ ZU7EV (sau route) |
 |---|---:|---:|---:|
-| WNS ở 4 ns / hold | +0,219 ns | **+0,097 ns** / +0,007 ns | đạt 250 MHz |
-| fmax = 1000 / (4 − WNS) | ~264 MHz | **~256 MHz** | |
-| LUT (logic + LUTRAM/SRL) | 65.839 | 64.050 | 27,8 % |
-| Flip-flop | 38.859 | 39.184 | 8,5 % |
+| WNS ở 4 ns / hold | +0,219 ns | **+0,070 ns** / +0,006 ns | đạt 250 MHz |
+| fmax = 1000 / (4 − WNS) | ~264 MHz | **~254 MHz** | |
+| LUT (logic + LUTRAM/SRL) | 65.630 | 63.970 | 27,8 % |
+| Flip-flop | 38.960 | 39.285 | 8,5 % |
 | Block RAM tile (RAMB36 168 + RAMB18 48) | 192 | 192 | **61,5 %** |
 | URAM / DSP | 8 / 4 | 8 / 4 | 8,3 % / 0,2 % |
 
-- **0 ERROR, 0 CRITICAL WARNING**. So với fix67 chỉ khác: **hết 10 cảnh báo Synth 8-6090** (lỗi #14), không có mã cảnh báo mới. Các cảnh báo còn lại:
-  Synth 8-7137 (lỗi #15), 8-689 (`PE.v:2210/2211`, lỗi #11), 8-6057 (URAM không có thanh ghi pipeline), thanh ghi/cổng không dùng bị loại bỏ, và cảnh
-  báo bình thường của chế độ out-of-context.
+- **0 ERROR, 0 CRITICAL WARNING**. So với lần trước (fix14) chỉ khác: hết 2 cảnh báo Synth 8-689 (lệch độ rộng cổng `PE.v:2210/2211`, lỗi #11);
+  fix14 đã hết 10 cảnh báo 8-6090 (lỗi #14). Các cảnh báo còn lại: Synth 8-7137 (lỗi #15), 8-6057 (URAM không có thanh ghi pipeline), thanh ghi/cổng
+  không dùng bị loại bỏ, và cảnh báo bình thường của chế độ out-of-context.
+- Mỗi PE thêm **2 FF** (654 → 656): 2 bit cao của bộ đếm `first_spad_words_o` (7 bit) nay được dùng nên không bị loại bỏ.
 - **Tài nguyên theo khối:** mảng PE (`OpenEye_Parallel`, 48 PE) chiếm khoảng 84 % LUT và 85 % FF, mỗi PE khoảng 1.100 LUT và 655 FF; bộ nhân của PE làm bằng
   LUT (`USE_DSP=0`); 4 DSP ở 4 bộ lượng tử. 8 bộ đệm psum (16.384 × 40 bit) chiếm **144/168 RAMB36** (46 % BRAM của chip); 4 `iact_stream_constructor` chiếm
   24 RAMB36 (mỗi khối 364 FF sau bản sửa #6/#7); 48 RAMB18 là SPad của 48 PE; 8 URAM là 4 bộ đệm iact và bộ đệm weight.
-- **Đường găng sau route:** dây từ `psum_pipeline` (`psum_buffer_addr_array`) tới 144 BRAM của bộ đệm psum (16/20), trong chuỗi BRAM của bộ đệm psum (1), `OpenEye_Parallel` (2), `fsm_cycle` (1). Logic của `results_ready` không nằm trên đường găng.
+- **Đường găng sau route:** 18/20 nằm trong một PE (thanh ghi trạng thái `gen_sparse_fsm` → chân CE của `iact_data_handler`, 3 mức logic, 89 % là trễ dây), 2/20 từ `psum_pipeline` tới BRAM của bộ đệm psum. Lần trước (fix14) đa số là `psum_pipeline` → BRAM: đường găng đổi chỗ theo placement, các đường đều sát nhau quanh 4 ns.
 - **Thời gian thật ở 250 MHz** (bộ nhớ lý tưởng, baseline sau bản sửa #18): `mnist1` 55.048 chu kỳ = 220 µs, `mnist2` 262 µs, `mnist3` 82 µs.
 
 ### Lịch sử các lần chạy Vivado
@@ -848,7 +850,8 @@ cấu hình ở bảng trên, RTL = `dev` có bản sửa #14. Bản sửa lỗi
 | 2026-10-13 | `2026-10-13_route4ns_zu7ev` | Tổng hợp + place & route, 4 ns, **trước** khi sửa lỗi #13 | Đạt 250 MHz (WNS +0,025 ns); 63,9k LUT. Không dùng làm mốc vì phần cứng này tính sai (lỗi #13) |
 | 2026-10-14 | `2026-10-14_route4ns_fix13_zu7ev` | Tổng hợp + place & route, 4 ns, **sau** khi sửa lỗi #13 | CRITICAL WARNING 200 → 0; mỗi `iact_stream_constructor` +32 FF (đúng 4 bộ đếm × 8 bit); WNS +0,117 ns |
 | 2026-10-15 | `2026-10-15_route4ns_fix67_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #6/#7 | +103 FF, +201 LUT (logic địa chỉ 1 channel); WNS +0,048 ns |
-| 2026-10-19 | `2026-10-19_route4ns_fix14_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #14 (chạy batch từ WSL) | **Mốc hiện tại** (bảng trên). Synth 8-6090: 10 → 0; LUT −112, FF −8 (dao động công cụ); WNS +0,097 ns |
+| 2026-10-19 | `2026-10-19_route4ns_fix14_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #14 (chạy batch từ WSL) | Synth 8-6090: 10 → 0; LUT −112, FF −8 (dao động công cụ); WNS +0,097 ns |
+| 2026-10-21 | `2026-10-21_route4ns_up3_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi lấy 3 commit upstream | **Mốc hiện tại** (bảng trên). Synth 8-689: 2 → 0; FF +101 (+2/PE), LUT −80; WNS +0,070 ns |
 
 Ước lượng Yosys so với Vivado: LUT logic lệch dưới 1 %, nên Yosys dùng tốt để so sánh LUT tương đối. BRAM, URAM và DSP lệch nhiều (Yosys không dùng URAM
 và đưa bộ nhân vào DSP), nên các số này phải lấy từ Vivado.
@@ -921,11 +924,11 @@ dài 96 thay vì 192 chu kỳ.
 | **0.2 Mở rộng phạm vi đo**: payload/hiệu suất cho layer Dense (FC) và cho lượt 2 layer (pha `writeback`), tách số liệu theo từng layer (đã có `layer_starts` nhưng báo cáo chưa dùng) | **Chưa.** Bias, bảng quant và readout INT8 đều ảnh hưởng tới Dense và write-back giữa các layer |
 | **0.3 Cấu hình gần thực tế hơn**: 3 case kiểu MNIST (mục 6.7), baseline mới `baseline_2026-10-10` | **Xong** (2026-10-10) |
 | Mô hình bộ nhớ ngoài (độ trễ burst, giới hạn băng thông) | **Xong** (2026-10-10, mục 6c); tham số chưa hiệu chỉnh theo board |
-| Mốc phần cứng: tổng hợp + place & route Vivado (`tools/export_vivado.py`) | **Xong** (2026-10-12 → 2026-10-19, mục 6d): 250 MHz, 64,1k LUT, 39,2k FF, 192 BRAM tile |
+| Mốc phần cứng: tổng hợp + place & route Vivado (`tools/export_vivado.py`) | **Xong** (2026-10-12 → 2026-10-21, mục 6d): 250 MHz, 64,0k LUT, 39,3k FF, 192 BRAM tile |
 | Kiểm tra độc lập từng word + test dữ liệu ngẫu nhiên | **Xong** (2026-10-15, mục 6.12) |
 | Baseline sau các bản sửa | **Xong**: `doc/perf/baseline_2026-10-15/` |
 
-### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-15)
+### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-21)
 
 | # | Lỗi | Nơi | Trạng thái |
 |---|---|---|---|
@@ -939,7 +942,7 @@ dài 96 thay vì 192 chu kỳ.
 | 8 | 64 filter: `IndexError` trong `layer_parameters.read_data_from_layer` | Cấu hình | **Không phải lỗi code** (2026-10-14): bảng lượng tử có `QUANT_AMOUNT` entry, nên số filter phải ≤ `QUANT_AMOUNT`. Layer 64 filter cần `QUANT_AMOUNT=64` |
 | 9 | Ảnh rộng 7 (có cột đệm): phần cứng ghi giá trị khác 0 vào ô đệm (giá trị thật vẫn đúng) | RTL/testbench | **Chưa sửa** |
 | 10 | `CLUSTER_ROWS=1`: một số cấu hình treo FSM (theo tài liệu upstream) | RTL | **Chưa sửa**, chưa tự kiểm chứng |
-| 11 | Lint đáng ngờ: `PE.v:2210` (cắt 7→5 bit), `data_pipeline_wght.v:394/396/424` (overhead 4 bit). Cấu hình đang dùng có `SPARSITY_EN=1` nên các đường này **đang được dùng** | RTL | **Chưa sửa**, cần test (mục 9b) |
+| 11 | Lint đáng ngờ: `PE.v:2210` (cắt 7→5 bit), `data_pipeline_wght.v:394/396/424` (overhead 4 bit). Cấu hình đang dùng có `SPARSITY_EN=1` nên các đường này **đang được dùng** | RTL | **`PE.v:2210`: đã sửa** (2026-10-21, lấy upstream `2bf497d` + mở rộng 0 tường minh; bộ đếm lên tới 64 ở Dense K = 512 nhưng lockstep cho thấy bản cũ vẫn cho cùng hành vi ở mọi trường hợp đã thử). **`data_pipeline_wght.v`: chưa sửa**, cần test (mục 9b) |
 | 12 | `current_filter` (chỉ số filter của bộ lượng tử) chỉ được reset về 0, **không bao giờ tăng**, nên mọi filter dùng hệ số lượng tử của filter 0 (lượng tử theo filter chưa hoạt động) | `hdl/psum_pipeline.v` | **Chưa sửa**, phát hiện bằng đọc code (2026-10-10), chưa kiểm chứng bằng test. Test hiện tại dùng hệ số giống nhau cho mọi filter nên không phát hiện được |
 | 13 | `rd_cycle_loop_cnt_0..3` bị lái từ 2 khối `always` (reset ở khối này, đếm ở khối kia). Vivado giữ giá trị reset nên trên FPGA các bộ đếm **luôn bằng 0**; mô phỏng không thấy | `hdl/iact_stream_constructor.v:233/437` | **Đã xác nhận bằng thí nghiệm** (2026-10-13, `doc/experiments/2026-10-13_bug13_stuck_counters.md`): giả lập phần cứng thì 6/9 case baseline FAIL (mọi case có `iact_read_limit_1..3` ≠ 0, gồm cả 3 layer MNIST), đối chứng PASS. **Đã sửa** (`5f1e66e`, 2026-10-13, được bạn đồng ý): 0 chu kỳ, 79 test hồi quy không đổi; Vivado 2026-10-14: CRITICAL WARNING 200 → 0, vẫn đạt 250 MHz (mục 9) |
 | 14 | `results_ready` vừa gán blocking vừa non-blocking (lint `BLKANDNBLK`, 4 lỗi); Vivado Synth 8-6090: "entire logic could be removed" | `hdl/psum_pipeline.v` | **Đã sửa** (2026-10-19, được bạn đồng ý; phân tích 2026-10-16). Phần cứng Vivado trước đó vẫn đúng; lỗi thật là code không khả chuyển (netlist Yosys treo, Verilator từ chối). Tách phần AND tổ hợp ra khỏi thanh ghi, chỉ còn gán `<=`. Lockstep cũ/mới trên 125 test: 0 sai khác; netlist Yosys nay PASS; lint −4 lỗi −3 cảnh báo; Vivado hết 10 cảnh báo 8-6090, vẫn 250 MHz (mục 9) |
@@ -948,10 +951,11 @@ dài 96 thay vì 192 chu kỳ.
 | 17 | 1 channel với ảnh rộng hơn một lượt x (ví dụ MNIST Conv1 28×28): các hàng output đi theo cặp giống nhau | `iact_stream_constructor.v` (bộ ghi 1 channel) | **Chưa sửa** (lỗi cũ, có từ trước `23be043`): địa chỉ 1 channel (hàng + cột) không tính các lượt x. Rộng 8/16 đúng, rộng 28 sai |
 | 18 | Filter 32–63 sai (MNIST Conv2/Conv3); thực chất **mọi layer > 4 channel tính sai với weight thật** | `src/open_eye/conv_mapper.py` (Python) | **Đã sửa** (2026-10-15, được bạn đồng ý; xoá khoá `used_wght_per_PE` bị lặp). Kiểm chứng từng word bằng tính toán numpy độc lập (mục 9). Conv2 MNIST thật PASS, Conv3 đúng mọi giá trị; baseline −16 % đến −25 % chu kỳ |
 | 18b | Số filter > 32 và không chia hết cho 32 (40, 48): sai từ cả filter 0 | Python/psum address generator | **Chưa điều tra xong**: Python báo 768 word ra nhưng tạo tham chiếu 1.024 dòng. MNIST không dùng |
+| 20 | `PE.v:829–830`: tham chiếu "tiến" `gen_sparse_fsm.wght_addr_vec` / `wght_addr_use_vec` / `wght_data_use_vec` vào khối generate khai báo sau (dòng 978). Icarus, Verilator, Vivado hiểu đúng; **Yosys tạo dây 1 bit không ai lái** ("implicitly declared") | `hdl/PE.v` | **Chưa sửa** (phát hiện 2026-10-21). Cùng loại với #14 (nghĩa phụ thuộc công cụ). Đề xuất: khai báo 3 tín hiệu ở cấp module trước hai khối generate. (Số #19 dành cho lỗi Dense K > 512 của phân tích 2026-10-19, chưa ghi vào bảng) |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-15)
 
-**Định hướng (mốc phần cứng 2026-10-19: 64,1k LUT, 39,2k FF, 192 BRAM tile, đạt 250 MHz sau route; mốc chu kỳ `baseline_2026-10-15`, không đổi sau bản sửa #14):**
+**Định hướng (mốc phần cứng 2026-10-21: 64,0k LUT, 39,3k FF, 192 BRAM tile, đạt 250 MHz sau route; mốc chu kỳ `baseline_2026-10-15`, không đổi sau bản sửa #14 và 3 commit upstream):**
 
 | # | Việc | Loại | Vì sao | Trạng thái |
 |---|---|---|---|---|
@@ -1311,6 +1315,48 @@ Vì sao tương đương từng chu kỳ với code cũ (theo ngữ nghĩa mô p
 Kết luận: hành vi không đổi ở bất kỳ chu kỳ nào (chứng minh bằng lockstep), nên số chu kỳ và kết quả của mọi layer giữ nguyên; tài nguyên và tần số
 chỉ khác ở mức dao động của công cụ. Cái được là code nay có cùng một nghĩa với mọi công cụ: Yosys tạo ra mạch chạy đúng, Verilator không còn lỗi.
 
+### Lấy 3 commit upstream: `b6fa369`, `2c8c324`, `2bf497d` (2026-10-21, được bạn đồng ý)
+
+Chi tiết: `doc/experiments/2026-10-21_upstream_cherry_pick.md`. `git cherry-pick -x` không xung đột: `0cacda1`, `22614d2`, `9c0c8dc` (tác giả gốc DenLeb,
+mỗi commit ghi hash upstream), cộng một commit riêng của mình.
+
+| Thay đổi | Trước | Sau |
+|---|---|---|
+| `OpenEye_FPGA.v` (comment) | `TRANS_WORDS - Number of DMA transfer words` (sai nghĩa) | `Number of words per transmissions from layer to layer` |
+| `OpenEye_Parallel.v` | 4 khối generate của router **psum** mang tên `gen_router_iact_bottom_connect/top_connect/top_edge/bottom_edge` (trùng tên với khối của router iact, chỉ không xung đột vì nằm trong hai vòng `for` khác nhau) | `gen_router_psum_*`: tên hierarchy trong Vivado, khi debug và trong báo cáo đúng với nội dung |
+| `PE.v`: `first_spad_words_wght` | `wire [4:0]`, nối vào cổng `first_spad_words_o` 7 bit của `data_pipeline_wght`: bộ đếm số word của SPad địa chỉ weight bị cắt còn 5 bit, giá trị ≥ 32 sẽ quay vòng trong 4 phép so `(first_spad_words_wght - 1) > wght_addr_vec` | `wire [$clog2(WGHT_ADDR_ADDR+1)-1:0]` = 7 bit, khớp cổng |
+| `PE.v`: `filters_reg_M0` | `wire [5:0]` nối vào cổng `first_spad_max_i` 8 bit | `wire [$clog2(WGHT_ADDR_ADDR+1):0]` = 8 bit; **mình thêm**: gán bằng mở rộng 0 tường minh qua `generate if` (`FILTERS_M0_BITS > 6`: thêm bit 0; nếu không: lấy vừa đủ bit), nên không sinh cảnh báo mới và vẫn đúng khi `WGHT_ADDR_ADDR=16` (đúng 6 bit) hay 8 |
+
+**Lỗi cắt bit có xảy ra thật không?** Đo bằng probe (`first_spad_words_o` lớn nhất trên mọi PE): mọi layer Conv đã thử (4–64 channel, 4–64 filter) chỉ tới **13** (kernel rộng 3 × tối đa 4 channel mỗi PE + 1); 8 test GEMM/Dense mẫu từ 3 tới **25**. **Dense K = 512 (10 output) lên tới 64** (đầy cả 64 word của SPad địa chỉ), có 3.564 mẫu ≥ 32, tức là dây 5 bit cũ **có** cắt bit thật. Nhưng PE cũ vẫn PASS ở K = 512, và lockstep PE trên chính layer đó cho **0 sai khác trong 161.088 PE-chu kỳ**: ở mọi trường hợp đã thử, các phép so bị cắt bit vẫn cho cùng quyết định. Nên bản sửa là **phòng ngừa** (đúng độ rộng, lint và Vivado sạch), không thay đổi kết quả nào đã thấy.
+
+Kết quả phụ cho lỗi #19 (Dense K > 512 sai, phát hiện 2026-10-19): K = 520 sai 10/10 output với **cả** PE cũ lẫn PE mới, nên lỗi này không do độ rộng bit. Hướng điều tra: ở K = 512 SPad địa chỉ weight vừa đầy (64 word), K = 520 cần nhiều hơn.
+
+**Kiểm chứng:**
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Lint Verilator 5.020 | fpga 470 → 468, parallel 38 → 36: hết 2 cảnh báo `WIDTHEXPAND` ở cổng của `PE.v`, **0 cảnh báo mới** (bản gốc upstream sẽ sinh thêm 1 cảnh báo ở phép gán 6 → 8 bit; phần mở rộng 0 tránh được). Đã hạ baseline |
+| Elaborate riêng `PE` với `WGHT_ADDR_ADDR` = 8, 16, 64 (cả hai nhánh `generate`) | Icarus và Verilator: 0 lỗi |
+| `2c8c324` (chỉ đổi tên): netlist Yosys của `OpenEye_Parallel` (48 PE, `proc; flatten; opt_clean`) trước / sau | **Giống hệt từng byte** (198.236 cell): các khối đổi tên không khai báo tín hiệu nào |
+| **Lockstep PE trong hệ thống**: mỗi PE mang theo một bản PE cũ (`3717d12`) chạy song song, cùng đầu vào, so 8 đầu ra bằng `!==` ở mỗi sườn xuống clock; chạy **cả 125 test** | **5.708 PE (mảng từ 8 đến 128 PE), tất cả OK, 0 sai khác, 36.363.008 PE-chu kỳ** |
+| Như trên, 23 test GEMM/Dense chạy lại với `OPENEYE_SKIP_FC_WRITE_CHECK=1` | 23/23 PASS; 592 PE, 607.944 PE-chu kỳ, 0 sai khác |
+| Đối chứng: PE mới bị "đột biến" (`filters_reg_M0 + 1`) | Bị bắt ngay (`PE LOCKSTEP MISMATCH`, FAIL): phép so phân biệt được |
+| Kết quả các bộ test | Giống hệt trước: Conv 34/34; GEMM/Dense 40/23 (23 do bộ kiểm tra FC, lỗi #5); MNIST/ngẫu nhiên 15 passed + 4 xfailed; ca mốc 9/9 |
+| 9 ca mốc (`tools/run_profile.py --compare doc/perf/baseline_2026-10-15`) | 9/9 PASS, **0 chu kỳ và 0 word DMA** chênh lệch |
+| Vivado toàn thiết kế, 4 ns (`doc/synth/2026-10-21_route4ns_up3_zu7ev/`) | 0 CRITICAL; Synth 8-689: 2 → 0, không loại cảnh báo nào khác thay đổi; **FF +101 (+2 mỗi PE)**, LUT −209 / −80; BRAM/URAM/DSP không đổi; WNS +0,219 / +0,070 ns, đạt 250 MHz |
+| Tài nguyên PE theo Yosys | **Không dùng được**: Yosys elaborate sai `PE.v:829–830` (lỗi #20 mới), nên hai bản cho netlist giống nhau, không chứng minh được gì |
+
+**Ưu và nhược điểm, trước và sau:**
+
+| | Trước (`3717d12`) | Sau |
+|---|---|---|
+| Đúng chức năng ở các cấu hình đã thử | Đúng | Đúng; lockstep chứng minh hành vi không đổi ở bất kỳ chu kỳ nào (125 + 23 test, thêm Dense K = 512) |
+| Bộ đếm ≥ 32 (đã gặp ở Dense K = 512, tới 64) | Bị cắt còn 5 bit; ở các trường hợp đã thử vẫn không đổi kết quả (lockstep 0 sai khác), nhưng phụ thuộc may rủi vào giá trị | Đúng độ rộng tới 64 word (hết dải của SPad địa chỉ) |
+| Lint / Vivado | 2 `WIDTHEXPAND` + 2 Synth 8-689; tên khối psum sai | Sạch hơn (−2 / −2), tên đúng |
+| Tài nguyên, tần số | 39.184 FF, 64.050 LUT, WNS +0,097 ns | +101 FF (+0,26 %), −80 LUT, WNS +0,070 ns (dao động placement), vẫn 250 MHz |
+| Chu kỳ, DMA | — | Không đổi |
+| Đồng bộ với upstream | Lệch 3 commit | Lệch ít hơn; `-x` giúp merge sau này nhận ra; phần mở rộng 0 là khác biệt riêng nhỏ (1 khối `generate`) |
+
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
 Output gốc đầy đủ: `doc/lint/verilator-5.020_2026-10-10.txt`; chạy lại đúng lệnh CI của upstream trên RTL hiện tại (2026-10-14, vẫn 38 warning, giống hệt):
@@ -1584,3 +1630,13 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   không đổi, 9 ca mốc 0 chu kỳ chênh lệch, netlist Vivado và **netlist Yosys** (trước treo) PASS, Verilator nay biên dịch được cả thiết kế, lint fpga 477 → 470
   (baseline đã hạ), Vivado (`doc/synth/2026-10-19_route4ns_fix14_zu7ev/`, mốc phần cứng mới): hết 10 cảnh báo 8-6090, đạt 250 MHz (WNS +0,097 ns). Chi tiết: mục 9.
 - **Lỗi #5 là báo động giả của testbench**: tắt bộ kiểm tra FC live thì 23/23 test GEMM/Dense PASS (mục 8b).
+
+### 2026-10-21
+
+- **Lấy 3 commit upstream** (được bạn đồng ý): `git cherry-pick -x b6fa369 2c8c324 2bf497d` → `0cacda1`, `22614d2`, `9c0c8dc`, cộng phần mở rộng 0 tường minh
+  cho `filters_reg_M0`. Kiểm chứng: lockstep PE trên 125 + 23 test (5.708 + 592 PE, 0 sai khác), netlist `OpenEye_Parallel` giống hệt từng byte sau khi đổi tên,
+  9 ca mốc 0 chu kỳ chênh lệch, lint fpga 470 → 468 và parallel 38 → 36 (baseline đã hạ), Vivado (`doc/synth/2026-10-21_route4ns_up3_zu7ev/`, mốc phần cứng mới):
+  hết 2 cảnh báo 8-689, +2 FF mỗi PE, đạt 250 MHz. Chi tiết: mục 9, `doc/experiments/2026-10-21_upstream_cherry_pick.md`.
+- Upstream có thêm `81173dc` (20/10, đồng bộ `hdl/config/regmap.yaml`), chưa lấy (mục 2).
+- **Lỗi mới #20** (chưa sửa): `PE.v:829–830` tham chiếu tiến vào khối `gen_sparse_fsm`; Yosys tạo dây 1 bit không ai lái (mục 8b).
+- Lỗi #19 (Dense K > 512): K = 520 sai với cả PE cũ lẫn PE mới, nên không do độ rộng bit; ở K = 512 SPad địa chỉ weight vừa đầy 64 word (hướng điều tra).

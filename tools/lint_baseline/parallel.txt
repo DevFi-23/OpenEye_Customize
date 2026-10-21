@@ -7,11 +7,9 @@
 1	UNDRIVEN | hdl/OpenEye_Parallel.v | Signal is not driven: 'mem_addr_psum'
 1	UNOPTFLAT | hdl/PE.v | Signal unoptimizable: Circular combinational logic: 'OpenEye_Parallel.gen_x[0].gen_y[1].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_spad_oh_acc'
 1	UNOPTFLAT | hdl/data_pipeline_wght.v | Signal unoptimizable: Circular combinational logic: 'OpenEye_Parallel.gen_x[0].gen_y[1].OpenEye_Cluster.pe_cluster.gen_X[0].gen_Y[0].pe.wght_data_handler.overhead_temp'
-1	WIDTHEXPAND | hdl/PE.v | Input port connection 'first_spad_max_i' expects 8 bits on the pin connection, but pin connection's VARREF 'filters_reg_M0' generates 6 bits.
 1	WIDTHEXPAND | hdl/PE.v | Operator ADD expects 32 or 6 bits on the LHS, but LHS's VARREF 'iact_oh_delay_1' generates 4 bits.
 1	WIDTHEXPAND | hdl/PE.v | Operator ASSIGNDLY expects 6 bits on the Assign RHS, but Assign RHS's VARREF 'iact_oh_delay_1' generates 4 bits.
 2	WIDTHEXPAND | hdl/PE.v | Operator SUB expects 32 or 6 bits on the LHS, but LHS's VARREF 'iact_data_spad_oh' generates 4 bits.
-1	WIDTHEXPAND | hdl/PE.v | Output port connection 'first_spad_words_o' expects 7 bits on the pin connection, but pin connection's VARREF 'first_spad_words_wght' generates 5 bits.
 1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator ADD expects 16 bits on the RHS, but RHS's ARRAYSEL generates 4 bits.
 1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator ADD expects 17 bits on the RHS, but RHS's SEL generates 4 bits.
 1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator ADD expects 17 bits on the RHS, but RHS's VARREF 'overhead_next_word' generates 4 bits.
