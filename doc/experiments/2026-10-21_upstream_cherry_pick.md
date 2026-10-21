@@ -23,7 +23,7 @@ got the 6-bit `filters_reg_M0`. Bug #11 (first part, `PE.v:2210`, Vivado Synth 8
 
 Is the wrap reachable today? Measured with `probe_spad.py` (largest `first_spad_words_o` over all PEs): Conv layers of all sizes tried (4-64 channels, 4-64 filters) stay at **13** or less (3-wide kernel x at most 4 channels per PE + 1); 8 sampled GEMM/Dense tests reach 3 to **25**. **Dense K = 512 (10 outputs) reaches 64** (the whole 64-word address SPad), with 3,564 samples >= 32, so the old 5-bit wire did truncate. Yet the old PE passes K = 512 too, and the PE lock-step (old PE as shadow) on that layer gives **0 mismatches in 161,088 PE-cycles** (48 PEs): in every case tried the truncated comparisons give the same decisions. So the fix is defensive (correct widths, clean lint and Vivado), it does not change any result seen so far.
 
-Side result for bug #19 (Dense K > 512 wrong, found 2026-10-19): K = 520 fails 10/10 outputs with the old **and** the new PE, so the width fix is not its cause. Lead for later: at K = 512 the address SPad is exactly full (64 words), K = 520 needs more.
+Side result for bug #19 (Dense K > 512 wrong, found 2026-10-19): K = 520 fails 10/10 outputs with the old **and** the new PE, so the width fix is not its cause. Root cause found the same day: the 8-bit `x_pos_in_w_cycle` of `iact_stream_constructor` (`2026-10-21_bug19_dense_k512.md`); the address SPad lead was wrong (it also wraps in passing runs).
 
 ## Verification
 

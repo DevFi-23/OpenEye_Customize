@@ -168,7 +168,7 @@ OpenEye_orig/
 ├── doc/
 │   ├── perf/                  ★  Số liệu đo chu kỳ: baseline_2026-10-15/ (mốc hiện tại, sau lỗi #18), baseline_2026-10-10/ (mốc cũ), mem_typical_2026-10-10/, ...
 │   ├── synth/                 ★  Báo cáo Vivado theo từng lần chạy (mỗi thư mục có SUMMARY.md)
-│   ├── experiments/           ★  Báo cáo thí nghiệm và điều tra lỗi (#13, #6/#7, #18, #14, cherry-pick upstream + script lockstep)
+│   ├── experiments/           ★  Báo cáo thí nghiệm và điều tra lỗi (#13, #6/#7, #18, #14, #19, cherry-pick upstream + script lockstep, probe)
 │   ├── lint/                  ★  Output lint gốc
 │   ├── reports/               ★  Báo cáo tiến độ (Word): BaoCao_TienDo_OpenEye_2026-10-10.docx, BaoCao_TienDo_OpenEye_2026-10-15.docx
 │   ├── OpenEye_FPGA_documentation.md, test_status_handover.md   Tài liệu của upstream
@@ -951,7 +951,10 @@ dài 96 thay vì 192 chu kỳ.
 | 17 | 1 channel với ảnh rộng hơn một lượt x (ví dụ MNIST Conv1 28×28): các hàng output đi theo cặp giống nhau | `iact_stream_constructor.v` (bộ ghi 1 channel) | **Chưa sửa** (lỗi cũ, có từ trước `23be043`): địa chỉ 1 channel (hàng + cột) không tính các lượt x. Rộng 8/16 đúng, rộng 28 sai |
 | 18 | Filter 32–63 sai (MNIST Conv2/Conv3); thực chất **mọi layer > 4 channel tính sai với weight thật** | `src/open_eye/conv_mapper.py` (Python) | **Đã sửa** (2026-10-15, được bạn đồng ý; xoá khoá `used_wght_per_PE` bị lặp). Kiểm chứng từng word bằng tính toán numpy độc lập (mục 9). Conv2 MNIST thật PASS, Conv3 đúng mọi giá trị; baseline −16 % đến −25 % chu kỳ |
 | 18b | Số filter > 32 và không chia hết cho 32 (40, 48): sai từ cả filter 0 | Python/psum address generator | **Chưa điều tra xong**: Python báo 768 word ra nhưng tạo tham chiếu 1.024 dòng. MNIST không dùng |
-| 20 | `PE.v:829–830`: tham chiếu "tiến" `gen_sparse_fsm.wght_addr_vec` / `wght_addr_use_vec` / `wght_data_use_vec` vào khối generate khai báo sau (dòng 978). Icarus, Verilator, Vivado hiểu đúng; **Yosys tạo dây 1 bit không ai lái** ("implicitly declared") | `hdl/PE.v` | **Chưa sửa** (phát hiện 2026-10-21). Cùng loại với #14 (nghĩa phụ thuộc công cụ). Đề xuất: khai báo 3 tín hiệu ở cấp module trước hai khối generate. (Số #19 dành cho lỗi Dense K > 512 của phân tích 2026-10-19, chưa ghi vào bảng) |
+| 19 | Dense có K > 512 input sai (MNIST: Dense 784 → 10 của mạng trong repo, FC 3136 → 10) | `hdl/iact_stream_constructor.v:214` | **Đã tìm ra nguyên nhân, chưa sửa** (2026-10-21, `doc/experiments/2026-10-21_bug19_dense_k512.md`): K = 512 đúng, **K = 513 đã sai**. Mọi activation từ chỉ số 512 trở đi bị thay bằng 0 (khớp chính xác 10/10 output ở K = 520 và 784). Nguyên nhân: bộ đếm vị trí cặp `x_pos_in_w_cycle` chỉ 8 bit, quay vòng sau 256 cặp nên cửa sổ ghi RAM iact bỏ qua các cặp 256+. Đề xuất: mở rộng lên 12 bit (cần đồng ý). Rào cản kế tiếp (đọc code): `current_x` có dấu 12 bit trong `CONVERT_IACT` → K > 2048 |
+| 19b | Dense N = 32 output với từ 8 lượt K (K ≥ 508) | ? | **Chưa rõ nguyên nhân**: K ≤ 504 đúng, 508/512 sai; N = 16/24 ở K = 512 đúng. Sai ở phía weight hoặc psum, không phải kiểu mất activation |
+| 20 | `PE.v:829–830`: tham chiếu "tiến" `gen_sparse_fsm.wght_addr_vec` / `wght_addr_use_vec` / `wght_data_use_vec` vào khối generate khai báo sau (dòng 978). Icarus, Verilator, Vivado hiểu đúng; **Yosys tạo dây 1 bit không ai lái** ("implicitly declared") | `hdl/PE.v` | **Chưa sửa** (phát hiện 2026-10-21). Cùng loại với #14 (nghĩa phụ thuộc công cụ). Đề xuất: khai báo 3 tín hiệu ở cấp module trước hai khối generate. |
+| 21 | Dense N > 32 output (cần 2 lượt psum): sai với mọi K | ? | **Chưa điều tra** (phát hiện 2026-10-21): K = 64, N = 40 chỉ đúng 10 output đầu, N = 48 chỉ đúng 12 output đầu; N = 32 đúng |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-15)
 
@@ -1329,7 +1332,7 @@ mỗi commit ghi hash upstream), cộng một commit riêng của mình.
 
 **Lỗi cắt bit có xảy ra thật không?** Đo bằng probe (`first_spad_words_o` lớn nhất trên mọi PE): mọi layer Conv đã thử (4–64 channel, 4–64 filter) chỉ tới **13** (kernel rộng 3 × tối đa 4 channel mỗi PE + 1); 8 test GEMM/Dense mẫu từ 3 tới **25**. **Dense K = 512 (10 output) lên tới 64** (đầy cả 64 word của SPad địa chỉ), có 3.564 mẫu ≥ 32, tức là dây 5 bit cũ **có** cắt bit thật. Nhưng PE cũ vẫn PASS ở K = 512, và lockstep PE trên chính layer đó cho **0 sai khác trong 161.088 PE-chu kỳ**: ở mọi trường hợp đã thử, các phép so bị cắt bit vẫn cho cùng quyết định. Nên bản sửa là **phòng ngừa** (đúng độ rộng, lint và Vivado sạch), không thay đổi kết quả nào đã thấy.
 
-Kết quả phụ cho lỗi #19 (Dense K > 512 sai, phát hiện 2026-10-19): K = 520 sai 10/10 output với **cả** PE cũ lẫn PE mới, nên lỗi này không do độ rộng bit. Hướng điều tra: ở K = 512 SPad địa chỉ weight vừa đầy (64 word), K = 520 cần nhiều hơn.
+Kết quả phụ cho lỗi #19 (Dense K > 512 sai, phát hiện 2026-10-19): K = 520 sai 10/10 output với **cả** PE cũ lẫn PE mới, nên lỗi này không do độ rộng bit. Nguyên nhân thật (tìm ra cùng ngày): bộ đếm 8 bit `x_pos_in_w_cycle` trong `iact_stream_constructor` (lỗi #19, mục 8b).
 
 **Kiểm chứng:**
 
@@ -1639,4 +1642,8 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   hết 2 cảnh báo 8-689, +2 FF mỗi PE, đạt 250 MHz. Chi tiết: mục 9, `doc/experiments/2026-10-21_upstream_cherry_pick.md`.
 - Upstream có thêm `81173dc` (20/10, đồng bộ `hdl/config/regmap.yaml`), chưa lấy (mục 2).
 - **Lỗi mới #20** (chưa sửa): `PE.v:829–830` tham chiếu tiến vào khối `gen_sparse_fsm`; Yosys tạo dây 1 bit không ai lái (mục 8b).
-- Lỗi #19 (Dense K > 512): K = 520 sai với cả PE cũ lẫn PE mới, nên không do độ rộng bit; ở K = 512 SPad địa chỉ weight vừa đầy 64 word (hướng điều tra).
+- Lỗi #19 (Dense K > 512): K = 520 sai với cả PE cũ lẫn PE mới, nên không do độ rộng bit (nguyên nhân: xem mục điều tra #19 bên dưới).
+- **Điều tra lỗi #19** (không sửa RTL): K = 512 đúng, K = 513 đã sai. Dữ liệu dump cho thấy chính xác (10/10 output, K = 520 và 784) mọi activation từ
+  chỉ số 512 bị coi là 0. Probe trong `iact_stream_constructor` chỉ ra nguyên nhân: `x_pos_in_w_cycle` (8 bit) quay vòng ở cặp 256 nên các cặp đó không được ghi
+  vào RAM iact. Đã loại: độ rộng bit của upstream `2bf497d`, trường 8 bit `iact_x_add_up` (K = 264/300 vẫn đúng), con trỏ bộ đệm weight, SPad địa chỉ weight.
+  Phát hiện thêm #19b (N = 32 với K ≥ 508) và #21 (N > 32 sai với mọi K). Chi tiết: `doc/experiments/2026-10-21_bug19_dense_k512.md`.
