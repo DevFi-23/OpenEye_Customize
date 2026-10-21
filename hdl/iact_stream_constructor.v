@@ -211,7 +211,11 @@ module iact_stream_constructor #(
     reg [7:0] rd_cycle_loop_cnt_2;
     reg [7:0] rd_cycle_loop_cnt_3;
     reg [7:0] rd_cycle_loop_cnt_4;
-    reg [ 8-1:0] x_pos_in_w_cycle;
+    // Stream position in WRITE_TO_MEMORY (pixels for a convolution, activation
+    // pairs for an FC layer), compared with the 12-bit x_range_lower_bound,
+    // x_pos_inc and iact_x_add_up. It was 8 bits: an FC layer wrapped at pair
+    // 256 and every activation from index 512 on was never written (bug #19).
+    reg [12-1:0] x_pos_in_w_cycle;
     reg [ 8-1:0] channel_trans_cycle;
   wire [12-1:0] rd_addr_inc_0_next;
   wire [12-1:0] rd_addr_inc_1_next;

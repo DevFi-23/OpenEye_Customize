@@ -272,7 +272,7 @@ và so sánh với baseline để biết thay đổi tốt hơn hay tệ hơn ba
 tối ưu có tác dụng. Có hai loại baseline:
 - **Chu kỳ và DMA** (mô phỏng): `doc/perf/baseline_2026-10-15/` (9 case, sau bản sửa lỗi #18). `baseline_2026-10-10` (đo khi lỗi #18 còn: weight đọc gấp đôi,
   case > 4 channel tính sai với weight thật), `doc/perf/baseline.md` và `baseline_2026-10-09*` là mốc cũ.
-- **Phần cứng** (Vivado): `doc/synth/2026-10-21_route4ns_up3_zu7ev/` (tài nguyên, fmax 250 MHz). Các thư mục `doc/synth` cũ hơn là lịch sử.
+- **Phần cứng** (Vivado): `doc/synth/2026-10-21_route4ns_fix19_zu7ev/` (tài nguyên, fmax 250 MHz). Các thư mục `doc/synth` cũ hơn là lịch sử.
 
 ### 5.5 QUANT_AMOUNT
 
@@ -816,29 +816,28 @@ Lưu ý:
   Kiểm tra danh sách thiết bị trước khi chọn part.
 - Lưu báo cáo vào repo: chép `reports/utilization.txt`, `reports/timing_summary.txt` và `config.json` vào `doc/synth/<ngày>_<cấu hình>/`.
 
-### Kết quả Vivado hiện tại: mốc phần cứng (2026-10-21, sau các bản sửa #13, #6/#7, #14 và 3 commit upstream)
+### Kết quả Vivado hiện tại: mốc phần cứng (2026-10-21, sau các bản sửa #13, #6/#7, #14, 3 commit upstream và #19)
 
-Chi tiết: `doc/synth/2026-10-21_route4ns_up3_zu7ev/SUMMARY.md`. Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 4 ns (250 MHz),
-cấu hình ở bảng trên, RTL = `dev` sau khi lấy upstream `b6fa369`, `2c8c324`, `2bf497d` (+ mở rộng 0 tường minh). Bản sửa lỗi #18 chỉ là Python, không đổi
-phần cứng. Vivado được chạy batch từ WSL (`cmd.exe /c ... vivado.bat -mode batch -source synth_ooc.tcl -tclargs xczu7ev-ffvc1156-2-e 4 impl`).
+Chi tiết: `doc/synth/2026-10-21_route4ns_fix19_zu7ev/SUMMARY.md`. Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 4 ns (250 MHz),
+cấu hình ở bảng trên, RTL = `dev` có bản sửa #19. Bản sửa lỗi #18 chỉ là Python, không đổi phần cứng. Vivado được chạy batch từ WSL
+(`cmd.exe /c ... vivado.bat -mode batch -source synth_ooc.tcl -tclargs xczu7ev-ffvc1156-2-e 4 impl`).
 
 | | Sau tổng hợp | **Sau route** | Tỉ lệ ZU7EV (sau route) |
 |---|---:|---:|---:|
-| WNS ở 4 ns / hold | +0,219 ns | **+0,070 ns** / +0,006 ns | đạt 250 MHz |
-| fmax = 1000 / (4 − WNS) | ~264 MHz | **~254 MHz** | |
-| LUT (logic + LUTRAM/SRL) | 65.630 | 63.970 | 27,8 % |
-| Flip-flop | 38.960 | 39.285 | 8,5 % |
+| WNS ở 4 ns / hold | +0,199 ns | **+0,073 ns** / +0,007 ns | đạt 250 MHz |
+| fmax = 1000 / (4 − WNS) | ~263 MHz | **~255 MHz** | |
+| LUT (logic + LUTRAM/SRL) | 65.545 | 63.910 | 27,7 % |
+| Flip-flop | 38.982 | 39.309 | 8,5 % |
 | Block RAM tile (RAMB36 168 + RAMB18 48) | 192 | 192 | **61,5 %** |
 | URAM / DSP | 8 / 4 | 8 / 4 | 8,3 % / 0,2 % |
 
-- **0 ERROR, 0 CRITICAL WARNING**. So với lần trước (fix14) chỉ khác: hết 2 cảnh báo Synth 8-689 (lệch độ rộng cổng `PE.v:2210/2211`, lỗi #11);
-  fix14 đã hết 10 cảnh báo 8-6090 (lỗi #14). Các cảnh báo còn lại: Synth 8-7137 (lỗi #15), 8-6057 (URAM không có thanh ghi pipeline), thanh ghi/cổng
-  không dùng bị loại bỏ, và cảnh báo bình thường của chế độ out-of-context.
+- **0 ERROR, 0 CRITICAL WARNING**; danh sách cảnh báo giống hệt lần up3 (lần đó hết 2 cảnh báo Synth 8-689, fix14 hết 10 cảnh báo 8-6090). Các cảnh báo còn lại:
+  Synth 8-7137 (lỗi #15), 8-6057 (URAM không có thanh ghi pipeline), thanh ghi/cổng không dùng bị loại bỏ, và cảnh báo bình thường của chế độ out-of-context.
 - Mỗi PE thêm **2 FF** (654 → 656): 2 bit cao của bộ đếm `first_spad_words_o` (7 bit) nay được dùng nên không bị loại bỏ.
 - **Tài nguyên theo khối:** mảng PE (`OpenEye_Parallel`, 48 PE) chiếm khoảng 84 % LUT và 85 % FF, mỗi PE khoảng 1.100 LUT và 655 FF; bộ nhân của PE làm bằng
   LUT (`USE_DSP=0`); 4 DSP ở 4 bộ lượng tử. 8 bộ đệm psum (16.384 × 40 bit) chiếm **144/168 RAMB36** (46 % BRAM của chip); 4 `iact_stream_constructor` chiếm
   24 RAMB36 (mỗi khối 364 FF sau bản sửa #6/#7); 48 RAMB18 là SPad của 48 PE; 8 URAM là 4 bộ đệm iact và bộ đệm weight.
-- **Đường găng sau route:** 18/20 nằm trong một PE (thanh ghi trạng thái `gen_sparse_fsm` → chân CE của `iact_data_handler`, 3 mức logic, 89 % là trễ dây), 2/20 từ `psum_pipeline` tới BRAM của bộ đệm psum. Lần trước (fix14) đa số là `psum_pipeline` → BRAM: đường găng đổi chỗ theo placement, các đường đều sát nhau quanh 4 ns.
+- **Đường găng sau route:** 19/20 là dây từ `psum_pipeline` (`psum_buffer_addr_array`) tới 144 BRAM của bộ đệm psum (0 mức logic), 1/20 từ `fsm_cycle`. Lần up3 đa số nằm trong một PE: đường găng đổi chỗ theo placement, các đường đều sát nhau quanh 4 ns.
 - **Thời gian thật ở 250 MHz** (bộ nhớ lý tưởng, baseline sau bản sửa #18): `mnist1` 55.048 chu kỳ = 220 µs, `mnist2` 262 µs, `mnist3` 82 µs.
 
 ### Lịch sử các lần chạy Vivado
@@ -851,7 +850,8 @@ phần cứng. Vivado được chạy batch từ WSL (`cmd.exe /c ... vivado.bat
 | 2026-10-14 | `2026-10-14_route4ns_fix13_zu7ev` | Tổng hợp + place & route, 4 ns, **sau** khi sửa lỗi #13 | CRITICAL WARNING 200 → 0; mỗi `iact_stream_constructor` +32 FF (đúng 4 bộ đếm × 8 bit); WNS +0,117 ns |
 | 2026-10-15 | `2026-10-15_route4ns_fix67_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #6/#7 | +103 FF, +201 LUT (logic địa chỉ 1 channel); WNS +0,048 ns |
 | 2026-10-19 | `2026-10-19_route4ns_fix14_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #14 (chạy batch từ WSL) | Synth 8-6090: 10 → 0; LUT −112, FF −8 (dao động công cụ); WNS +0,097 ns |
-| 2026-10-21 | `2026-10-21_route4ns_up3_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi lấy 3 commit upstream | **Mốc hiện tại** (bảng trên). Synth 8-689: 2 → 0; FF +101 (+2/PE), LUT −80; WNS +0,070 ns |
+| 2026-10-21 | `2026-10-21_route4ns_up3_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi lấy 3 commit upstream | Synth 8-689: 2 → 0; FF +101 (+2/PE), LUT −80; WNS +0,070 ns |
+| 2026-10-21 | `2026-10-21_route4ns_fix19_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #19 | **Mốc hiện tại** (bảng trên). Cảnh báo không đổi; FF +24, LUT −60; WNS +0,073 ns |
 
 Ước lượng Yosys so với Vivado: LUT logic lệch dưới 1 %, nên Yosys dùng tốt để so sánh LUT tương đối. BRAM, URAM và DSP lệch nhiều (Yosys không dùng URAM
 và đưa bộ nhân vào DSP), nên các số này phải lấy từ Vivado.
@@ -924,7 +924,7 @@ dài 96 thay vì 192 chu kỳ.
 | **0.2 Mở rộng phạm vi đo**: payload/hiệu suất cho layer Dense (FC) và cho lượt 2 layer (pha `writeback`), tách số liệu theo từng layer (đã có `layer_starts` nhưng báo cáo chưa dùng) | **Chưa.** Bias, bảng quant và readout INT8 đều ảnh hưởng tới Dense và write-back giữa các layer |
 | **0.3 Cấu hình gần thực tế hơn**: 3 case kiểu MNIST (mục 6.7), baseline mới `baseline_2026-10-10` | **Xong** (2026-10-10) |
 | Mô hình bộ nhớ ngoài (độ trễ burst, giới hạn băng thông) | **Xong** (2026-10-10, mục 6c); tham số chưa hiệu chỉnh theo board |
-| Mốc phần cứng: tổng hợp + place & route Vivado (`tools/export_vivado.py`) | **Xong** (2026-10-12 → 2026-10-21, mục 6d): 250 MHz, 64,0k LUT, 39,3k FF, 192 BRAM tile |
+| Mốc phần cứng: tổng hợp + place & route Vivado (`tools/export_vivado.py`) | **Xong** (2026-10-12 → 2026-10-21, mục 6d): 250 MHz, 63,9k LUT, 39,3k FF, 192 BRAM tile |
 | Kiểm tra độc lập từng word + test dữ liệu ngẫu nhiên | **Xong** (2026-10-15, mục 6.12) |
 | Baseline sau các bản sửa | **Xong**: `doc/perf/baseline_2026-10-15/` |
 
@@ -951,14 +951,14 @@ dài 96 thay vì 192 chu kỳ.
 | 17 | 1 channel với ảnh rộng hơn một lượt x (ví dụ MNIST Conv1 28×28): các hàng output đi theo cặp giống nhau | `iact_stream_constructor.v` (bộ ghi 1 channel) | **Chưa sửa** (lỗi cũ, có từ trước `23be043`): địa chỉ 1 channel (hàng + cột) không tính các lượt x. Rộng 8/16 đúng, rộng 28 sai |
 | 18 | Filter 32–63 sai (MNIST Conv2/Conv3); thực chất **mọi layer > 4 channel tính sai với weight thật** | `src/open_eye/conv_mapper.py` (Python) | **Đã sửa** (2026-10-15, được bạn đồng ý; xoá khoá `used_wght_per_PE` bị lặp). Kiểm chứng từng word bằng tính toán numpy độc lập (mục 9). Conv2 MNIST thật PASS, Conv3 đúng mọi giá trị; baseline −16 % đến −25 % chu kỳ |
 | 18b | Số filter > 32 và không chia hết cho 32 (40, 48): sai từ cả filter 0 | Python/psum address generator | **Chưa điều tra xong**: Python báo 768 word ra nhưng tạo tham chiếu 1.024 dòng. MNIST không dùng |
-| 19 | Dense có K > 512 input sai (MNIST: Dense 784 → 10 của mạng trong repo, FC 3136 → 10) | `hdl/iact_stream_constructor.v:214` | **Đã tìm ra nguyên nhân, chưa sửa** (2026-10-21, `doc/experiments/2026-10-21_bug19_dense_k512.md`): K = 512 đúng, **K = 513 đã sai**. Mọi activation từ chỉ số 512 trở đi bị thay bằng 0 (khớp chính xác 10/10 output ở K = 520 và 784). Nguyên nhân: bộ đếm vị trí cặp `x_pos_in_w_cycle` chỉ 8 bit, quay vòng sau 256 cặp nên cửa sổ ghi RAM iact bỏ qua các cặp 256+. Đề xuất: mở rộng lên 12 bit (cần đồng ý). Rào cản kế tiếp (đọc code): `current_x` có dấu 12 bit trong `CONVERT_IACT` → K > 2048 |
+| 19 | Dense có K > 512 input sai (MNIST: Dense 784 → 10 của mạng trong repo, FC 3136 → 10) | `hdl/iact_stream_constructor.v:218`, `hdl/OpenEye_FPGA.v:2163` | **Đã sửa** (2026-10-21, được bạn đồng ý; `doc/experiments/2026-10-21_bug19_dense_k512.md`). Hai nguyên nhân: (1) bộ đếm vị trí cặp `x_pos_in_w_cycle` 8 bit quay vòng ở cặp 256 → activation ≥ 512 bị bỏ; (2) `current_x` có dấu 12 bit âm từ activation 2048 → activation ≥ 2048 bị bỏ. Sửa: bộ đếm 12 bit, điều kiện lưu của FC không dùng dấu của `current_x`. Loạt K 64 … 4032 (gồm 784 và 3136) đều đúng từng output so với numpy |
 | 19b | Dense N = 32 output với từ 8 lượt K (K ≥ 508) | ? | **Chưa rõ nguyên nhân**: K ≤ 504 đúng, 508/512 sai; N = 16/24 ở K = 512 đúng. Sai ở phía weight hoặc psum, không phải kiểu mất activation |
 | 20 | `PE.v:829–830`: tham chiếu "tiến" `gen_sparse_fsm.wght_addr_vec` / `wght_addr_use_vec` / `wght_data_use_vec` vào khối generate khai báo sau (dòng 978). Icarus, Verilator, Vivado hiểu đúng; **Yosys tạo dây 1 bit không ai lái** ("implicitly declared") | `hdl/PE.v` | **Chưa sửa** (phát hiện 2026-10-21). Cùng loại với #14 (nghĩa phụ thuộc công cụ). Đề xuất: khai báo 3 tín hiệu ở cấp module trước hai khối generate. |
 | 21 | Dense N > 32 output (cần 2 lượt psum): sai với mọi K | ? | **Chưa điều tra** (phát hiện 2026-10-21): K = 64, N = 40 chỉ đúng 10 output đầu, N = 48 chỉ đúng 12 output đầu; N = 32 đúng |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-15)
 
-**Định hướng (mốc phần cứng 2026-10-21: 64,0k LUT, 39,3k FF, 192 BRAM tile, đạt 250 MHz sau route; mốc chu kỳ `baseline_2026-10-15`, không đổi sau bản sửa #14 và 3 commit upstream):**
+**Định hướng (mốc phần cứng 2026-10-21 sau bản sửa #19: 63,9k LUT, 39,3k FF, 192 BRAM tile, đạt 250 MHz sau route; mốc chu kỳ `baseline_2026-10-15`, không đổi sau các bản sửa #14, #19 và 3 commit upstream):**
 
 | # | Việc | Loại | Vì sao | Trạng thái |
 |---|---|---|---|---|
@@ -1360,6 +1360,49 @@ Kết quả phụ cho lỗi #19 (Dense K > 512 sai, phát hiện 2026-10-19): K 
 | Chu kỳ, DMA | — | Không đổi |
 | Đồng bộ với upstream | Lệch 3 commit | Lệch ít hơn; `-x` giúp merge sau này nhận ra; phần mở rộng 0 là khác biệt riêng nhỏ (1 khối `generate`) |
 
+### Sửa lỗi #19: Dense có K > 512 input (2026-10-21, được bạn đồng ý)
+
+Chi tiết: `doc/experiments/2026-10-21_bug19_dense_k512.md` (mục 1–6 là điều tra, mục 8 là bản sửa và kiểm chứng).
+
+**Hai chỗ sửa** (thêm comment giải thích tại chỗ), không đổi Python:
+
+| File | Trước | Sau | Vì sao |
+|---|---|---|---|
+| `hdl/iact_stream_constructor.v:218` | `reg [ 8-1:0] x_pos_in_w_cycle;` | `reg [12-1:0] x_pos_in_w_cycle;` | Bộ đếm vị trí trong luồng (pixel với Conv, **cặp activation** với FC) quyết định cặp nào được ghi vào RAM iact. 8 bit quay vòng ở cặp 256 = activation 512, nên từ đó cặp không còn nằm trong cửa sổ ghi (`x_range_lower_bound` 12 bit) và **không bao giờ được ghi**; chỗ của nó nhận số 0 đệm. Nay rộng bằng `x_range_lower_bound`, `x_pos_inc`, `iact_x_add_up` (12 bit) |
+| `hdl/OpenEye_FPGA.v:2163` (`CONVERT_IACT`) | `if ((current_x >= 0) & ...` | `if ((fully_connected_layer \| (current_x >= 0)) & ...` | `current_x` là số có dấu 12 bit, đếm activation; từ 2048 nó đọc ra âm nên phép so có dấu loại bỏ mọi activation ≥ 2048 (chặn FC 3136 của MNIST). FC không có padding (`padding_x = 0`), `current_x` bắt đầu ở 0 và chỉ tăng, nên phép so dấu chỉ có ý nghĩa với padding của Conv; Conv giữ nguyên điều kiện cũ |
+
+Rào cản thứ hai được dự đoán từ việc đọc code và được kiểm chứng **trước** khi sửa: chỉ với chỗ sửa thứ nhất, K = 520, 784, 2046 đúng, K = 2050 sai và
+output khớp chính xác (10/10) giả thuyết "activation ≥ 2048 bị coi là 0" (ngưỡng 2046 hay 2044 đều không khớp).
+
+Không mở rộng `x_start` và `iact_converter_x` (vẫn 8 bit): với FC chúng chỉ mang độ lệch của từng hàng (đo được 0 và 18), mở rộng thì phải đổi cách đóng gói
+word tham số của bộ chuyển đổi; chúng chỉ là giới hạn với Conv có ảnh rộng hơn 255 pixel.
+
+**Kiểm chứng:**
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Loạt K, 10 output, dữ liệu ngẫu nhiên, từng output so với numpy | **14/14 PASS, 0 output sai**: K = 64, 256, 510, 512, **513, 520, 576, 784** (Dense của mạng MNIST), **1024, 2046, 2048, 2050, 3136** (FC của MNIST), **4032** |
+| Lockstep `iact_stream_constructor` (bản cũ `ef709b9` chạy song song trong mọi constructor, so 4 đầu ra mỗi chu kỳ), 125 test | **499 constructor OK, 0 sai khác**, 3.051.186 constructor-chu kỳ; 23 test GEMM chạy lại với bộ kiểm tra FC tắt: 60 constructor OK, 23/23 PASS |
+| Đối chứng: constructor đột biến (`>=` → `>` ở cửa sổ ghi) | Bị bắt ngay (`iact_data_o`, FAIL) |
+| Giám sát FC (`fc_guard_monitor.v`, module root riêng): chu kỳ có `fully_connected_layer = 1` và `current_x < 0`, trường hợp duy nhất điều kiện cũ/mới khác nhau | 57.283 chu kỳ FC trong 125 test, 11 chu kỳ có `current_x < 0`: mỗi chu kỳ ở một test Conv hai layer, khi `fully_connected_layer` lên 1 đúng một chu kỳ lúc nạp cấu hình layer sau (chạy lại có theo dõi trạng thái: luôn là `GET_PARAMETERS`, **0 chu kỳ trong `CONVERT_IACT`**, trạng thái duy nhất đánh giá điều kiện). Vậy điều kiện cũ và mới cho cùng kết quả ở mọi chu kỳ của bộ hồi quy. Lượt chạy lại GEMM: 24.390 chu kỳ FC, 0 chu kỳ âm |
+| Kết quả các bộ test | Giống hệt trước: Conv 34/34, GEMM/Dense 40/23 (23 do bộ kiểm tra FC, lỗi #5), MNIST/ngẫu nhiên 15 passed + 4 xfailed, ca mốc 9/9 |
+| 9 ca mốc (`run_profile --compare`) | 9/9 PASS, **0 chu kỳ, 0 word DMA** chênh lệch |
+| Lint Verilator | fpga 468 → 463: hết **5 cảnh báo `WIDTHEXPAND`** so `x_pos_in_w_cycle` 8 bit với giá trị 12 bit (Verilator đã chỉ đúng vào lỗi này từ trước), 0 cảnh báo mới; đã hạ baseline |
+| Vivado toàn thiết kế, 4 ns (`doc/synth/2026-10-21_route4ns_fix19_zu7ev/`) | 0 CRITICAL, danh sách cảnh báo giống hệt; FF +24, LUT −60 (mỗi constructor +3 FF, +10 LUT); BRAM/URAM/DSP không đổi; WNS +0,199 / +0,073 ns, đạt 250 MHz; đường găng không đổi |
+
+**Ưu và nhược điểm, trước và sau:**
+
+| | Trước | Sau |
+|---|---|---|
+| Dense K ≤ 512 | Đúng | Đúng (lockstep chứng minh hành vi constructor không đổi ở mọi test hiện có) |
+| Dense 512 < K ≤ 2048 (Dense 784 → 10) | **Sai**: activation ≥ 512 thành 0 | Đúng |
+| Dense K > 2048 (FC 3136 → 10) | **Sai**: activation ≥ 512 thành 0 | Đúng, tới K = 4032 (giới hạn mới: trường cấu hình 12 bit `iact_size_c` = K đã đệm ≤ 4095) |
+| Cách tránh bằng phần mềm (chia K ≤ 512, cộng psum trên CPU) | Cần thiết, tốn thêm một lần nạp weight/iact và một lần đọc kết quả cho mỗi khối | Không cần |
+| Tài nguyên, tần số | 39.285 FF, 63.970 LUT, WNS +0,070 ns | +24 FF (+0,06 %), −60 LUT, WNS +0,073 ns, vẫn 250 MHz |
+| Chu kỳ, DMA của các layer hiện có | — | Không đổi |
+| Lint | 5 cảnh báo độ rộng ở `x_pos_in_w_cycle` | Sạch |
+| Còn lại | — | Lỗi #19b (32 output, K ≥ 508) và #21 (> 32 output) không thuộc bản sửa này; `x_start`/`iact_converter_x` 8 bit vẫn giới hạn Conv rộng > 255 pixel |
+
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
 Output gốc đầy đủ: `doc/lint/verilator-5.020_2026-10-10.txt`; chạy lại đúng lệnh CI của upstream trên RTL hiện tại (2026-10-14, vẫn 38 warning, giống hệt):
@@ -1647,3 +1690,7 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   chỉ số 512 bị coi là 0. Probe trong `iact_stream_constructor` chỉ ra nguyên nhân: `x_pos_in_w_cycle` (8 bit) quay vòng ở cặp 256 nên các cặp đó không được ghi
   vào RAM iact. Đã loại: độ rộng bit của upstream `2bf497d`, trường 8 bit `iact_x_add_up` (K = 264/300 vẫn đúng), con trỏ bộ đệm weight, SPad địa chỉ weight.
   Phát hiện thêm #19b (N = 32 với K ≥ 508) và #21 (N > 32 sai với mọi K). Chi tiết: `doc/experiments/2026-10-21_bug19_dense_k512.md`.
+- **Sửa lỗi #19** (được bạn đồng ý): `iact_stream_constructor.v` bộ đếm `x_pos_in_w_cycle` 8 → 12 bit; `OpenEye_FPGA.v` điều kiện lưu của FC không dùng dấu của
+  `current_x` (rào cản K > 2048, dự đoán từ code và kiểm chứng trước khi sửa). Loạt K 64 … 4032 (gồm Dense 784 và FC 3136 của MNIST) 14/14 đúng từng output;
+  lockstep constructor trên 125 + 23 test 0 sai khác; 9 ca mốc 0 chu kỳ; lint fpga 468 → 463; Vivado (`doc/synth/2026-10-21_route4ns_fix19_zu7ev/`, mốc phần cứng mới)
+  đạt 250 MHz, +24 FF. Chi tiết: mục 9.

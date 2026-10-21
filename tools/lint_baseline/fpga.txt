@@ -316,10 +316,6 @@
 1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 12 bits on the RHS, but RHS's VARREF 'iact_words_per_compute' generates 8 bits.
 1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 16 bits on the RHS, but RHS's VARREF 'needed_iact_buffer_words_i' generates 12 bits.
 1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'router_cycle' generates 2 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 32 or 12 bits on the LHS, but LHS's VARREF 'x_pos_in_w_cycle' generates 8 bits.
-2	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator GTE expects 12 bits on the LHS, but LHS's VARREF 'x_pos_in_w_cycle' generates 8 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator LT expects 12 bits on the LHS, but LHS's VARREF 'x_pos_in_w_cycle' generates 8 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator LTE expects 12 bits on the LHS, but LHS's VARREF 'x_pos_in_w_cycle' generates 8 bits.
 1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator NEQ expects 16 bits on the RHS, but RHS's REPLICATE generates 15 bits.
 1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator SUB expects 32 or 12 bits on the RHS, but RHS's VARREF 'stride_x_i' generates 3 bits.
 1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator SUB expects 32 or 8 bits on the LHS, but LHS's VARREF 'channel_div_trans' generates 2 bits.

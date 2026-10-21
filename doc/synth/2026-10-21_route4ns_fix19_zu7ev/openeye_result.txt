@@ -1,0 +1,2 @@
+OPENEYE_RESULT post-synthesis part=xczu7ev-ffvc1156-2-e clock_ns=4 WNS=0.199 ns  fmax~263.1 MHz
+OPENEYE_RESULT post-route part=xczu7ev-ffvc1156-2-e clock_ns=4 WNS=0.073 ns  fmax~254.6 MHz

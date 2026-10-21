@@ -2156,7 +2156,11 @@ end
               // ceil(iact_size_x/2), a word count) while current_x counts
               // activations, so the sweep stopped at half the input. fc_size_reg
               // carries the full FC input size.
-              if ((current_x >= 0) & (current_y >= 0) &
+              // An FC layer has no padding: current_x starts at 0 and only
+              // counts up, so the sign test only guards convolution padding.
+              // From activation 2048 on the signed 12-bit current_x reads
+              // negative and dropped every later FC activation (bug #19).
+              if ((fully_connected_layer | (current_x >= 0)) & (current_y >= 0) &
                   (current_x < (fully_connected_layer ? fc_size_reg : iact_size_x)) &
                   (current_y < iact_size_y)) begin
                 iact_input_window       <= iact_input_window >> 16;
