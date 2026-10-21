@@ -1299,7 +1299,6 @@ end
         end
       end
     end
-    temp_var = 0;
   end
 
   // --- DMA output staging registers (main FSM Process 6) ---
