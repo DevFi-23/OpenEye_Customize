@@ -19,6 +19,7 @@ import open_eye.layer_parameters as lp
 import open_eye.simple_layer_operations as slo
 import open_eye.layer_execution_state as les
 import open_eye.data_create as data_create
+import open_eye.channel_pad as channel_pad
 import open_eye.tflite2model as tflite2model
 import open_eye.onnx2model as o2m
 from cocotb.logging import SimLogFormatter
@@ -310,10 +311,24 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
 
     # Process the layers of the model one after another
     max_layers = len(model)
-    layer_parameters = [0 for _ in range(len(model))]
-    for layer_number, layer in reversed(list(enumerate(model))):
-        layer_parameters[max_layers - layer_number - 1] = lp.LayerParameters(layer_parameters, layer, openeye_parameter, layer_number, max_layers)
-    layer_parameters = list(reversed(layer_parameters))
+
+    def build_layer_parameters(model):
+        layer_parameters = [0 for _ in range(len(model))]
+        for layer_number, layer in reversed(list(enumerate(model))):
+            layer_parameters[max_layers - layer_number - 1] = lp.LayerParameters(layer_parameters, layer, openeye_parameter, layer_number, max_layers)
+        return list(reversed(layer_parameters))
+
+    layer_parameters = build_layer_parameters(model)
+    # Bug #17 workaround (no RTL change): a one-channel first layer wider than
+    # one x pass gets a second input channel with zero activations
+    # (open_eye.channel_pad).
+    model, padded = channel_pad.pad_first_layer(model, layer_parameters)
+    if padded:
+        layer_parameters = build_layer_parameters(model)
+        layer_parameters[0].pad_channels = model[0].pad_channels
+        logger.info("%s: layer 0 input padded from %d to %d channels (bug #17; %s=0 turns this off)",
+                    channel_pad.PAD_CHANNELS_ENV, model[0].original_channels, layer_parameters[0].channels,
+                    channel_pad.PAD_CHANNELS_ENV)
     if os.environ.get("DUMP_LAYER_PARAMS"):
         for n, lpar in enumerate(layer_parameters):
             fields = sorted(k for k in vars(lpar) if k.startswith(("iact_read_", "iact_write_", "psum_pagu_"))
@@ -432,6 +447,8 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
             logger.info("layer-0 input activations (first 34): %s", flat[:34])
         except Exception as exc:
             logger.info("could not flatten layer-0 input (%s)", type(exc).__name__)
+    # After the debug hooks above, which fill every channel
+    channel_pad.fill_padding_channels(model, dram)
     test_amount = 1
     for _ in range(test_amount) :
         for layer_number, layer in enumerate(model):

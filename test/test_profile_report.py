@@ -136,6 +136,8 @@ def make_model_profile():
 def test_layer_labels():
     labels = [r["label"] for r in profile_report.summarise_layers(make_model_profile())]
     assert labels == ["Conv 8x4x2->4 k3x3", "Pool 8x4x4", "Dense 32->10"]
+    padded = dict(make_model_profile()["layers"][0]["info"], pad_channels=1)    # bug #17 workaround
+    assert profile_report.layer_label(padded, 0) == "Conv 8x4x1+1pad->4 k3x3"
 
 
 def test_layer_payload():
@@ -148,6 +150,9 @@ def test_layer_payload():
         "load_iact": 0, "load_wght": 32 * 10, "load_bias": 30, "load_quant": 50, "readout": 30}
     chained = dict(conv, skip_iact=1)
     assert profile_report.layer_payload_bytes(chained, config, last=False)["load_iact"] == 0
+    padded = dict(conv, pad_channels=1)         # the zero channel is overhead, not payload
+    assert profile_report.layer_payload_bytes(padded, config, last=False) == {
+        "load_iact": 8 * 4, "load_wght": 4 * 3 * 3, "load_bias": 4 * 3, "load_quant": 20}
 
 
 def test_summarise_layers():

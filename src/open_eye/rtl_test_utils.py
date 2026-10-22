@@ -1011,6 +1011,7 @@ def profile_set_layer_info(layer_parameters):
             "stride": _plain_int(getattr(lpar, "strideX", None), 1),
             "skip_iact": _plain_int(getattr(lpar, "skipIact", None), 0),
             "send_values_out": _plain_int(getattr(lpar, "send_values_out", None), 0),
+            "pad_channels": _plain_int(getattr(lpar, "pad_channels", None), 0),   # bug #17 workaround
         })
     _PROFILE_LAYER_INFO[:] = info
 

@@ -84,7 +84,9 @@ def layer_label(info, index):
         k = f" k{kernel[0]}x{kernel[1]}" if len(kernel) >= 2 else ""
         s = f" s{stride}" if stride != 1 else ""
         kind = "DWConv" if "Depthwise" in name else "Conv"
-        return f"{kind} {x}x{y}x{c}->{f}{k}{s}"
+        pad = info.get("pad_channels") or 0           # zero channels added for bug #17
+        channels = f"{c - pad}+{pad}pad" if pad and isinstance(c, int) else c
+        return f"{kind} {x}x{y}x{channels}->{f}{k}{s}"
     if name == "Dense":
         return f"Dense {x}->{f}"
     if "Pooling" in name:
@@ -98,6 +100,7 @@ def layer_payload_bytes(info, config, last):
     Same rules as payload_bytes: one byte per activation and weight, one bias
     and one quantization entry per filter, one psum per output. A chained layer
     loads no activations (skip_iact) and only the last layer reads results out.
+    Zero channels added for bug #17 (pad_channels) are overhead, not payload.
     """
     if not info:
         return {}
@@ -106,6 +109,7 @@ def layer_payload_bytes(info, config, last):
         x, y, c, f = (int(info[k]) for k in ("iact_size_x", "iact_size_y", "channels", "filters"))
     except (KeyError, TypeError, ValueError):
         return {}
+    c -= info.get("pad_channels") or 0
     psum_bytes = math.ceil(int(config["DATA_PSUM_BITWIDTH"]) / 8)
     quant = math.ceil(f * QUANT_ENTRY_BITS / 8)
     if name == "Convolution2D":

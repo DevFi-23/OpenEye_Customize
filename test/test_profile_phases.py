@@ -32,13 +32,16 @@ def test_profile_phase(main, psum, out_word, phase):
 
 def test_profile_set_layer_info():
     conv = types.SimpleNamespace(layer_name="Convolution2D", iact_size_x=28, iact_size_y=28, channels=2,
-                                 filters=32, kernel_size=(3, 3), strideX=1, skipIact=0, send_values_out=0)
+                                 filters=32, kernel_size=(3, 3), strideX=1, skipIact=0, send_values_out=0,
+                                 pad_channels=1)
     dense = types.SimpleNamespace(layer_name="Dense", iact_size_x=3136, iact_size_y=1, channels=1,
                                   filters=10, kernel_size=[0], strideX=1, skipIact=1, send_values_out=1)
     rtu.profile_set_layer_info([conv, dense])
     info = rtu._PROFILE_LAYER_INFO
     assert info[0] == {"name": "Convolution2D", "iact_size_x": 28, "iact_size_y": 28, "channels": 2,
-                       "filters": 32, "kernel": [3, 3], "stride": 1, "skip_iact": 0, "send_values_out": 0}
+                       "filters": 32, "kernel": [3, 3], "stride": 1, "skip_iact": 0, "send_values_out": 0,
+                       "pad_channels": 1}
     assert (info[1]["name"], info[1]["iact_size_x"], info[1]["skip_iact"]) == ("Dense", 3136, 1)
+    assert info[1]["pad_channels"] == 0             # not padded: attribute missing
     rtu.profile_set_layer_info([])
     assert rtu._PROFILE_LAYER_INFO == []
