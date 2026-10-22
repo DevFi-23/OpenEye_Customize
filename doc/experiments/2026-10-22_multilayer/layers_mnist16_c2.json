@@ -1,0 +1,90 @@
+[
+ {
+  "layer": 0,
+  "start_cycle": 0,
+  "phases": {
+   "load_config": 18,
+   "load_iact": 196,
+   "load_wght": 240,
+   "load_bias": 7168,
+   "load_quant": 20,
+   "convert_iact": 1091,
+   "wait_psum_idle": 54,
+   "compute": 6097,
+   "writeback": 3599
+  },
+  "in_words": 7642,
+  "out_words": 0
+ },
+ {
+  "layer": 1,
+  "start_cycle": 18483,
+  "phases": {
+   "load_config": 21,
+   "load_quant": 20,
+   "pooling": 2576
+  },
+  "in_words": 18,
+  "out_words": 0
+ },
+ {
+  "layer": 2,
+  "start_cycle": 21100,
+  "phases": {
+   "load_config": 21,
+   "load_wght": 1920,
+   "load_bias": 1792,
+   "load_quant": 20,
+   "convert_iact": 2375,
+   "wait_psum_idle": 102,
+   "compute": 11233,
+   "writeback": 911
+  },
+  "in_words": 3750,
+  "out_words": 0
+ },
+ {
+  "layer": 3,
+  "start_cycle": 39474,
+  "phases": {
+   "load_config": 21,
+   "load_quant": 20,
+   "pooling": 704
+  },
+  "in_words": 18,
+  "out_words": 0
+ },
+ {
+  "layer": 4,
+  "start_cycle": 40219,
+  "phases": {
+   "load_config": 21,
+   "load_wght": 960,
+   "load_bias": 448,
+   "load_quant": 20,
+   "convert_iact": 791,
+   "wait_psum_idle": 58,
+   "compute": 3617,
+   "writeback": 239
+  },
+  "in_words": 1446,
+  "out_words": 0
+ },
+ {
+  "layer": 5,
+  "start_cycle": 46373,
+  "phases": {
+   "load_config": 21,
+   "load_wght": 1980,
+   "load_bias": 12,
+   "load_quant": 20,
+   "convert_iact": 467,
+   "wait_psum_idle": 55,
+   "compute": 1079,
+   "writeback": 3,
+   "readout": 14
+  },
+  "in_words": 2030,
+  "out_words": 12
+ }
+]

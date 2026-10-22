@@ -1011,6 +1011,37 @@ Mỗi thay đổi RTL: test, `run_profile --compare`, Yosys (so sánh nhanh LUT)
 
 Mỗi bước đều đánh giá bằng `tools/run_profile.py --compare doc/perf/baseline_2026-10-15`, kèm thêm `--mem typical` để thấy lợi ích khi có bộ nhớ thực tế hơn.
 
+### 8d. Chạy cả một model nhiều layer (phân tích 2026-10-22)
+
+Chi tiết: `doc/experiments/2026-10-22_multilayer_model.md`, script `doc/experiments/2026-10-22_multilayer/`. Testbench chạy model **nối tiếp trên chip**:
+layer trung gian ghi kết quả đã lượng tử ngược vào bộ đệm iact (trạng thái 11), testbench so bộ đệm đó với tham chiếu của layer sau; chỉ layer cuối gửi
+kết quả ra.
+
+**Hiện trạng (dữ liệu ngẫu nhiên, sau bản sửa #19):**
+
+| Model | Kết quả |
+|---|---|
+| `LAYER=MNIST` của `data_create.py` (Conv 2→16, Pool, Conv 16→16, Pool, Conv 7×7 16→16, Dense 784→10), `NUM_GLB_IACT` 1 và 3 | **PASS** cả 6 layer |
+| Kiến trúc MNIST thật (`models/mnist_conv_net.py`: Conv 32, Pool, Conv 64, Pool, Conv 7×7 64, FC 3136→10), đầu vào **đệm thành 2 channel**, `QUANT_AMOUNT=64` | **PASS** cả 6 layer |
+| Như trên với **1 channel** (đúng model gốc) | FAIL ở bộ đệm iact sau Conv1 (lỗi #17) |
+
+**Còn thiếu để mô phỏng đúng model MNIST thật (ngữ nghĩa của testbench):** (1) lỗi #17: đệm 1 → 2 channel bằng Python (đã kiểm chứng, +9,5 % chu kỳ Conv1)
+hoặc sửa RTL; (2) dựng phần cứng với `QUANT_AMOUNT=64`; (3) nới ngưỡng phát hiện treo (layer 64 filter tính 90.000 chu kỳ trong trạng thái 11);
+(4) model khác: #19b, #21, layer nhiều lượt truyền.
+
+**Còn thiếu để chạy model int8 đã huấn luyện với kết quả đúng:** tham chiếu giữa các layer (`batchnorm_output`) chỉ là `floor(mant·x/2^shift)`, không kẹp,
+không ReLU, nên PASS ở trên không nói gì về độ chính xác. Cần: (A) kẹp int8 trong `quantization_unit.v` (thiếu → 9,3 % theo mô phỏng ngày 19/10); (B) ReLU
+(`af_cluster.v` không được nối) → gộp vào bộ kẹp có cận [qmin, qmax] lập trình được; (C) zero point cộng sau khi nhân (hiện offset cộng trước) hoặc lượng tử đối
+xứng; (D) làm tròn gần nhất; (E) mantissa bị cắt 8 bit (`OpenEye_FPGA.v:1345`); (F) lỗi #12 `current_filter`; (G) psum 20 bit thiếu (cần 21) → 24/32 bit kèm thu
+nhỏ bộ đệm psum; (H) luồng Python cho model thật: bộ chuyển TFLite/PyTorch int8, ảnh MNIST thật, mô hình numpy đúng từng bit của phần cứng + TFLite làm chuẩn,
+đo độ chính xác. A–F là RTL, cần bạn đồng ý. Cách không đổi RTL: chạy từng layer riêng, đọc psum ra, lượng tử/kẹp/ReLU/pool trên CPU rồi gửi lại (đúng nhưng
+tốn băng thông).
+
+**Đo pha khi chạy nhiều layer:** profiler hiện tại cộng dồn mọi layer, và với layer trung gian thì tính toán diễn ra trong trạng thái 11 nên bị ghi là `writeback`
+(`compute = 0`). Bản thử `probe_model.py` tách theo từng lần vào `GET_PARAMETERS` và tách trạng thái 10/11 theo FSM psum (1–3 = tính toán, 4/6 = ghi ngược).
+Model MNIST thật (2 channel, bộ nhớ lý tưởng): **244.052 chu kỳ = 976 µs ở 250 MHz**; tính toán 62 %, nạp weight 16 %, nạp bias 10 % (40 % của Conv1), ghi ngược
+5 %, chuyển đổi 4 %, pooling 3 %; Conv2 là layer nặng nhất (121.162 chu kỳ). Đề xuất đưa vào `profile_dma_phases` / `profile_report` / `run_profile` (chỉ Python).
+
 ## 9. Các lỗi đã biết và các bản sửa RTL
 
 **Số channel vào và `NUM_GLB_IACT`** (đo ngày 2026-10-09: một layer Conv, input 8×1, 4 filter, ramp, 2×2 cluster, `QUANT_AMOUNT=32`):
@@ -1694,3 +1725,10 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   `current_x` (rào cản K > 2048, dự đoán từ code và kiểm chứng trước khi sửa). Loạt K 64 … 4032 (gồm Dense 784 và FC 3136 của MNIST) 14/14 đúng từng output;
   lockstep constructor trên 125 + 23 test 0 sai khác; 9 ca mốc 0 chu kỳ; lint fpga 468 → 463; Vivado (`doc/synth/2026-10-21_route4ns_fix19_zu7ev/`, mốc phần cứng mới)
   đạt 250 MHz, +24 FF. Chi tiết: mục 9.
+
+### 2026-10-22
+
+- **Phân tích chạy cả model nhiều layer** (không sửa RTL): model `LAYER=MNIST` và kiến trúc MNIST thật (đầu vào đệm 2 channel, `QUANT_AMOUNT=64`) chạy đúng cả
+  6 layer nối tiếp trên chip; với 1 channel thì fail do lỗi #17. Liệt kê những gì còn thiếu cho model int8 thật (kẹp int8, ReLU, zero point, làm tròn, mantissa,
+  #12, độ rộng psum, luồng Python) và cách đo pha theo từng layer (bản thử profiler, kết quả 976 µs cho MNIST). Mục 8d,
+  `doc/experiments/2026-10-22_multilayer_model.md`.
