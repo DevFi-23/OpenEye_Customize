@@ -12,9 +12,14 @@ needs (e.g. F*C*Kx*Ky weight bytes) and the resulting bus efficiency:
 
     efficiency = payload bytes / (DMA words * DMA_BITWIDTH / 8)
 
+A whole-model profile (several layer streams, test_profile_model) also
+carries the counters per layer; the report adds a table with one row per
+layer (cycles per phase, DMA words, and for Conv/Dense layers the payload
+and bus efficiency of the layer).
+
 With --compare it puts two sets of profiles side by side (e.g. a saved
 baseline and the profiles of a modified RTL), matched by case name, and
-prints the change per phase and per case.
+prints the change per phase, per layer (models) and per case.
 
 Profiles can be given as profile.json files or as directories: a directory
 of snapshots (<case>.json, as in doc/perf/baseline_*/) or of simulation
@@ -67,6 +72,109 @@ def payload_bytes(config):
     }
 
 
+def layer_label(info, index):
+    """Short name of one layer from the description profile_set_layer_info wrote."""
+    if not info:
+        return f"layer {index}"
+    name = info.get("name", "?")
+    x, y, c, f = info.get("iact_size_x"), info.get("iact_size_y"), info.get("channels"), info.get("filters")
+    kernel = info.get("kernel") or []
+    stride = info.get("stride") or 1
+    if "Conv" in name:
+        k = f" k{kernel[0]}x{kernel[1]}" if len(kernel) >= 2 else ""
+        s = f" s{stride}" if stride != 1 else ""
+        kind = "DWConv" if "Depthwise" in name else "Conv"
+        return f"{kind} {x}x{y}x{c}->{f}{k}{s}"
+    if name == "Dense":
+        return f"Dense {x}->{f}"
+    if "Pooling" in name:
+        return f"Pool {x}x{y}x{c}"
+    return name
+
+
+def layer_payload_bytes(info, config, last):
+    """Bytes each phase of one model layer must move at minimum; {} if unknown.
+
+    Same rules as payload_bytes: one byte per activation and weight, one bias
+    and one quantization entry per filter, one psum per output. A chained layer
+    loads no activations (skip_iact) and only the last layer reads results out.
+    """
+    if not info:
+        return {}
+    name = info.get("name", "")
+    try:
+        x, y, c, f = (int(info[k]) for k in ("iact_size_x", "iact_size_y", "channels", "filters"))
+    except (KeyError, TypeError, ValueError):
+        return {}
+    psum_bytes = math.ceil(int(config["DATA_PSUM_BITWIDTH"]) / 8)
+    quant = math.ceil(f * QUANT_ENTRY_BITS / 8)
+    if name == "Convolution2D":
+        kernel = info.get("kernel") or []
+        if len(kernel) < 2:
+            return {}
+        stride = info.get("stride") or 1
+        payload = {"load_iact": 0 if info.get("skip_iact") else x * y * c,
+                   "load_wght": f * c * kernel[0] * kernel[1],
+                   "load_bias": f * psum_bytes, "load_quant": quant}
+        if last:
+            payload["readout"] = math.ceil(x / stride) * math.ceil(y / stride) * f * psum_bytes
+        return payload
+    if name == "Dense":               # iact_size_x = inputs (K), filters = outputs (N)
+        payload = {"load_iact": 0 if info.get("skip_iact") else x,
+                   "load_wght": x * f, "load_bias": f * psum_bytes, "load_quant": quant}
+        if last:
+            payload["readout"] = f * psum_bytes
+        return payload
+    return {}
+
+
+LOAD_PHASES = ("load_config", "load_iact", "load_quant")   # the "load" column of the layer table
+
+
+def summarise_layers(profile):
+    """One row per layer of a whole-model profile ([] for profiles without per-layer counters)."""
+    layers = profile.get("layers") or []
+    config = profile["config"]
+    word_bytes = config["DMA_BITWIDTH"] // 8
+    total = profile["total_cycles"]
+    rows = []
+    for layer in layers:
+        phases = layer.get("phases", {})
+        info = layer.get("info")
+        payload = layer_payload_bytes(info, config, layer["index"] == len(layers) - 1)
+        cycles = sum(p["cycles"] for p in phases.values())
+        need = sum(payload.values()) if payload else None
+        moved = sum(phases[p]["in_accepted"] + phases[p]["out_words"] for p in payload if p in phases)
+        rows.append({
+            "index": layer["index"],
+            "label": layer_label(info, layer["index"]),
+            "cycles": cycles,
+            "share": cycles / total if total else 0.0,
+            "phase_cycles": {name: p["cycles"] for name, p in phases.items()},
+            "in_words": sum(p["in_accepted"] for p in phases.values()),
+            "out_words": sum(p["out_words"] for p in phases.values()),
+            "payload_bytes": need,
+            "efficiency": need / (moved * word_bytes) if need is not None and moved else None,
+        })
+    return rows
+
+
+def print_layer_table(rows, clock_ns, clock_label):
+    """Markdown table: one row per layer, cycles per phase; time = cycles * clock_ns."""
+    print(f"\n| # | layer | cycles | share | us ({clock_label}) | load | load_wght | load_bias | convert_iact | compute "
+          "| writeback | pooling | readout | DMA in | DMA out | bus eff. |")
+    print("|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    for r in rows:
+        pc = r["phase_cycles"]
+        load = sum(pc.get(p, 0) for p in LOAD_PHASES)
+        cells = [pc.get(p, 0) for p in ("load_wght", "load_bias", "convert_iact", "compute",
+                                         "writeback", "pooling", "readout")]
+        us = r["cycles"] * clock_ns / 1000
+        print(f"| {r['index']} | {r['label']} | {r['cycles']} | {r['share']:.1%} | {us:.1f} | {load} | "
+              + " | ".join(str(v) for v in cells)
+              + f" | {r['in_words']} | {r['out_words']} | {_eff(r['efficiency'])} |")
+
+
 def summarise(profile):
     config = profile["config"]
     phases = profile["phases"]
@@ -99,15 +207,16 @@ def case_name(path):
     """Case name of a profile: <case>.json -> case; .../<sim dir>/profile.json -> sim dir.
 
     Simulation directories of test_profile.py are named after the pytest node
-    id, e.g. test_cocotb_fpga_test_profile.py_test_profile_conv_8x1_f4_q32_dma64_;
-    only the parameter id (8x1_f4_q32_dma64) is kept.
+    id, e.g. test_cocotb_fpga_test_profile.py_test_profile_conv_8x1_f4_q32_dma64_
+    or ..._test_profile_model_model_mnist16_c2_; only the parameter id
+    (8x1_f4_q32_dma64, model_mnist16_c2) is kept.
     """
     path = os.path.abspath(path)
     base = os.path.basename(path)
     if base != "profile.json":
         return os.path.splitext(base)[0]
     name = os.path.basename(os.path.dirname(path))
-    m = re.search(r"test_profile_conv_(.+?)_?$", name)
+    m = re.search(r"test_profile_(?:conv|model)_(.+?)_?$", name)
     return m.group(1) if m else name
 
 
@@ -133,11 +242,28 @@ def memory_name(config):
     return (config.get("MEMORY") or {}).get("name", "ideal (legacy driver)")
 
 
-def describe(config):
-    return ("{LAYER} {INPUT_SIZE_X}x{INPUT_SIZE_Y}x{INPUT_CHANNELS} k{KERNEL_SIZE_X}x{KERNEL_SIZE_Y} "
-            "f{NUM_FILTERS} | {CLUSTER_ROWS}x{CLUSTER_COLUMNS} clusters, DMA {DMA_BITWIDTH} b, "
+def describe(config, layers=1):
+    if layers > 1:
+        # Whole model: the INPUT_*/KERNEL_* variables do not describe it.
+        layer = f"{config.get('LAYER')} ({layers} layers)"
+    else:
+        layer = ("{LAYER} {INPUT_SIZE_X}x{INPUT_SIZE_Y}x{INPUT_CHANNELS} k{KERNEL_SIZE_X}x{KERNEL_SIZE_Y} "
+                 "f{NUM_FILTERS}").format(**config)
+    return (layer + " | {CLUSTER_ROWS}x{CLUSTER_COLUMNS} clusters, DMA {DMA_BITWIDTH} b, "
             "psum {DATA_PSUM_BITWIDTH} b, QUANT_AMOUNT {QUANT_AMOUNT}").format(**config) \
         + f" | memory: {memory_name(config)}"
+
+
+# Real clock for the time columns of the layer table (--clock-mhz); None: the
+# simulation clock of the profile (CLOCK_NS), which is not the FPGA clock.
+CLOCK_MHZ = None
+
+
+def report_clock(config):
+    """(ns per cycle, label) for converting cycles to time in the report."""
+    if CLOCK_MHZ:
+        return 1000.0 / CLOCK_MHZ, f"{CLOCK_MHZ:g} MHz"
+    return config["CLOCK_NS"], f"sim clock {config['CLOCK_NS']} ns"
 
 
 def print_report(case, profile, rows):
@@ -145,8 +271,9 @@ def print_report(case, profile, rows):
     total = profile["total_cycles"]
     words = sum(r["in_words"] + r["out_words"] for r in rows)
     compute = sum(r["cycles"] for r in rows if r["phase"] == "compute")
+    layer_rows = summarise_layers(profile)
     print(f"\n## {case}")
-    print(describe(config))
+    print(describe(config, len(layer_rows)))
     stall = sum(r["mem_stall"] for r in rows)
     print(f"total {total} cycles ({total * config['CLOCK_NS']} ns), compute {compute / total:.1%}, "
           f"DMA busy {words / total:.1%} of cycles, waiting for memory {stall / total:.1%}\n")
@@ -158,6 +285,8 @@ def print_report(case, profile, rows):
         drop = f" ({r['refused_words']} refused)" if r["refused_words"] else ""
         print(f"| {r['phase']} | {r['cycles']} | {r['share']:.1%} | {r['in_words']}{drop} | "
               f"{r['out_words']} | {r['mem_stall']} | {need} | {eff} |")
+    if len(layer_rows) > 1:
+        print_layer_table(layer_rows, *report_clock(config))
 
 
 # Configuration keys that must agree for two profiles to be comparable
@@ -211,6 +340,17 @@ def compare_rows(base_profile, new_profile):
     return rows
 
 
+def compare_layer_rows(base_profile, new_profile):
+    """Per-layer comparison rows; [] unless both profiles have the same number (> 1) of layers."""
+    base, new = summarise_layers(base_profile), summarise_layers(new_profile)
+    if len(base) < 2 or len(base) != len(new):
+        return []
+    return [{"index": n["index"], "label": n["label"],
+             "cycles_base": b["cycles"], "cycles_new": n["cycles"],
+             "words_base": b["in_words"] + b["out_words"], "words_new": n["in_words"] + n["out_words"]}
+            for b, n in zip(base, new)]
+
+
 def print_comparison(base, new):
     """Markdown comparison of two {case: (path, profile)} sets."""
     common = [c for c in sorted(base) if c in new]
@@ -219,7 +359,7 @@ def print_comparison(base, new):
         b, n = base[case][1], new[case][1]
         rows = compare_rows(b, n)
         print(f"\n## {case}")
-        print(describe(n["config"]))
+        print(describe(n["config"], len(n.get("layers") or [])))
         mismatch = [k for k in COMPARE_CONFIG_KEYS
                     if str(b["config"].get(k)) != str(n["config"].get(k))]
         if mismatch:
@@ -238,7 +378,18 @@ def print_comparison(base, new):
             print(f"| {bold}{r['phase']}{bold} | {r['cycles_base']} | {r['cycles_new']} | "
                   f"{_delta(r['cycles_base'], r['cycles_new'])} | {r['words_base']} | {r['words_new']} | "
                   f"{_delta(r['words_base'], r['words_new'])} | {r['stall_base']} -> {r['stall_new']} | {eff} |")
+        layer_rows = compare_layer_rows(b, n)
+        if layer_rows:
+            print("\n| # | layer | cycles base | cycles new | change | DMA words base | DMA words new | change |")
+            print("|---:|---|---:|---:|---:|---:|---:|---:|")
+            for r in layer_rows:
+                print(f"| {r['index']} | {r['label']} | {r['cycles_base']} | {r['cycles_new']} | "
+                      f"{_delta(r['cycles_base'], r['cycles_new'])} | {r['words_base']} | {r['words_new']} | "
+                      f"{_delta(r['words_base'], r['words_new'])} |")
         summary.append((case, rows[-1]))
+    # Cases the baseline does not have yet: their plain report (with the layer table)
+    for case in sorted(set(new) - set(base)):
+        print_report(case, new[case][1], summarise(new[case][1]))
 
     print("\n## Summary\n")
     print("| case | cycles base | cycles new | change | DMA words base | DMA words new | change |")
@@ -259,7 +410,11 @@ def main(argv=None):
     parser.add_argument("--csv", help="also write one row per (profile, phase) to this file")
     parser.add_argument("--compare", action="append", metavar="BASELINE",
                         help="baseline profile file or directory to compare against (repeatable)")
+    parser.add_argument("--clock-mhz", type=float,
+                        help="FPGA clock for the time column of the layer table (default: the simulation clock)")
     args = parser.parse_args(argv)
+    global CLOCK_MHZ
+    CLOCK_MHZ = args.clock_mhz
 
     profiles = load_profiles(args.profiles)
     if args.compare:

@@ -87,3 +87,8 @@ The 16-filter `LAYER=MNIST` net: 50,024 cycles = 200 us (compute 44 %, bias 19 %
 Proposed integration (Python only): per-layer counters in `profile_dma_phases` (a `layers` list next to the totals), the
 state 10/11 split by the psum FSM, a per-layer table and model totals in `profile_report`, and model cases (for example the
 MNIST nets) in `tools/run_profile.py` with `--compare`.
+
+**Done the same day** (README section 6.13): the cases `model_mnist16_c2` and `model_mnist_real_c2` of `test_profile.py`, the
+`layers` list of `profile.json`, the per-layer table of `profile_report`, baseline `doc/perf/baseline_2026-10-22/`. The numbers
+above came from unseeded runs; with `OPENEYE_SEED=1` the nets take 50,020 and 244,050 cycles, and the integrated profiler matches
+`probe_model.py` on all 6 layers (start cycles, DMA words and every phase, with `wait_psum_idle` counted as `writeback`).

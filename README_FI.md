@@ -498,6 +498,15 @@ Khảo sát ngày 2026-10-10 (đều `QUANT_AMOUNT=32`, `NUM_GLB_IACT=1`): **PAS
 `test/cocotb_fpga/test_mnist_layers.py::test_mnist_conv`: Conv2 (14×14, 32 → 64, `QUANT_AMOUNT=64`) **PASS** từ sau bản sửa lỗi #18; Conv3 đúng mọi giá trị
 nhưng còn lỗi #9; Conv1 còn lỗi #17. Lưu ý: trước bản sửa lỗi #18, các case > 4 channel chỉ "PASS" vì weight hằng số che lỗi (mục 9).
 
+**Cập nhật 2026-10-22: hai case "cả model"** (`test_profile_model`, chạy nối tiếp trên chip, dữ liệu ngẫu nhiên với seed cố định `OPENEYE_SEED=1`):
+
+| Case | Model | QUANT_AMOUNT | Thời gian chạy |
+|---|---|---:|---:|
+| `model_mnist16_c2` | `LAYER=MNIST`: Conv 28×28×2→16, MaxPool, Conv 16→16, MaxPool, Conv 7×7 16→16, Dense 784→10 | 32 | ~4 phút |
+| `model_mnist_real_c2` | `LAYER=MNIST_REAL` = kiến trúc `models/mnist_conv_net.py` (Conv 32, MaxPool, Conv 64, MaxPool, Conv 64, FC 3136→10), đầu vào đệm thành 2 channel (lỗi #17) | 64 | ~11 phút |
+
+`-k "not model"` chỉ chạy 9 case một layer; `-k model` chỉ chạy 2 case model. Mốc gồm cả 11 case: `doc/perf/baseline_2026-10-22/` (mục 6.13).
+
 ### 6.8 Thêm một case mới
 
 Thêm một dòng vào `CASES` trong `test/cocotb_fpga/test_profile.py`:
@@ -519,14 +528,14 @@ Chạy thử với `-k tên_case`; nếu PASS thì thêm vào snapshot bằng `-
 
 ### 6.10 Profiler hoạt động thế nào
 
-Coroutine cocotb lấy mẫu **mỗi cạnh lên của clock**. Với mỗi chu kỳ, nó xác định pha (FSM chính, hoặc `readout` khi FSM psum
-ở `PSUM_SEND_RESULTS`) và đếm: `cycles`, `in_offered` (host đưa word), `in_accepted` (`enable_dma_i_reg & ready_dma_o`),
+Coroutine cocotb lấy mẫu **mỗi cạnh lên của clock**. Với mỗi chu kỳ, nó xác định pha (hàm `profile_phase`: FSM chính; `readout` khi FSM psum
+ở `PSUM_SEND_RESULTS`; ở trạng thái 11 `RECEIVE_PSUMS_TO_IACT` thì FSM psum tách `compute` với `writeback`, mục 6.13) và đếm: `cycles`, `in_offered` (host đưa word), `in_accepted` (`enable_dma_i_reg & ready_dma_o`),
 `out_words` (`enable_dma_o & ready_dma_i`), `in_stall` (pha nạp, DUT sẵn sàng nhưng không có word), `out_stall` (có kết quả nhưng
 `ready_dma_i` thấp). Cửa sổ đo bắt đầu từ word vào đầu tiên được nhận và kết thúc ở word ra cuối cùng. File `profile.json` được ghi lại
 mỗi khi đổi pha và sau mỗi word ra, nên vẫn còn khi test FAIL hoặc treo.
 
-Giới hạn: payload và hiệu suất bus chỉ tính cho `Convolution_Single` (việc 0.2 sẽ mở rộng cho Dense và lượt nhiều layer).
-**Chưa đo được MNIST nguyên model**: `model_test` bị tắt, Conv1 thật còn lỗi #17, Conv3 lỗi #9, layer FC lỗi #5, và chuỗi nhiều layer chưa ổn định.
+Cùng các bộ đếm đó được giữ **theo từng layer** (`layers` trong `profile.json`, mục 6.13). Payload và hiệu suất bus: cho `Convolution_Single` ở bảng pha,
+và cho từng layer Conv/Dense của một model ở bảng layer. Từ 2026-10-22 đo được cả model MNIST (2 case `test_profile_model`).
 
 ### 6.11 Công thức tính (chi tiết)
 
@@ -542,7 +551,10 @@ Mỗi cạnh lên của `clk_i`, profiler đọc 4 tín hiệu bắt tay của R
 | `in_stall` (chỉ ở pha `load_*`) | `r_in · (1 − v_in)`: DUT sẵn sàng nhưng bộ nhớ chưa có word |
 | `out_stall` | `v_out · (1 − r_out)`: có kết quả nhưng phía ghi chưa nhận |
 
-- **Pha của chu kỳ:** `readout` nếu FSM psum ở `PSUM_SEND_RESULTS` (5) hoặc đang có `out_word`; ngược lại theo trạng thái FSM chính (bảng mục 5.1).
+- **Pha của chu kỳ** (`profile_phase`): `readout` nếu FSM psum ở `PSUM_SEND_RESULTS` (5) hoặc đang có `out_word`; nếu FSM chính ở 11 (`RECEIVE_PSUMS_TO_IACT`,
+  layer nối tiếp) thì `compute` khi FSM psum ở 1–3 (`WAIT_TO_SEND_READY_SIGNAL`, `CALCULATE_PSUM`, `PSUM_GET_RESULTS`) và `writeback` khi ở trạng thái khác
+  (`SEND_PSUM_TO_IACT`, ...); ngược lại theo trạng thái FSM chính (bảng mục 5.1). Layer đơn không vào trạng thái 11 nên số liệu cũ không đổi.
+- **Ranh giới layer:** một layer mới bắt đầu ở mỗi lần FSM chính vào `GET_PARAMETERS` (1), tức mỗi stream layer. Bộ đếm của mọi layer cộng lại đúng bằng `phases`.
 - **Cửa sổ đo:** từ chu kỳ có `in_accepted` đầu tiên tới chu kỳ có `out_words` cuối cùng (cả hai đầu đều tính). Các chu kỳ sau word ra cuối nằm ở `pending`, không tính.
   Vì vậy **độ trễ layer** = `total_cycles` = Σ `cycles` của mọi pha = số chu kỳ từ khi DUT nhận word cấu hình đầu tiên tới khi gửi xong kết quả cuối.
   Không gồm: thời gian trước word đầu (reset, CPU cấu hình DMA), độ trễ của burst đầu tiên khi bật mô hình bộ nhớ, và overhead phần mềm.
@@ -551,11 +563,14 @@ Mỗi cạnh lên của `clk_i`, profiler đọc 4 tín hiệu bắt tay của R
   - `compute` = `cycles(compute) / total_cycles`
   - `DMA busy` = `Σ (in_accepted + out_words) / total_cycles` (tỉ lệ chu kỳ có word trên bus; tối đa có thể vượt 100 % nếu vào và ra cùng chu kỳ)
   - `waiting for memory` = `Σ (in_stall + out_stall) / total_cycles`
-  - `bus eff.` = `payload(pha) / ((in_accepted + out_words) · W)`; payload theo mục 5.3 (chỉ cho `Convolution_Single`)
+  - `bus eff.` = `payload(pha) / ((in_accepted + out_words) · W)`; payload theo mục 5.3 (cho `Convolution_Single`)
+  - `bus eff.` của một layer trong model = `Σ payload(pha) / (Σ (in_accepted + out_words) · W)` trên các pha có payload; payload tính từ kích thước
+    layer: Conv `X·Y·C` iact (chỉ layer đầu), `F·C·Kx·Ky` weight, `F·⌈psum/8⌉` bias, `⌈F·40/8⌉` bảng lượng tử, `⌈X/s⌉·⌈Y/s⌉·F·⌈psum/8⌉` readout
+    (chỉ layer cuối); Dense `K` iact, `K·N` weight, `N·⌈psum/8⌉` bias và readout; Pooling không tính
   - `change` = `new − base`, phần trăm = `(new − base) / base`
   - `total ... ns` = `total_cycles × CLOCK_NS`. **Chú ý:** `CLOCK_NS` là chu kỳ clock **giả định của mô phỏng** (10 hoặc 20 ns), không phải clock thật.
 - **Đổi ra thời gian thật:** `t = total_cycles / f_clk`, với `f_clk` lấy từ Vivado sau route (hiện 250 MHz, tức 4 ns/chu kỳ).
-  Ví dụ `mnist1`: 65.800 × 4 ns = 263,2 µs.
+  Ví dụ `mnist1`: 55.048 × 4 ns = 220,2 µs. Báo cáo đổi sẵn khi chạy với `--clock-mhz 250`.
 - **Ví dụ kiểm tra tay** (`8x1_f4_q32_dma64`, baseline): pha 18 + 4 + 120 + 32 + 20 + 179 + 161 + 34 = **568** chu kỳ; word vào 194, ra 32, tổng 226 →
   `DMA busy` = 226/568 = 39,8 %, `compute` = 161/568 = 28,3 %. Weight: payload 4 × 4 × 3 × 3 = 144 B, bus 120 × 8 = 960 B → 15 %.
   Bias: 4 × 3 = 12 B / (32 × 8) = 5 %. Readout: 8 × 1 × 4 = 32 output × 3 B = 96 B / (32 × 8) = 38 %.
@@ -578,6 +593,66 @@ hai bên hoặc một lỗi "đọc nhầm weight" (lỗi #18) vẫn PASS.
 
 Dữ liệu ngẫu nhiên: `_run_conv_const(..., random_data=True)` bỏ các hook hằng số/dốc. Các test `test_mnist_layers.py::test_random_data` và `test_mnist_conv` tự
 chạy công cụ sau mô phỏng.
+
+### 6.13 Đo pha khi chạy cả model (theo từng layer, 2026-10-22)
+
+**Vấn đề trước đây:** profiler cộng dồn mọi layer vào một bảng pha, và với layer nối tiếp (kết quả ghi ngược vào bộ đệm iact cho layer sau) thì
+FSM chính **tính toán ngay trong trạng thái 11** `RECEIVE_PSUMS_TO_IACT`, nên toàn bộ thời gian tính bị ghi thành `writeback` (`compute = 0`).
+
+**Cách làm bây giờ** (chỉ Python, không đổi RTL):
+1. `rtl_test_utils.profile_phase(main, psum, out_word)`: ở trạng thái 11, FSM psum ở 1–3 là `compute`, ở trạng thái khác là `writeback`.
+2. `profile_dma_phases` mở một layer mới mỗi lần FSM chính vào `GET_PARAMETERS`; mỗi layer có bộ đếm riêng (cùng 6 đại lượng như mục 6.11), cùng quy
+   tắc cửa sổ đo; tổng các layer = `phases`.
+3. Testbench gọi `rtl_test_utils.profile_set_layer_info(layer_parameters)` (khi `OPENEYE_PROFILE=1`) để ghi tên và kích thước từng layer.
+4. `OPENEYE_SEED=<n>` cố định dữ liệu ngẫu nhiên bằng `tf.keras.utils.set_random_seed` (Python `random`, numpy của `DRAMContents`, khởi tạo weight của
+   Keras), vì phần sparse làm số chu kỳ phụ thuộc dữ liệu. `tf.random.set_seed` thôi là **không đủ**: Keras 3 có bộ sinh seed riêng, lần thử đầu cho 2 lần
+   chạy lệch 5 chu kỳ ở layer Dense.
+5. `profile_report` in thêm **bảng theo layer** và so sánh theo layer khi `--compare`; `--clock-mhz 250` đổi chu kỳ ra µs ở clock thật.
+
+```bash
+venv/bin/python tools/run_profile.py -k model --clock-mhz 250                                     # 2 case model
+venv/bin/python tools/run_profile.py -k model --compare doc/perf/baseline_2026-10-22 --clock-mhz 250
+venv/bin/python -m open_eye.profile_report --clock-mhz 250 doc/perf/baseline_2026-10-22/model_mnist_real_c2.json
+```
+
+Khi `--compare`, case có trong mốc được so từng pha và từng layer (`cycles base/new`, `DMA words base/new`); case chưa có trong mốc được in báo cáo đầy đủ
+(kèm bảng layer).
+
+`profile.json` có thêm `layers`: mỗi phần tử gồm `index`, `start_cycle`, `total_cycles`, `phases` (như `phases` tổng) và `info` (`name`, `iact_size_x/y`,
+`channels`, `filters`, `kernel`, `stride`, `skip_iact`, `send_values_out`).
+
+**Kết quả `model_mnist_real_c2`** (kiến trúc MNIST thật, đầu vào 2 channel, bộ nhớ lý tưởng, `OPENEYE_SEED=1`): **244.050 chu kỳ = 976 µs ở 250 MHz**.
+
+| # | Layer | Chu kỳ | Tỉ lệ | µs @250 MHz | load (cấu hình, iact, lượng tử) | load_wght | load_bias | convert | compute | writeback | pooling | DMA vào | bus eff. |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | Conv 28×28×2→32 | 35.591 | 14,6 % | 142,4 | 254 | 480 | **14.336** | 1.091 | 12.193 | 7.237 | 0 | 15.070 | 2 % |
+| 1 | Pool 28×28×32 | 5.213 | 2,1 % | 20,9 | 61 | 0 | 0 | 0 | 0 | 0 | 5.152 | 18 | |
+| 2 | Conv 14×14×32→64 | 121.162 | **49,6 %** | 484,6 | 61 | 15.360 | 7.168 | 4.679 | **90.193** | 3.701 | 0 | 22.586 | 10 % |
+| 3 | Pool 14×14×64 | 2.861 | 1,2 % | 11,4 | 61 | 0 | 0 | 0 | 0 | 0 | 2.800 | 18 | |
+| 4 | Conv 7×7×64→64 | 65.210 | 26,7 % | 260,8 | 61 | 15.360 | 1.792 | 2.951 | 44.033 | 1.013 | 0 | 17.210 | 27 % |
+| 5 | Dense 3136→10 | 14.013 | 5,7 % | 56,1 | 61 | 7.920 | 12 | 1.655 | 4.351 | 0 | 0 | 7.990 | 49 % |
+
+Cả model: tính toán 61,8 %, nạp weight 16,0 %, nạp bias 9,6 % (40 % của Conv1), ghi ngược 4,9 %, chuyển đổi iact 4,3 %, pooling 3,3 %.
+`model_mnist16_c2`: 50.020 chu kỳ = 200 µs (tính toán 44 %, nạp bias 19 %, nạp weight 10 %, ghi ngược 10 %, chuyển đổi iact 9 %).
+Layer có kích thước iact 7×7 dùng kernel 3×3 (nhãn `Conv 7x7x64->64 k3x3`).
+
+**Cách đọc:**
+- `load` = `load_config + load_iact + load_quant`. Chỉ layer đầu nạp iact (196 chu kỳ); các layer sau đọc iact từ bộ đệm (`skip_iact`).
+- Layer cuối (Dense) không ở trạng thái 11 mà ở trạng thái 10 (chờ kết quả) nên `writeback = 0`, và chỉ layer cuối có `readout`.
+- `bus eff.` thấp ở Conv1 (2 %) vì 14.336 word bias chỉ chứa 32 giá trị khác nhau: đúng chỗ tối ưu "bias theo filter" (mục 8c) có lợi nhất.
+- Ở layer pooling, FSM vẫn ở pha nạp bảng lượng tử 40 chu kỳ (`QUANT_AMOUNT=64`; 20 với 32) nhưng **không nhận word nào** (driver đưa 40 word, chip
+  từ chối cả 40): 80 chu kỳ phí trên cả model, ứng viên nhỏ cho Giai đoạn 1.
+- Ngưỡng phát hiện treo của case model là 400.000 chu kỳ (`OPENEYE_FAIL_ON_STALL`), vì Conv2 tính 90.000 chu kỳ trong cùng một trạng thái.
+
+**Kiểm chứng (2026-10-22):**
+- 9 case một layer: mọi bộ đếm của mọi pha trùng với `baseline_2026-10-15` (tổng chu kỳ và số word ở bảng tóm tắt của `run_profile` lệch 0).
+- 2 case model: tổng các layer = tổng `phases` (từng pha, từng bộ đếm); `start_cycle` trùng với chu kỳ bắt đầu layer mà testbench ghi; chạy 2 lần cùng
+  `OPENEYE_SEED=1` cho file `profile.json` giống hệt nhau.
+- Đối chiếu với bản thử `probe_model.py` (cùng seed, đo độc lập bằng probe riêng): 6/6 layer khớp `start_cycle`, số word DMA vào/ra và mọi pha, sau khi quy đổi
+  cách gọi tên (bản thử tách thêm `wait_psum_idle` = FSM psum ở 0 trong trạng thái 11, ở đây tính vào `writeback`; với layer cuối, bản thử gọi phần trạng thái 10
+  ngoài FSM psum 1–3 là `writeback`/`wait_psum_idle`, ở đây là `compute` như trước).
+- Unit test: `test/test_profile_phases.py` (quy tắc gán pha, thông tin layer) và `test/test_profile_report.py` (bảng theo layer, so sánh, `--clock-mhz`): 34 test pass.
+- Mốc mới gồm cả 11 case: `doc/perf/baseline_2026-10-22/`, báo cáo `doc/perf/baseline_2026-10-22.md` (so với `baseline_2026-10-15`, 250 MHz).
 
 ## 6b. Đo trên mô phỏng so với chạy trên FPGA thật
 
@@ -873,9 +948,11 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 
 Độ trễ thật = số chu kỳ ÷ fmax. Một tối ưu giảm 19 % số chu kỳ nhưng làm fmax giảm 25 % thì **chậm hơn**. Vì vậy mọi tối ưu cần cả hai con số.
 
-## 7. Kết quả baseline chính (chi tiết: `doc/perf/baseline_2026-10-15.md`; trước bản sửa #18: `baseline_2026-10-10.md`)
+## 7. Kết quả baseline chính (chi tiết: `doc/perf/baseline_2026-10-22.md`; trước bản sửa #18: `baseline_2026-10-10.md`)
 
-**Baseline hiện tại: `doc/perf/baseline_2026-10-15/`** (9 case, bộ nhớ lý tưởng, sau bản sửa lỗi #18; thời gian ở 250 MHz = chu kỳ × 4 ns).
+**Baseline hiện tại: `doc/perf/baseline_2026-10-22/`** (11 case, bộ nhớ lý tưởng; thời gian ở 250 MHz = chu kỳ × 4 ns). 9 case một layer giống hệt
+`baseline_2026-10-15` (sau bản sửa lỗi #18); thêm 2 case cả model có bảng theo layer (mục 6.13): `model_mnist_real_c2` **244.050 chu kỳ (976 µs)**,
+Conv2 chiếm 50 %; `model_mnist16_c2` 50.020 chu kỳ (200 µs).
 
 **Layer kiểu MNIST (0.3):**
 
@@ -1040,7 +1117,8 @@ tốn băng thông).
 **Đo pha khi chạy nhiều layer:** profiler hiện tại cộng dồn mọi layer, và với layer trung gian thì tính toán diễn ra trong trạng thái 11 nên bị ghi là `writeback`
 (`compute = 0`). Bản thử `probe_model.py` tách theo từng lần vào `GET_PARAMETERS` và tách trạng thái 10/11 theo FSM psum (1–3 = tính toán, 4/6 = ghi ngược).
 Model MNIST thật (2 channel, bộ nhớ lý tưởng): **244.052 chu kỳ = 976 µs ở 250 MHz**; tính toán 62 %, nạp weight 16 %, nạp bias 10 % (40 % của Conv1), ghi ngược
-5 %, chuyển đổi 4 %, pooling 3 %; Conv2 là layer nặng nhất (121.162 chu kỳ). Đề xuất đưa vào `profile_dma_phases` / `profile_report` / `run_profile` (chỉ Python).
+5 %, chuyển đổi 4 %, pooling 3 %; Conv2 là layer nặng nhất (121.162 chu kỳ). **Đã đưa vào profiler của repo** (2026-10-22, chỉ Python): mỗi layer có bảng
+pha riêng, case `model_*` trong `run_profile.py`, bảng theo layer trong `profile_report`. Cách dùng và số liệu: mục 6.13.
 
 ## 9. Các lỗi đã biết và các bản sửa RTL
 
@@ -1732,3 +1810,10 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   6 layer nối tiếp trên chip; với 1 channel thì fail do lỗi #17. Liệt kê những gì còn thiếu cho model int8 thật (kẹp int8, ReLU, zero point, làm tròn, mantissa,
   #12, độ rộng psum, luồng Python) và cách đo pha theo từng layer (bản thử profiler, kết quả 976 µs cho MNIST). Mục 8d,
   `doc/experiments/2026-10-22_multilayer_model.md`.
+- **Profiler theo từng layer** (chỉ Python, không đổi RTL): `profile_dma_phases` tách bảng pha cho mỗi layer (mở layer mới khi FSM chính vào
+  `GET_PARAMETERS`) và gán pha trong trạng thái 11 theo FSM psum (1–3 = `compute`, còn lại = `writeback`), nên layer nối tiếp không còn `compute = 0`.
+  Testbench ghi tên/kích thước layer vào `profile.json` (`layers[].info`); `OPENEYE_SEED` cố định model và dữ liệu (`tf.keras.utils.set_random_seed`, vì Keras 3
+  bỏ qua `tf.random.set_seed`). Thêm `LAYER=MNIST_REAL` (`data_create.py`), 2 case `model_mnist16_c2` / `model_mnist_real_c2` (`test_profile.py`),
+  bảng theo layer, so sánh theo layer, `--clock-mhz` và báo cáo case mới khi so sánh (`profile_report.py`, `run_profile.py`). Kiểm chứng: 9 case cũ 0 chu kỳ
+  lệch, 2 lần chạy model giống hệt nhau, khớp bản thử `probe_model.py` 6/6 layer; 35 unit test của profiler pass (11 lỗi có sẵn của `test_dense_output.py` không
+  liên quan). Mốc mới `doc/perf/baseline_2026-10-22/` (11 case). MNIST thật (2 channel): 244.050 chu kỳ = 976 µs, Conv2 50 %. Mục 6.13.

@@ -3,13 +3,17 @@
 # SPDX-License-Identifier: SHL-2.1
 # For more details, see the LICENSE file in the root directory of this project.
 
-"""Latency and bandwidth baseline of single convolution layers.
+"""Latency and bandwidth baseline of single convolution layers and of whole models.
 
-Every case runs one Convolution_Single layer (ramp activations, 3x3 kernel,
-CLUSTER_ROWS=2, CLUSTER_COLUMNS=2) with the cycle and
-DMA profiler enabled (OPENEYE_PROFILE=1, see
-rtl_test_utils.profile_dma_phases). The result check of the testbench still
-applies, so a profile is only meaningful for a passing case.
+test_profile_conv: one Convolution_Single layer (ramp activations, 3x3 kernel,
+CLUSTER_ROWS=2, CLUSTER_COLUMNS=2). test_profile_model: a whole net whose
+layers are chained on chip (each non-final layer writes its requantized
+results back into the iact buffer), random data with a fixed seed
+(OPENEYE_SEED) so the cycle counts are reproducible. Both run with the cycle
+and DMA profiler enabled (OPENEYE_PROFILE=1, see
+rtl_test_utils.profile_dma_phases), which also splits the counters per layer.
+The result check of the testbench still applies, so a profile is only
+meaningful for a passing case.
 
 Each case writes test/.temp/<test id>/profile.json. Summarise with:
 
@@ -18,6 +22,7 @@ Each case writes test/.temp/<test id>/profile.json. Summarise with:
 Usage:
     pytest test_profile.py -v
     pytest test_profile.py -v -k "not mnist"     # small layers only
+    pytest test_profile.py -v -k model           # whole models (5-30 min each)
 Prefer tools/run_profile.py, which runs the cases in parallel and compares them.
 """
 
@@ -58,3 +63,26 @@ def test_profile_conv(case, request, monkeypatch):
                          request=request, input_height=height, ramp_iacts=True,
                          asymmetric_kernel=True, quant_amount=quant_amount,
                          dma_bitwidth=dma_bitwidth)
+
+
+# Whole models: id -> (LAYER of data_create.create_layer, input channels, QUANT_AMOUNT).
+# The 64-filter layers of MNIST_REAL need QUANT_AMOUNT >= 64. Both inputs are
+# 2 channels wide: one channel on 28-pixel rows fails with bug #17.
+MODEL_CASES = {
+    #   Conv 28x28x2->16, MaxPool, Conv 16->16, MaxPool, Conv 7x7 16->16, Dense 784->10 (about 5 min)
+    "model_mnist16_c2": ("MNIST", 2, 32),
+    #   models/mnist_conv_net.py: Conv 32, MaxPool, Conv 64, MaxPool, Conv 64, FC 3136->10 (about 30 min)
+    "model_mnist_real_c2": ("MNIST_REAL", 2, 64),
+}
+
+
+@pytest.mark.parametrize("case", list(MODEL_CASES))
+def test_profile_model(case, request, monkeypatch):
+    layer, channels, quant_amount = MODEL_CASES[case]
+    monkeypatch.setenv("OPENEYE_PROFILE", "1")
+    monkeypatch.setenv("OPENEYE_SEED", "1")
+    # A 64-filter layer computes for about 90,000 cycles in one main FSM state.
+    monkeypatch.setenv("OPENEYE_FAIL_ON_STALL", "400000")
+    conv._run_conv_const(layer, 8, 2, num_glb_iact=1, input_channels=channels, request=request,
+                         input_height=28, quant_amount=quant_amount, dma_bitwidth=64,
+                         random_data=True, expect_layers=6)

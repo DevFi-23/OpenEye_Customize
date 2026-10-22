@@ -99,3 +99,112 @@ def test_print_comparison(capsys):
     assert "| **TOTAL** | 100 | 80 | -20 (-20.0%) |" in out
     assert "WARNING: configuration differs in QUANT_AMOUNT (32 -> 1024)" in out
     assert "| old_only | 100 | (not run) |" in out
+
+
+def counters(cycles, accepted=0, out=0):
+    return {"cycles": cycles, "in_offered": accepted, "in_accepted": accepted, "out_words": out,
+            "in_stall": 0, "out_stall": 0}
+
+
+def make_model_profile():
+    """Three chained layers: Conv (loads the input), Pooling, Dense (reads the result out)."""
+    config = dict(make_profile("MNIST")["config"])
+    conv = {"name": "Convolution2D", "iact_size_x": 8, "iact_size_y": 4, "channels": 2, "filters": 4,
+            "kernel": [3, 3], "stride": 1, "skip_iact": 0, "send_values_out": 0}
+    pool = {"name": "Pooling", "iact_size_x": 8, "iact_size_y": 4, "channels": 4, "filters": 1,
+            "kernel": [2, 2], "stride": 2, "skip_iact": 1, "send_values_out": 0}
+    dense = {"name": "Dense", "iact_size_x": 32, "iact_size_y": 1, "channels": 1, "filters": 10,
+             "kernel": [0], "stride": 1, "skip_iact": 1, "send_values_out": 1}
+    layers = [
+        {"index": 0, "start_cycle": 0, "info": conv, "phases": {
+            "load_iact": counters(8, 8), "load_wght": counters(12, 12), "load_bias": counters(16, 16),
+            "compute": counters(50), "writeback": counters(14)}},
+        {"index": 1, "start_cycle": 100, "info": pool, "phases": {"pooling": counters(20)}},
+        {"index": 2, "start_cycle": 120, "info": dense, "phases": {
+            "load_wght": counters(40, 40), "compute": counters(30), "readout": counters(10, 0, 2)}},
+    ]
+    phases = {}
+    for layer in layers:
+        for name, c in layer["phases"].items():
+            total = phases.setdefault(name, counters(0))
+            for key in total:
+                total[key] += c[key]
+    return {"config": config, "total_cycles": sum(p["cycles"] for p in phases.values()),
+            "layer_starts": [0, 100, 120], "phases": phases, "layers": layers}
+
+
+def test_layer_labels():
+    labels = [r["label"] for r in profile_report.summarise_layers(make_model_profile())]
+    assert labels == ["Conv 8x4x2->4 k3x3", "Pool 8x4x4", "Dense 32->10"]
+
+
+def test_layer_payload():
+    config = make_profile()["config"]                       # 20-bit psum -> 3 bytes
+    conv, pool, dense = (layer["info"] for layer in make_model_profile()["layers"])
+    assert profile_report.layer_payload_bytes(conv, config, last=False) == {
+        "load_iact": 8 * 4 * 2, "load_wght": 4 * 2 * 3 * 3, "load_bias": 4 * 3, "load_quant": 20}
+    assert profile_report.layer_payload_bytes(pool, config, last=False) == {}
+    assert profile_report.layer_payload_bytes(dense, config, last=True) == {
+        "load_iact": 0, "load_wght": 32 * 10, "load_bias": 30, "load_quant": 50, "readout": 30}
+    chained = dict(conv, skip_iact=1)
+    assert profile_report.layer_payload_bytes(chained, config, last=False)["load_iact"] == 0
+
+
+def test_summarise_layers():
+    rows = profile_report.summarise_layers(make_model_profile())
+    assert [r["cycles"] for r in rows] == [100, 20, 80]
+    assert rows[0]["share"] == pytest.approx(0.5)
+    assert (rows[0]["in_words"], rows[0]["out_words"]) == (36, 0)
+    assert (rows[2]["in_words"], rows[2]["out_words"]) == (40, 2)
+    # conv: 64 + 72 + 12 + 20 bytes needed, 36 words of 8 bytes moved in the phases with a payload
+    assert rows[0]["efficiency"] == pytest.approx((64 + 72 + 12 + 20) / (36 * 8))
+    assert rows[1]["efficiency"] is None
+    assert profile_report.summarise_layers(make_profile()) == []   # no per-layer counters
+
+
+def test_report_prints_layer_table(capsys):
+    profile = make_model_profile()
+    profile_report.print_report("m", profile, profile_report.summarise(profile))
+    out = capsys.readouterr().out
+    assert "MNIST (3 layers)" in out
+    assert "| us (sim clock 10 ns) |" in out
+    assert "| 0 | Conv 8x4x2->4 k3x3 | 100 | 50.0% | 1.0 | 8 | 12 | 16 | 0 | 50 | 14 | 0 | 0 | 36 | 0 |" in out
+    assert "| 2 | Dense 32->10 | 80 |" in out
+
+
+def test_report_clock_option(tmp_path, capsys):
+    path = tmp_path / "model.json"
+    path.write_text(json.dumps(make_model_profile()))
+    try:
+        assert profile_report.main([str(path), "--clock-mhz", "250"]) == 0
+    finally:
+        profile_report.CLOCK_MHZ = None
+    out = capsys.readouterr().out
+    assert "| us (250 MHz) |" in out
+    assert "| 0 | Conv 8x4x2->4 k3x3 | 100 | 50.0% | 0.4 |" in out      # 100 cycles x 4 ns
+
+
+def test_compare_layer_rows():
+    base = make_model_profile()
+    new = make_model_profile()
+    new["layers"][0]["phases"]["load_bias"] = counters(1, 1)
+    rows = profile_report.compare_layer_rows(base, new)
+    assert (rows[0]["cycles_base"], rows[0]["cycles_new"]) == (100, 85)
+    assert (rows[0]["words_base"], rows[0]["words_new"]) == (36, 21)
+    assert rows[1]["cycles_base"] == rows[1]["cycles_new"] == 20
+    new["layers"].pop()
+    assert profile_report.compare_layer_rows(base, new) == []      # layer counts differ
+
+
+def test_comparison_reports_new_case(capsys):
+    profile_report.print_comparison({"c": ("b.json", make_profile())},
+                                    {"c": ("n.json", make_profile()), "m": ("m.json", make_model_profile())})
+    out = capsys.readouterr().out
+    assert "\n## m\nMNIST (3 layers)" in out
+    assert "| 0 | Conv 8x4x2->4 k3x3 | 100 |" in out
+    assert "| m | (not in baseline) | 200 |" in out
+
+
+def test_case_name_of_model_sim_dir():
+    path = "test/.temp/test_cocotb_fpga_test_profile.py_test_profile_model_model_mnist16_c2_/profile.json"
+    assert profile_report.case_name(path) == "model_mnist16_c2"

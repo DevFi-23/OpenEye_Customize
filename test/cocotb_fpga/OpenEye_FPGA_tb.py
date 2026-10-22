@@ -186,8 +186,18 @@ async def single_layer_test(dut):
 
     ptp = tp.PortTimingParameters()
     ptp.initiate_params(clk_cycle, clk_cycle_unit, clk_delay_in, clk_delay_unit_in, clk_delay_out, clk_delay_unit_out)
-    
-    # Create a test model    
+
+    # OPENEYE_SEED makes the random model and data reproducible: the Keras
+    # weight initializers (conv weights come from the model) and the numpy
+    # draws of DRAMContents (Dense weights, inputs, zero replacement). Used by
+    # the profiling baselines of whole models, where the zero-skipping makes
+    # the cycle count depend on the data. tf.random.set_seed alone is not
+    # enough: Keras 3 initializers draw from their own seed generator.
+    if os.environ.get("OPENEYE_SEED"):
+        tf.keras.utils.set_random_seed(int(os.environ["OPENEYE_SEED"]))
+        logger.info("OPENEYE_SEED: random model and data seeded with %s", os.environ["OPENEYE_SEED"])
+
+    # Create a test model
     gtu.select_gpu(0)
 
     #Here If-Condition test, wether use model or single Layer
@@ -328,6 +338,9 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
                     getattr(lpar, "store_in_psum", "?"), getattr(lpar, "needed_total_transmissions", "?"),
                     getattr(lpar, "output_cycles", "?"), getattr(lpar, "psum_output_words", "?"),
                     getattr(lpar, "used_Y_cluster", "?"), getattr(lpar, "used_X_cluster", "?"))
+    if os.environ.get("OPENEYE_PROFILE"):
+        # Names and shapes for the per-layer part of profile.json.
+        rtl_test_utils.profile_set_layer_info(layer_parameters)
     # Create the OpenEye parameters and the DRAM given the model
     dram = DRAM.DRAMContents(model, layer_parameters)
     time_printer.timestamp("Initialized DRAM. ", logger)

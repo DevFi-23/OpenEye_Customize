@@ -20,6 +20,8 @@ Usage (from the repository root, with the project venv):
   venv/bin/python tools/run_profile.py --save doc/perf/after_bias_fix --report doc/perf/after_bias_fix.md
   venv/bin/python tools/run_profile.py --mem typical --compare doc/perf/baseline_2026-10-09
   venv/bin/python tools/run_profile.py --mem typical --mem-set latency=60 --mem-set outstanding=1
+  venv/bin/python tools/run_profile.py -k "not model"     # single layers only (the 2 models take ~4 and ~11 min)
+  venv/bin/python tools/run_profile.py -k model --compare doc/perf/baseline_2026-10-22 --clock-mhz 250
 
 --mem selects a memory model preset (open_eye.memory_model.PRESETS: ideal,
 typical, slow) and --mem-set overrides single parameters (latency,
@@ -83,7 +85,9 @@ def case_of(test_id):
 
 
 def profile_path(case):
-    found = glob.glob(os.path.join(TEMP_DIR, f"*test_profile_conv_{case}_", "profile.json"))
+    found = []
+    for test in ("conv", "model"):   # test_profile_conv / test_profile_model
+        found += glob.glob(os.path.join(TEMP_DIR, f"*test_profile_{test}_{case}_", "profile.json"))
     return found[0] if found else None
 
 
@@ -111,6 +115,8 @@ def main(argv=None):
     parser.add_argument("--mem", metavar="PRESET", help="memory model preset (ideal, typical, slow)")
     parser.add_argument("--mem-set", action="append", metavar="KEY=VALUE",
                         help="override one memory model parameter (repeatable)")
+    parser.add_argument("--clock-mhz", type=float,
+                        help="FPGA clock for the time column of the per-layer table (e.g. 250)")
     args = parser.parse_args(argv)
 
     # The memory model is configured through the environment of the test processes;
@@ -158,6 +164,8 @@ def main(argv=None):
         if report_args:
             for base in args.compare or []:
                 report_args += ["--compare", base]
+            if args.clock_mhz:
+                report_args += ["--clock-mhz", str(args.clock_mhz)]
             profile_report.main(report_args)
     report = buffer.getvalue()
     print(report)

@@ -85,7 +85,7 @@ def _run_conv_const(layer_mode, const_value, cluster_rows, num_glb_iact,
                     input_channels, request, ramp_iacts=False,
                     psum_width=20, trans_words=8, bias_step=0,
                     input_height=INPUT_SIZE_Y, asymmetric_kernel=False,
-                    quant_amount=1024, dma_bitwidth=None, random_data=False):
+                    quant_amount=1024, dma_bitwidth=None, random_data=False, expect_layers=None):
     """Build and simulate one constant-operand conv configuration."""
     # OpenEyeParameters and parameters.vh read these from the environment at
     # generation time, so they have to be set before create_vh_file_from_envvars.
@@ -145,7 +145,9 @@ def _run_conv_const(layer_mode, const_value, cluster_rows, num_glb_iact,
             "CLOCK_DELAY_OUTPUT":      str(clk_delay_out),
             "CLOCK_DELAY_UNIT_OUTPUT": clk_delay_unit_out,
             "LAYER":             layer_mode,
-            "OPENEYE_EXPECT_LAYERS": "1" if layer_mode == "Convolution_Single" else "2",
+            # Layer count of the model the testbench builds (6 for the MNIST nets).
+            "OPENEYE_EXPECT_LAYERS": str(expect_layers) if expect_layers else
+                                     ("1" if layer_mode == "Convolution_Single" else "2"),
             "NUM_FILTERS":       str(NUM_FILTERS),
             "STRIDE":            str(STRIDE),
             "KERNEL_SIZE_X":     str(KERNEL_SIZE_X),

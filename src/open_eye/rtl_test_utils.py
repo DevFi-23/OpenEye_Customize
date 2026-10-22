@@ -958,14 +958,70 @@ PROFILE_PHASES = {
     13: "pooling", 14: "pooling",
 }
 PSUM_SEND_RESULTS_STATE = 5  # psum_pipeline.v: streaming results to data_dma_o
+# Main state RECEIVE_PSUMS_TO_IACT: a layer whose results stay on chip (the next
+# layer reads them from the iact buffer) computes AND writes back in this state.
+RECEIVE_PSUMS_TO_IACT_STATE = 11
+# psum FSM states in which the PE array computes: WAIT_TO_SEND_READY_SIGNAL,
+# CALCULATE_PSUM, PSUM_GET_RESULTS.
+PSUM_COMPUTE_STATES = (1, 2, 3)
+
+
+def profile_phase(main, psum, out_word):
+    """Phase of one clock cycle from the main FSM state, the psum FSM state and a result word.
+
+    readout: the psum FSM streams results (PSUM_SEND_RESULTS) or a result word
+    is on the bus (enable_dma_o is registered, the last word comes one cycle
+    after the psum FSM left that state). In RECEIVE_PSUMS_TO_IACT (a chained
+    layer) the psum FSM tells computing (states 1-3) from writing the
+    requantized results back to the iact buffer (SEND_PSUM_TO_IACT and the
+    states around it). Otherwise the main state decides (PROFILE_PHASES).
+    """
+    if psum == PSUM_SEND_RESULTS_STATE or out_word:
+        return "readout"
+    if main == RECEIVE_PSUMS_TO_IACT_STATE:
+        return "compute" if psum in PSUM_COMPUTE_STATES else "writeback"
+    return PROFILE_PHASES.get(main, "state_%s" % main)
+
+
+# Description of the layers of the running model, set by the testbench
+# (profile_set_layer_info) and written into profile.json next to the per-layer
+# counters, so the report can name the layers and compute their payload.
+_PROFILE_LAYER_INFO = []
+
+
+def _plain_int(value, default=None):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def profile_set_layer_info(layer_parameters):
+    """Give profile_dma_phases a description of every layer (name, shape, I/O flags)."""
+    info = []
+    for lpar in layer_parameters:
+        kernel = getattr(lpar, "kernel_size", None) or []
+        info.append({
+            "name": str(getattr(lpar, "layer_name", "?")),
+            "iact_size_x": _plain_int(getattr(lpar, "iact_size_x", None)),
+            "iact_size_y": _plain_int(getattr(lpar, "iact_size_y", None)),
+            "channels": _plain_int(getattr(lpar, "channels", None)),
+            "filters": _plain_int(getattr(lpar, "filters", None)),
+            "kernel": [_plain_int(k, 0) for k in kernel],
+            "stride": _plain_int(getattr(lpar, "strideX", None), 1),
+            "skip_iact": _plain_int(getattr(lpar, "skipIact", None), 0),
+            "send_values_out": _plain_int(getattr(lpar, "send_values_out", None), 0),
+        })
+    _PROFILE_LAYER_INFO[:] = info
 
 
 async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
     """Cycle and DMA-beat profile of the FPGA top level (opt-in: OPENEYE_PROFILE=1).
 
-    Samples every rising clock edge and attributes the cycle to a phase: the
-    main FSM state (see PROFILE_PHASES), or "readout" while the psum FSM is in
-    PSUM_SEND_RESULTS. Per phase it counts cycles, DMA input words offered by
+    Samples every rising clock edge and attributes the cycle to a phase
+    (profile_phase: the main FSM state, see PROFILE_PHASES; "readout" while the
+    psum FSM is in PSUM_SEND_RESULTS; in RECEIVE_PSUMS_TO_IACT the psum FSM
+    splits "compute" from "writeback"). Per phase it counts cycles, DMA input words offered by
     the host (enable_dma_i_reg), DMA input words accepted (enable_dma_i_reg and
     ready_dma_o), DMA output words (enable_dma_o and ready_dma_i), and memory
     stalls: in_stall = cycles of a load_* phase in which the DUT was ready but
@@ -976,9 +1032,12 @@ async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
 
     The measured window runs from the first accepted input word to the last
     output word, so idle time before the stream and after the result is not
-    counted. The result is rewritten to `path` (relative to the sim directory)
-    on every phase change and result word and every 1024 cycles, so it
-    survives a failing or hanging test.
+    counted. The same counters are also kept per layer ("layers": a new layer
+    starts at every entry into GET_PARAMETERS, i.e. with every layer stream;
+    the counters of all layers add up to "phases"), with the description the
+    testbench gave through profile_set_layer_info. The result is rewritten to
+    `path` (relative to the sim directory) on every phase change and result
+    word and every 1024 cycles, so it survives a failing or hanging test.
     Summarise it with `python -m open_eye.profile_report`.
     """
     try:
@@ -994,7 +1053,7 @@ async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
 
     config = {name: os.environ.get(name) for name in (
         "LAYER", "NUM_FILTERS", "KERNEL_SIZE_X", "KERNEL_SIZE_Y", "INPUT_SIZE_X",
-        "INPUT_SIZE_Y", "INPUT_CHANNELS", "STRIDE")}
+        "INPUT_SIZE_Y", "INPUT_CHANNELS", "STRIDE", "OPENEYE_SEED")}
     config.update({
         "DMA_BITWIDTH": oep.DMA_BITWIDTH, "DATA_PSUM_BITWIDTH": oep.DATA_PSUM_BITWIDTH,
         "CLUSTER_ROWS": oep.Clusters_Y, "CLUSTER_COLUMNS": oep.Clusters_X,
@@ -1012,16 +1071,26 @@ async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
     phases = {}         # phase -> counters, up to the last output word
     pending = {}        # counters after the last output word, merged on the next one
     layer_starts = []   # cycle (relative to start) of every GET_PARAMETERS entry
+    layers = []         # per layer: {"index", "start_cycle", "phases": phase -> counters}
+    layer_pending = {}  # layer index -> phase -> counters, merged like `pending`
     started = False
     cycle = 0
     last_main = None
     last_phase = None
 
+    def add(total, counters):
+        for key in total:
+            total[key] += counters[key]
+
     def dump():
         # pending: counters after the last result word (not part of the measured
         # window); kept for debugging a test that hangs before its first result.
+        for layer in layers:
+            layer["total_cycles"] = sum(p["cycles"] for p in layer["phases"].values())
+            if layer["index"] < len(_PROFILE_LAYER_INFO):
+                layer["info"] = _PROFILE_LAYER_INFO[layer["index"]]
         result = {"config": config, "total_cycles": sum(p["cycles"] for p in phases.values()),
-                  "layer_starts": layer_starts, "phases": phases, "pending": pending}
+                  "layer_starts": layer_starts, "phases": phases, "layers": layers, "pending": pending}
         try:
             with open(path, "w") as f:
                 json.dump(result, f, indent=1)
@@ -1044,30 +1113,29 @@ async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
             psum = int(psum_state_sig.value)
         except ValueError:
             main, psum = last_main, None
-        # enable_dma_o is registered, so the last result word is still on the
-        # bus one cycle after the psum FSM has left PSUM_SEND_RESULTS.
-        if psum == PSUM_SEND_RESULTS_STATE or out_word:
-            phase = "readout"
-        else:
-            phase = PROFILE_PHASES.get(main, "state_%s" % main)
-        if main == 1 and last_main != 1:
+        phase = profile_phase(main, psum, out_word)
+        if (main == 1 and last_main != 1) or not layers:
+            # A new layer stream starts with GET_PARAMETERS (the first accepted
+            # word normally arrives in it; the "not layers" guard covers a start
+            # in another state).
             layer_starts.append(cycle)
+            layers.append({"index": len(layers), "start_cycle": cycle, "phases": {}})
         last_main = main
 
-        counters = pending.setdefault(phase, empty())
-        counters["cycles"] += 1
-        counters["in_offered"] += offered
-        counters["in_accepted"] += accepted
-        counters["out_words"] += out_word
-        counters["in_stall"] += dut_ready_idle if phase.startswith("load_") else 0
-        counters["out_stall"] += out_waiting
+        step = {"cycles": 1, "in_offered": offered, "in_accepted": accepted, "out_words": out_word,
+                "in_stall": dut_ready_idle if phase.startswith("load_") else 0, "out_stall": out_waiting}
+        add(pending.setdefault(phase, empty()), step)
+        add(layer_pending.setdefault(len(layers) - 1, {}).setdefault(phase, empty()), step)
         cycle += 1
         if out_word:
-            for name, add in pending.items():
-                total = phases.setdefault(name, empty())
-                for key in total:
-                    total[key] += add[key]
+            # Everything up to this result word belongs to the measured window.
+            for name, counters in pending.items():
+                add(phases.setdefault(name, empty()), counters)
             pending = {}
+            for index, by_phase in layer_pending.items():
+                for name, counters in by_phase.items():
+                    add(layers[index]["phases"].setdefault(name, empty()), counters)
+            layer_pending = {}
         # The testbench may end the simulation right after the last result
         # word, so write after every result word as well as on phase changes,
         # and every 1024 cycles so a hanging test leaves current counters.
