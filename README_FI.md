@@ -1013,7 +1013,7 @@ dài 96 thay vì 192 chu kỳ.
 | Kiểm tra độc lập từng word + test dữ liệu ngẫu nhiên | **Xong** (2026-10-15, mục 6.12) |
 | Baseline sau các bản sửa | **Xong**: `doc/perf/baseline_2026-10-15/` |
 
-### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-22)
+### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-24)
 
 | # | Lỗi | Nơi | Trạng thái |
 |---|---|---|---|
@@ -1040,7 +1040,7 @@ dài 96 thay vì 192 chu kỳ.
 | 19b | Dense N = 32 output với từ 8 lượt K (K ≥ 508) | ? | **Chưa rõ nguyên nhân**: K ≤ 504 đúng, 508/512 sai; N = 16/24 ở K = 512 đúng. Sai ở phía weight hoặc psum, không phải kiểu mất activation |
 | 20 | `PE.v:829–830`: tham chiếu "tiến" `gen_sparse_fsm.wght_addr_vec` / `wght_addr_use_vec` / `wght_data_use_vec` vào khối generate khai báo sau (dòng 978). Icarus, Verilator, Vivado hiểu đúng; **Yosys tạo dây 1 bit không ai lái** ("implicitly declared") | `hdl/PE.v` | **Chưa sửa** (phát hiện 2026-10-21). Cùng loại với #14 (nghĩa phụ thuộc công cụ). Đề xuất: khai báo 3 tín hiệu ở cấp module trước hai khối generate. |
 | 21 | Dense N > 32 output (cần 2 lượt psum): sai với mọi K | ? | **Chưa điều tra** (phát hiện 2026-10-21): K = 64, N = 40 chỉ đúng 10 output đầu, N = 48 chỉ đúng 12 output đầu; N = 32 đúng |
-| 22 | Conv: **word weight toàn 0** (2 weight cạnh nhau, tức 2 filter liền kề cùng vị trí kernel, đều bằng 0) làm sai cả layer | Python `wght_stream_mapper.py` (`SKIP_ZERO_WORDS` bỏ word 0 → stream ngắn hơn số RTL chờ) **và** phía PE (giữ word 0 thì vẫn sai/treo) | **Chưa sửa** (phát hiện 2026-10-22 khi đệm channel #17): mọi test cũ bị che vì `DRAMContents` thay weight 0 bằng ±1. **Chặn model int8 thật** (có weight 0). Mục 9 |
+| 22 | Conv có **weight bằng 0** tính sai hoặc treo (mọi mẫu số 0 trừ "mỗi cột một số 0 ở đầu"; model MNIST int8 đã huấn luyện: Conv2 140/384, Conv3 116/384 lần nạp weight sai) | Định dạng nén weight: mapper Python (`ConvWghtStreamMapper`, bộ ghép stream, `SKIP_ZERO_WORDS`) **không khớp** với cách `data_pipeline_wght.v` giải mã (cột rỗng, ô đệm, overhead 4 bit, reset địa chỉ ở word 0) | **Đã điều tra** (2026-10-24, không sửa RTL): 6 cơ chế F1–F3, F7–F9; có bản sửa **chỉ Python** đã kiểm chứng (bộ mã hóa mới, chưa đưa vào `src/`). Mục 9, `doc/experiments/2026-10-24_bug22_weight_encoding.md` |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-15)
 
@@ -1116,7 +1116,7 @@ toàn 0, +472 chu kỳ = +1,5 % Conv1, mục 9; sửa RTL vẫn là lựa chọn
 (4) model khác: #19b, #21, layer nhiều lượt truyền.
 
 **Còn thiếu để chạy model int8 đã huấn luyện với kết quả đúng:** tham chiếu giữa các layer (`batchnorm_output`) chỉ là `floor(mant·x/2^shift)`, không kẹp,
-không ReLU, nên PASS ở trên không nói gì về độ chính xác. Cần: (I) **lỗi #22: weight 0 thật** (2 weight cạnh nhau cùng bằng 0 làm sai cả layer, mục 9); (A) kẹp int8 trong `quantization_unit.v` (thiếu → 9,3 % theo mô phỏng ngày 19/10); (B) ReLU
+không ReLU, nên PASS ở trên không nói gì về độ chính xác. Cần: (I) **lỗi #22: weight 0 thật** (đã điều tra 2026-10-24, có bản sửa chỉ Python chờ đưa vào, mục 9); (A) kẹp int8 trong `quantization_unit.v` (thiếu → 9,3 % theo mô phỏng ngày 19/10); (B) ReLU
 (`af_cluster.v` không được nối) → gộp vào bộ kẹp có cận [qmin, qmax] lập trình được; (C) zero point cộng sau khi nhân (hiện offset cộng trước) hoặc lượng tử đối
 xứng; (D) làm tròn gần nhất; (E) mantissa bị cắt 8 bit (`OpenEye_FPGA.v:1345`); (F) lỗi #12 `current_filter`; (G) psum 20 bit thiếu (cần 21) → 24/32 bit kèm thu
 nhỏ bộ đệm psum; (H) luồng Python cho model thật: bộ chuyển TFLite/PyTorch int8, ảnh MNIST thật, mô hình numpy đúng từng bit của phần cứng + TFLite làm chuẩn,
@@ -1573,30 +1573,55 @@ Trong cả model: Conv1 32.980 chu kỳ (ít hơn 2.611 so với channel thứ h
 Weight đệm ±1 thay vì 1 cho số chu kỳ như nhau. Ưu điểm: không đổi RTL, đúng từng bit, tự động. Nhược điểm: +1,2 % chu kỳ Conv1 và +456 word DMA; RTL vẫn còn
 lỗi (bật `OPENEYE_PAD_CHANNELS=0` sẽ thấy); host thật (driver CPU) sau này cũng phải đệm như vậy.
 
-### Lỗi mới #22: word weight toàn 0 (phát hiện 2026-10-22, chưa sửa)
+### Lỗi #22: weight bằng 0 làm sai định dạng weight nén (phát hiện 2026-10-22, điều tra 2026-10-24, không sửa RTL)
 
-Bản đệm đầu tiên dùng weight đệm = 0 và **fail ở mọi ca**. Thí nghiệm trên layer 2 channel thật (không đệm), đặt weight = 0 sau mọi hook dữ liệu:
+Chi tiết: `doc/experiments/2026-10-24_bug22_weight_encoding.md`, công cụ `doc/experiments/2026-10-24_bug22/`.
 
-| Weight đặt về 0 (Conv 20×8×2 → 8) | Kết quả |
+**Đính chính phần viết ngày 2026-10-22:** mapper Conv **có nén số 0** (lớp con `ConvWghtStreamMapper` ghi đè hàm dạng dày của lớp cha), "phía PE cũng sai"
+thực ra là các cơ chế F1/F2/F9 trong `data_pipeline_wght.v` (không phải vòng MAC), và không cần cặp số 0: một số 0 ở filter cuối của một cột là đủ, nên ước
+lượng "p²" là sai.
+
+**Định dạng (theo cách RTL giải mã):** mỗi word 24 bit có 2 entry `{overhead 4 bit, giá trị 8 bit}`; weight của một PE chia thành cột (mỗi vị trí iact = (kernel x,
+channel) một cột gồm `M0` filter). Mapper bỏ weight 0, entry khác 0 kế tiếp ghi số 0 đã bỏ vào overhead. `data_pipeline_wght` đếm "vị trí" (mỗi entry
+`overhead + 1`, ô đệm `(0,0)` tính 1), đủ `M0` vị trí thì kết thúc cột và ghi con trỏ cột (số word dữ liệu) vào SPad địa chỉ; PE đọc cột k từ word `addr[k-1]`
+đến `addr[k]`.
+
+**6 cơ chế hỏng** (đều tái hiện trên RTL):
+
+| | Cơ chế | Phía |
+|---|---|---|
+| F1 | Cột rỗng (mọi filter của một vị trí iact bằng 0): RTL chỉ sang cột tối đa 1 lần mỗi word, không tạo được cột rỗng → các cột sau lệch, thiếu con trỏ cuối | định dạng không khớp |
+| F2 | Cột có số entry lẻ được thêm ô đệm `(0,0)`: RTL tính ô đệm là 1 vị trí, mapper thì không mà còn mang mọi số 0 cuối cột sang overhead của cột sau → đếm trùng 1 vị trí, cột sau lệch 1 filter | định dạng không khớp |
+| F3 | Hơn 15 số 0 liên tiếp không vừa overhead 4 bit | định dạng không khớp |
+| F7 | Bộ ghép stream gửi cho mọi PE số word bằng PE (0,0,0); khi nén, PE dài hơn bị cắt | Python |
+| F8 | `SKIP_ZERO_WORDS` bỏ các word 0 ở đuôi → stream weight ngắn hơn `trans_cycles_wght` (độ dài dày mà RTL được cấu hình) → RTL lấy word bias làm weight | Python |
+| F9 | RTL reset địa chỉ ghi SPad dữ liệu ở mỗi word 0, và PE nhận thêm 1 word sau khối của nó; khối có đuôi word 0 thì word thừa (dữ liệu thật ở layer nhiều lượt truyền) ghi đè địa chỉ 0 và đặt `second_spad_words = 2` → PE treo ở `CALCULATE_PSUM` | định dạng không khớp |
+
+**Bằng chứng:** probe dump mọi lần ghi SPad weight của 48 PE với giá trị weight duy nhất (đối chứng không có số 0: 0/48 PE sai; channel 1 toàn 0: con trỏ
+`[4, 5, 8, 9, 12]` thay vì `[4, 4, 8, 8, 12, 12]`); **mô hình chu kỳ Python của `data_pipeline_wght` khớp RTL từng lần ghi ở 336 lần nạp weight** (7 lượt chạy),
+tái hiện cả `second_spad_words = 2` của ca treo; bộ kiểm tra offline (mapper thật → bộ ghép stream → mô hình → cách PE đọc) dự đoán đúng kết quả RTL ở mọi ca
+đã mô phỏng. Quét offline 6 kích thước layer (gồm 3 Conv MNIST) × 9 mẫu số 0: bộ mã hóa hiện tại sai ở mọi mẫu trừ "filter 0 bằng 0" (mỗi cột một số 0 ở đầu).
+
+**Ảnh hưởng thật:** model MNIST int8 đã huấn luyện (`doc/demo_notebooks/mnist_quantized_model.tflite`, ~1 % weight bằng 0): Conv2 140/384, Conv3 116/384 lần
+nạp weight giải mã sai; mô phỏng RTL Conv2/Conv3 với weight này treo. Các test hiện có không thấy vì `DRAMContents` thay weight 0 bằng ±1
+(`test_conv3x3_sparse` PASS vì ở cấu hình đó RTL nhận đúng 24 word mỗi PE, bằng độ dài dữ liệu nén của mẫu bàn cờ).
+
+**Bản sửa đề xuất (chỉ Python, đã làm thử ngoài `src/`, chờ bạn đồng ý):** bộ mã hóa mới chỉ sinh định dạng RTL giải mã đúng: mỗi cột tự kết thúc ở filter
+`M0-1` (entry 0 tường minh khi cần, cột rỗng thành `(0, M0-1)`), không mang số 0 sang cột sau, cắt chuỗi số 0 dài bằng `(0, 15)`, không bao giờ tạo word toàn 0,
+lấp phần còn lại của khối PE bằng word `[(0,0), (0,1)]` (giá trị 0, chỉ tạo cột PE không đọc), gửi đủ độ dài (tắt `SKIP_ZERO_WORDS`).
+
+| Kiểm chứng bộ mã hóa mới | Kết quả |
 |---|---|
-| Không (đối chứng) | PASS |
-| Channel 1, mọi filter | **FAIL** (cả ở 8×4×2 → 4, một lượt x: không liên quan lỗi #17) |
-| Channel 1, chỉ filter 0 | PASS |
-| Filter 0, mọi channel | PASS |
+| Offline: 6 kích thước × 9 mẫu số 0 (3 seed), weight MNIST thật | 0 lần nạp sai (bộ hiện tại: sai ở mọi mẫu trừ 1) |
+| Weight không có số 0 (8 kích thước, 30 – 15.360 word DMA) | Stream **giống hệt từng word** bộ hiện tại → mọi test và mốc không đổi |
+| RTL: 20×8×2→8 (30 %, 90 %, channel 1 = 0), 8×4×8→16 (30 %, 50 %, không 0), 8×4×4→32 (30 %, cột rỗng 16 filter), Conv2 MNIST với 30 % số 0, test thưa có sẵn `test_conv3x3_sparse` | **PASS** cả 10 |
+| RTL: MNIST Conv1 / Conv2 với weight int8 đã huấn luyện | **PASS** (Conv2: bộ hiện tại treo) |
+| RTL: MNIST Conv3 với weight đã huấn luyện | **3.136/3.136 output = numpy** (kiểm tra stream vẫn fail do lỗi #9 như trước); bộ hiện tại treo |
+| Chi phí | Word DMA weight **không đổi** (độ dài khối do cấu hình RTL cố định); chu kỳ tính giảm nhẹ khi có số 0 (8×4×8→16: 1.054 → 1.001 ở 30 %, 963 ở 50 %) |
 
-**Nguyên nhân phía Python:** stream weight Conv (chế độ serial) đóng 2 weight (`PARALLEL_MACS = 2`; mỗi weight 8 bit giá trị + 4 bit overhead) vào một word 24
-bit, là weight của 2 filter liền kề tại cùng vị trí kernel, ở dạng dày (overhead luôn 0); `WghtStreamMapper.SKIP_ZERO_WORDS = True` bỏ mọi word toàn 0.
-Conv1 có đệm với weight đệm 0: phần weight chỉ còn **240 word thay vì 480**, RTL vẫn chờ 480 nên lấy luôn word bias làm weight. Một weight 0 đứng cạnh
-weight khác 0 thì vô hại (word vẫn được gửi), nên 2 dòng cuối của bảng PASS.
-
-**Cả phía PE cũng sai:** giữ lại word 0 (`SKIP_ZERO_WORDS = False`, stream đúng độ dài) vẫn cho kết quả sai (20×8×2 → 8, 30 % weight bằng 0) hoặc treo ở trạng
-thái 10 với FSM psum ở `CALCULATE_PSUM` (8×4×8 → 16, 10 % weight bằng 0; Conv1 đệm với weight 0). Có lẽ PE coi word 0 là "không có weight"/hết dữ liệu.
-
-**Vì sao trước giờ không thấy:** `DRAMContents` thay mọi weight 0 bằng ±1, và mẫu `sparse_wghts` xen kẽ filter 0 / khác 0, nên không test nào có word toàn 0.
-**Ảnh hưởng:** model int8 đã huấn luyện có weight 0; với tỉ lệ p weight bằng 0, xác suất một word toàn 0 khoảng p² (1 % khi p = 10 %), riêng MNIST Conv2 có
-18.432 weight = 9.216 cặp, nên gần như chắc chắn gặp. **Chặn việc chạy model int8 thật.** Hướng sửa (cần điều tra PE, là RTL): mã hóa bỏ qua số 0 thật sự
-trong mapper serial (trường overhead có sẵn nhưng luôn 0) cùng phần RTL tương ứng, hoặc sửa RTL để chấp nhận word 0; cách chỉ dùng Python: sắp xếp lại
-thứ tự filter để không có 2 filter liền kề cùng có số 0 ở một vị trí (không phải lúc nào cũng làm được).
+Bản nháp đầu (chưa có word lấp đầy) PASS ở layer 1 lượt truyền nhưng treo ở layer nhiều lượt; snapshot trạng thái PE cho thấy `second_spad_words_wght = 2`,
+mô hình truy ra F9. **Hướng phía RTL** (cần bạn đồng ý, chưa làm): cho phép cột rỗng, sửa nghĩa ô đệm, bỏ reset địa chỉ ở word 0; độ dài stream weight thay
+đổi được thì weight 0 còn tiết kiệm được cả DMA.
 
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
@@ -1911,4 +1936,14 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   ghi `pad_channels`. Mục 9, `doc/experiments/2026-10-22_bug17_channel_pad.md`.
 - **Lỗi mới #22** (chưa sửa): word weight Conv toàn 0 (2 filter liền kề cùng có weight 0 ở một vị trí kernel) làm sai cả layer: mapper Python bỏ word 0 nên
   stream thiếu word (Conv1 có đệm weight 0: 240 thay vì 480 word), giữ lại word 0 thì PE vẫn tính sai hoặc treo. Trước giờ bị che vì `DRAMContents` thay
-  weight 0 bằng ±1. Chặn việc chạy model int8 thật. Vì vậy channel đệm của #17 dùng weight 1. Mục 8b, 9.
+  weight 0 bằng ±1. Chặn việc chạy model int8 thật. Vì vậy channel đệm của #17 dùng weight 1. Mục 8b, 9. (Đính chính 2026-10-24: nguyên nhân là định dạng nén không khớp, không phải PE; mục 9.)
+
+### 2026-10-24
+
+- **Điều tra lỗi #22** (không sửa RTL, không sửa code repo): weight 0 làm sai định dạng weight nén của Conv. Mapper Python và `data_pipeline_wght.v` hiểu khác
+  nhau về cột rỗng, ô đệm, overhead 4 bit và word 0; thêm 2 lỗi của bộ ghép stream (cắt theo PE đầu, `SKIP_ZERO_WORDS` làm lệch stream): 6 cơ chế F1–F3, F7–F9.
+  Mô hình chu kỳ Python của `data_pipeline_wght` khớp RTL từng lần ghi ở 336 lần nạp weight; bộ kiểm tra offline dự đoán đúng mọi ca mô phỏng. Model MNIST
+  int8 đã huấn luyện: Conv2 140/384, Conv3 116/384 lần nạp weight sai (mô phỏng RTL treo). Bản sửa chỉ Python (bộ mã hóa mới, làm thử ngoài `src/`): 0 lỗi
+  offline trên 6 kích thước × 9 mẫu và weight thật; RTL 12 ca PASS gồm MNIST Conv1/Conv2 thật, Conv3 thật 3.136/3.136 output đúng (fail stream do #9 như
+  trước); stream giống hệt khi không có số 0; DMA không đổi. Đính chính phân tích ngày 22/10. Mục 8b, 9,
+  `doc/experiments/2026-10-24_bug22_weight_encoding.md`, công cụ `doc/experiments/2026-10-24_bug22/`.

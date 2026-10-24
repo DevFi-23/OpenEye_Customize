@@ -66,6 +66,11 @@ cycle counts (`run_padw.py`), so the value does not matter as long as it is non-
 
 ## 3. New bug #22: all-zero packed weight words
 
+**Correction (2026-10-24, `2026-10-24_bug22_weight_encoding.md`):** the conv mapper does skip zeros (overhead count), the
+failures without `SKIP_ZERO_WORDS` come from the weight decoder `data_pipeline_wght` (empty columns, padding-slot counting,
+address reset at zero words), not from the MAC loop, and a single zero at the end of a column is enough (the p^2 estimate
+below is wrong). The measurements of this section stand; their explanation is superseded.
+
 The first version padded with zero weights and failed everywhere (28x28: 32/32 maps wrong after a hang; 20x8, 40x8, model: wrong
 values). Probes on real two-channel layers (no padding), weights zeroed after all data hooks (`probe_zerok.py`):
 
