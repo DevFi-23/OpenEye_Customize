@@ -182,7 +182,8 @@ class DRAMContents(object):
 
         Note:
             - Weights are quantized by multiplying by 127 and flooring to nearest integer
-            - Zero weights are replaced with random values (-1 or 1) to avoid true zeros
+            - Zero weights of Depthwise and Dense layers are replaced with random values (-1 or 1);
+              Conv2D keeps real zero weights (bug #22 fixed in the weight encoding, 2026-10-24)
             - Sparse patterns use modulo arithmetic on spatial/channel indices
 
         """
@@ -215,10 +216,8 @@ class DRAMContents(object):
                                 # Apply sparsity pattern if requested: zero out elements where sum of indices is even
                                 if (sparse_wghts & (((c+f+x+y) % 2) == 0)):
                                     self.weights[l][c][f][y][x] = 0
-                                else:
-                                    # Replace zeros with random -1 or 1
-                                    if (self.weights[l][c][f][y][x] == 0):
-                                        self.weights[l][c][f][y][x] = int(np.random.choice([-1, 1]))
+                                # Zero weights stay zero: the conv weight encoding handles them
+                                # (bug #22); replacing them by +-1 hid the bug in every test.
             elif "Dense" in str(layer_parameters[l].layer_name):
                 # Load Dense (fully connected) layer weights
                 # Note: Uses random weights instead of model weights
@@ -288,3 +287,29 @@ class DRAMContents(object):
                 self.fmap[0][c] = np.random.randint(-16, 15)
                 if (self.fmap[0][c] == 0):
                     self.fmap[0][c] = int(np.random.choice([-1, 1]))
+
+    def load_conv_weights_tflite(self, layer, path, tensor_name):
+        """Replace the weights of conv layer `layer` by an int8 tensor of a TFLite model.
+
+        TFLite stores conv kernels as [filter][kernel row][kernel column][channel] (OHWI); like the Keras
+        loader above (weights[c][f][y][x] = kernel[x][y][c][f]) this sets weights[c][f][y][x] = t[f][x][y][c].
+        Channels beyond the tensor (the bug #17 padding channel) are left alone. Returns the number of zero
+        weights loaded, which the encoding of bug #22 has to handle.
+        """
+        import tensorflow as tf
+        interpreter = tf.lite.Interpreter(model_path=path)
+        interpreter.allocate_tensors()
+        details = [d for d in interpreter.get_tensor_details() if d["name"] == tensor_name]
+        if not details:
+            raise KeyError("no tensor %r in %s" % (tensor_name, path))
+        t = interpreter.get_tensor(details[0]["index"])
+        filters, rows, cols, channels = t.shape
+        w = self.weights[layer]
+        if len(w) < channels or len(w[0]) != filters or len(w[0][0]) != cols or len(w[0][0][0]) != rows:
+            raise ValueError("tensor %s %s does not fit the layer's weights" % (tensor_name, tuple(t.shape)))
+        for c in range(channels):
+            for f in range(filters):
+                for y in range(cols):
+                    for x in range(rows):
+                        w[c][f][y][x] = int(t[f][x][y][c])
+        return int((t == 0).sum())

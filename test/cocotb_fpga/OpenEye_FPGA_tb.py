@@ -447,6 +447,12 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
             logger.info("layer-0 input activations (first 34): %s", flat[:34])
         except Exception as exc:
             logger.info("could not flatten layer-0 input (%s)", type(exc).__name__)
+    if os.environ.get("OPENEYE_TFLITE_CONV"):
+        # Layer-0 conv weights of a trained int8 TFLite model ("<file>:<tensor name>"),
+        # e.g. the MNIST model of doc/demo_notebooks: real zero weights (bug #22).
+        tflite_path, tensor_name = os.environ["OPENEYE_TFLITE_CONV"].split(":", 1)
+        zeros = dram.load_conv_weights_tflite(0, tflite_path, tensor_name)
+        logger.info("OPENEYE_TFLITE_CONV: layer-0 weights from %s (%d zero weights)", tensor_name, zeros)
     # After the debug hooks above, which fill every channel
     channel_pad.fill_padding_channels(model, dram)
     test_amount = 1

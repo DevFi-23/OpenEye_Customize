@@ -47,6 +47,7 @@ import math
 import logging
 import open_eye.generic_test_utils as gtu
 import open_eye.stream_dicts as strdic
+import open_eye.conv_wght_encoding as cwe
 
 logger = logging.getLogger("cocotb")
 
@@ -587,6 +588,11 @@ class ConvWghtStreamMapper(WghtStreamMapper):
 
     """
 
+    # Every PE block has the length the RTL takes (trans_cycles_wght) and no
+    # all-zero word (conv_wght_encoding), so no word may be dropped (bug #22:
+    # dropping the zero tail made the stream shorter than configured).
+    SKIP_ZERO_WORDS = False
+
     def __init__(self, params, layer_params, layer_repetition, dram_layer_content, sparse_data):
         """Initialize the Conv2D weight stream mapper.
 
@@ -601,7 +607,32 @@ class ConvWghtStreamMapper(WghtStreamMapper):
         super().__init__(params, layer_params, layer_repetition, dram_layer_content, sparse_data)
 
     def write_wght_data_storage(self, cl_x, cl_y, router):
-        """Populate Conv2D weight data SPAD from DRAM for a specific PE.
+        """Zero-compressed weight data SPAD of one PE, in the format data_pipeline_wght.v decodes.
+
+        The columns (one per iact position, the weights of its filters) are taken from the dense layout of
+        write_dense_wght_data_storage and encoded by conv_wght_encoding.encode_columns (bug #22). Without zero
+        weights the result equals the dense layout.
+
+        Args:
+            cl_x (int): Cluster X coordinate
+            cl_y (int): Cluster Y coordinate
+            router (int): Router/PE ID within the cluster
+
+        Returns:
+            list: Weight data SPAD as 3D array [words][parallel_macs][value, overhead]
+
+        """
+        layer_params = self.layer_params
+        macs = self.params.PARALLEL_MACS
+        dense = self.write_dense_wght_data_storage(cl_x, cl_y, router)
+        column_length = math.ceil(layer_params.used_wght_per_PE / layer_params.used_iact_per_PE)
+        words_per_column = math.ceil(column_length / macs)      # every column starts at a word boundary
+        columns = [[entry[0] for word in dense[k * words_per_column:(k + 1) * words_per_column] for entry in word]
+                   [:column_length] for k in range(layer_params.used_iact_per_PE)]
+        return cwe.encode_columns(columns, macs, math.ceil(layer_params.used_wght_per_PE / macs), len(dense))
+
+    def write_dense_wght_data_storage(self, cl_x, cl_y, router):
+        """Populate Conv2D weight data SPAD from DRAM for a specific PE, every weight in its slot (zeros included).
 
         This overridden method handles Conv2D-specific weight distribution patterns,
         including multi-kernel configurations and cluster-based channel partitioning.
@@ -619,7 +650,7 @@ class ConvWghtStreamMapper(WghtStreamMapper):
             router (int): Router/PE ID within the cluster
 
         Returns:
-            list: Weight data SPAD as 3D array [words][parallel_macs][value, overhead]
+            list: Weight data SPAD as 3D array [words][parallel_macs][value, 0]
 
         """
         layer_repetition = self.layer_repetition
@@ -629,7 +660,6 @@ class ConvWghtStreamMapper(WghtStreamMapper):
 
         # Initialize SPAD storage with 2 parallel MACs (Conv2D specific)
         spad_storage = [[[0 for _ in range(2)] for _ in range(params.PARALLEL_MACS)] for _ in range(int(self.params.Wghts_per_PE/params.PARALLEL_MACS))]
-        overhead_counter = 0
         kernel_x = 0
 
         # Calculate channel partitioning for this router/PE
@@ -665,13 +695,9 @@ class ConvWghtStreamMapper(WghtStreamMapper):
                 if(channel != 1 + int(layer_params.input_shape[3]/layer_params.iact_transmissions_pe) + (layer_repetition % layer_params.iact_transmissions_pe) * math.ceil(layer_params.input_shape[3]/layer_params.iact_transmissions_pe)):
                     try:
                         # Load weight from DRAM: dram[channel][filter][kernel_row][kernel_x]
+                        # (zeros stay in their slot; write_wght_data_storage compresses them)
                         spad_storage[spad_position//params.PARALLEL_MACS][spad_position%params.PARALLEL_MACS][0] = dram[channel][filters][kernel_x][kernel_row]
-                        if (spad_storage[spad_position//params.PARALLEL_MACS][spad_position%params.PARALLEL_MACS][0] == 0):
-                            overhead_counter = overhead_counter + 1
-                        else:
-                            spad_storage[spad_position//params.PARALLEL_MACS][spad_position%params.PARALLEL_MACS][1] = overhead_counter
-                            spad_position = spad_position + 1
-                            overhead_counter = 0
+                        spad_position = spad_position + 1
                     except:
                         # Out of bounds, use zero
                         spad_storage[spad_position//params.PARALLEL_MACS][spad_position%params.PARALLEL_MACS][0] = 0

@@ -146,6 +146,8 @@ OpenEye_orig/
 │   ├── rtl_test_utils.py      ★  Hàm cocotb: gửi stream, so sánh kết quả, profiler, trace DMA, driver bộ nhớ
 │   ├── memory_model.py        ★  Mô hình DDR + AXI DMA (mục 6c)
 │   ├── channel_pad.py         ★  Đệm input 1 channel thành 2 channel (workaround lỗi #17, mục 9)
+│   ├── conv_wght_encoding.py  ★  Mã hóa weight Conv có số 0 theo đúng cách RTL giải mã (sửa lỗi #22, mục 9)
+│   ├── wght_pipeline_model.py ★  Mô hình chu kỳ của data_pipeline_wght.v (khớp RTL), dùng trong unit test
 │   └── profile_report.py      ★  Báo cáo và so sánh profile (mục 6.5)
 ├── test/
 │   ├── cocotb_fpga/              Testbench top-level FPGA (OpenEye_FPGA_tb.py) và các bộ test
@@ -159,6 +161,7 @@ OpenEye_orig/
 │   ├── test_profile_report.py ★  Unit test của công cụ báo cáo
 │   ├── test_profile_phases.py ★  Unit test quy tắc gán pha của profiler
 │   ├── test_channel_pad.py    ★  Unit test đệm channel (lỗi #17)
+│   ├── test_conv_wght_encoding.py ★ Unit test mã hóa weight Conv có số 0 (lỗi #22)
 │   └── .temp/                 ☆  Thư mục chạy của từng test (log, header sinh ra, profile.json)
 ├── tools/                     ★  Công cụ của dự án riêng
 │   ├── run_profile.py            Chạy các case đo song song, so sánh với baseline (mục 6)
@@ -509,7 +512,7 @@ nhưng còn lỗi #9; Conv1 còn lỗi #17. Lưu ý: trước bản sửa lỗi 
 | `model_mnist_real_c2` | `LAYER=MNIST_REAL` = kiến trúc `models/mnist_conv_net.py` (Conv 32, MaxPool, Conv 64, MaxPool, Conv 64, FC 3136→10), đầu vào 2 channel ngẫu nhiên | 64 | ~11 phút |
 | `model_mnist_real_c1` | Như trên với **đầu vào 1 channel (đúng model thật)**; testbench tự đệm thành 2 channel, channel thêm toàn 0 (lỗi #17, mục 9) | 64 | ~11 phút |
 
-`-k "not model"` chỉ chạy 9 case một layer; `-k model` chỉ chạy 3 case model. Mốc gồm cả 12 case: `doc/perf/baseline_2026-10-22/` (mục 6.13).
+`-k "not model"` chỉ chạy 9 case một layer; `-k model` chỉ chạy 3 case model. Mốc gồm cả 12 case: `doc/perf/baseline_2026-10-24/` (mục 6.13; sau bản sửa #22, weight Conv ngẫu nhiên giữ số 0 thật).
 
 ### 6.8 Thêm một case mới
 
@@ -615,8 +618,8 @@ FSM chính **tính toán ngay trong trạng thái 11** `RECEIVE_PSUMS_TO_IACT`, 
 
 ```bash
 venv/bin/python tools/run_profile.py -k model --clock-mhz 250                                     # 2 case model
-venv/bin/python tools/run_profile.py -k model --compare doc/perf/baseline_2026-10-22 --clock-mhz 250
-venv/bin/python -m open_eye.profile_report --clock-mhz 250 doc/perf/baseline_2026-10-22/model_mnist_real_c2.json
+venv/bin/python tools/run_profile.py -k model --compare doc/perf/baseline_2026-10-24 --clock-mhz 250
+venv/bin/python -m open_eye.profile_report --clock-mhz 250 doc/perf/baseline_2026-10-24/model_mnist_real_c2.json
 ```
 
 Khi `--compare`, case có trong mốc được so từng pha và từng layer (`cycles base/new`, `DMA words base/new`); case chưa có trong mốc được in báo cáo đầy đủ
@@ -956,11 +959,12 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 
 Độ trễ thật = số chu kỳ ÷ fmax. Một tối ưu giảm 19 % số chu kỳ nhưng làm fmax giảm 25 % thì **chậm hơn**. Vì vậy mọi tối ưu cần cả hai con số.
 
-## 7. Kết quả baseline chính (chi tiết: `doc/perf/baseline_2026-10-22.md`; trước bản sửa #18: `baseline_2026-10-10.md`)
+## 7. Kết quả baseline chính (chi tiết: `doc/perf/baseline_2026-10-24.md`; trước bản sửa #18: `baseline_2026-10-10.md`)
 
-**Baseline hiện tại: `doc/perf/baseline_2026-10-22/`** (12 case, bộ nhớ lý tưởng; thời gian ở 250 MHz = chu kỳ × 4 ns). 9 case một layer giống hệt
-`baseline_2026-10-15` (sau bản sửa lỗi #18); thêm 3 case cả model có bảng theo layer (mục 6.13): **MNIST thật 1 channel `model_mnist_real_c1` 241.250 chu kỳ
-(965 µs)**, Conv2 chiếm 50 %; `model_mnist_real_c2` 244.050 chu kỳ (976 µs); `model_mnist16_c2` 50.020 chu kỳ (200 µs).
+**Baseline hiện tại: `doc/perf/baseline_2026-10-24/`** (12 case, bộ nhớ lý tưởng; thời gian ở 250 MHz = chu kỳ × 4 ns). 9 case một layer giống hệt
+`baseline_2026-10-15` (sau bản sửa lỗi #18); thêm 3 case cả model có bảng theo layer (mục 6.13): **MNIST thật 1 channel `model_mnist_real_c1` 240.671 chu kỳ
+(963 µs)**, Conv2 chiếm 50 %; `model_mnist_real_c2` 243.517 chu kỳ (974 µs); `model_mnist16_c2` 50.007 chu kỳ (200 µs). So với `baseline_2026-10-22`
+(trước bản sửa #22) các case model giảm 13–579 chu kỳ: weight Conv ngẫu nhiên nay giữ số 0 thật (1–5 %) và PE bỏ qua chúng; số word DMA không đổi.
 
 **Layer kiểu MNIST (0.3):**
 
@@ -1040,7 +1044,9 @@ dài 96 thay vì 192 chu kỳ.
 | 19b | Dense N = 32 output với từ 8 lượt K (K ≥ 508) | ? | **Chưa rõ nguyên nhân**: K ≤ 504 đúng, 508/512 sai; N = 16/24 ở K = 512 đúng. Sai ở phía weight hoặc psum, không phải kiểu mất activation |
 | 20 | `PE.v:829–830`: tham chiếu "tiến" `gen_sparse_fsm.wght_addr_vec` / `wght_addr_use_vec` / `wght_data_use_vec` vào khối generate khai báo sau (dòng 978). Icarus, Verilator, Vivado hiểu đúng; **Yosys tạo dây 1 bit không ai lái** ("implicitly declared") | `hdl/PE.v` | **Chưa sửa** (phát hiện 2026-10-21). Cùng loại với #14 (nghĩa phụ thuộc công cụ). Đề xuất: khai báo 3 tín hiệu ở cấp module trước hai khối generate. |
 | 21 | Dense N > 32 output (cần 2 lượt psum): sai với mọi K | ? | **Chưa điều tra** (phát hiện 2026-10-21): K = 64, N = 40 chỉ đúng 10 output đầu, N = 48 chỉ đúng 12 output đầu; N = 32 đúng |
-| 22 | Conv có **weight bằng 0** tính sai hoặc treo (mọi mẫu số 0 trừ "mỗi cột một số 0 ở đầu"; model MNIST int8 đã huấn luyện: Conv2 140/384, Conv3 116/384 lần nạp weight sai) | Định dạng nén weight: mapper Python (`ConvWghtStreamMapper`, bộ ghép stream, `SKIP_ZERO_WORDS`) **không khớp** với cách `data_pipeline_wght.v` giải mã (cột rỗng, ô đệm, overhead 4 bit, reset địa chỉ ở word 0) | **Đã điều tra** (2026-10-24, không sửa RTL): 6 cơ chế F1–F3, F7–F9; có bản sửa **chỉ Python** đã kiểm chứng (bộ mã hóa mới, chưa đưa vào `src/`). Mục 9, `doc/experiments/2026-10-24_bug22_weight_encoding.md` |
+| 22 | Conv có **weight bằng 0** tính sai hoặc treo (mọi mẫu số 0 trừ "mỗi cột một số 0 ở đầu"; model MNIST int8 đã huấn luyện: Conv2 140/384, Conv3 116/384 lần nạp weight sai) | Định dạng nén weight: mapper Python không khớp cách `data_pipeline_wght.v` giải mã (cột rỗng, ô đệm, overhead 4 bit, reset địa chỉ ở word 0) và bộ ghép stream | **Đã sửa** (2026-10-24, được bạn đồng ý, **chỉ Python**): `conv_wght_encoding.py`; stream giống hệt khi không có số 0; MNIST Conv1/2/3 với weight đã huấn luyện tính đúng mọi output. Mục 9 |
+| 23 | `test_conv3x3_sparse` 32×4×8 → 16 (iact và weight thưa dạng bàn cờ, `NUM_GLB_IACT=3`) sai: output 0 ở các x lẻ của hàng 1 | ? (phía activation thưa: weight của ca này giải mã đúng theo mô hình RTL) | **Chưa điều tra** (có từ trước bản sửa #22: code cũ cũng fail, kiểu sai khác) |
+| 24 | **Không có hàm kích hoạt**: `af_cluster.v` (ReLU) không được dùng ở đâu, còn 2 lỗi (so sánh `< 0` trên dây không dấu, chọn bit `[a:+b]` sai), testbench riêng lỗi thời; `af_cluster_mode` chỉ reset về 0, không có trường cấu hình | RTL | **Chưa sửa** (ghi nhận 2026-10-24). Tham chiếu Python cũng không có ReLU; cần cho model thật (mục 8d) |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-15)
 
@@ -1116,7 +1122,7 @@ toàn 0, +472 chu kỳ = +1,5 % Conv1, mục 9; sửa RTL vẫn là lựa chọn
 (4) model khác: #19b, #21, layer nhiều lượt truyền.
 
 **Còn thiếu để chạy model int8 đã huấn luyện với kết quả đúng:** tham chiếu giữa các layer (`batchnorm_output`) chỉ là `floor(mant·x/2^shift)`, không kẹp,
-không ReLU, nên PASS ở trên không nói gì về độ chính xác. Cần: (I) **lỗi #22: weight 0 thật** (đã điều tra 2026-10-24, có bản sửa chỉ Python chờ đưa vào, mục 9); (A) kẹp int8 trong `quantization_unit.v` (thiếu → 9,3 % theo mô phỏng ngày 19/10); (B) ReLU
+không ReLU, nên PASS ở trên không nói gì về độ chính xác. Cần: (I) ~~lỗi #22: weight 0 thật~~ **đã sửa 2026-10-24** (chỉ Python, mục 9); (A) kẹp int8 trong `quantization_unit.v` (thiếu → 9,3 % theo mô phỏng ngày 19/10); (B) ReLU
 (`af_cluster.v` không được nối) → gộp vào bộ kẹp có cận [qmin, qmax] lập trình được; (C) zero point cộng sau khi nhân (hiện offset cộng trước) hoặc lượng tử đối
 xứng; (D) làm tròn gần nhất; (E) mantissa bị cắt 8 bit (`OpenEye_FPGA.v:1345`); (F) lỗi #12 `current_filter`; (G) psum 20 bit thiếu (cần 21) → 24/32 bit kèm thu
 nhỏ bộ đệm psum; (H) luồng Python cho model thật: bộ chuyển TFLite/PyTorch int8, ảnh MNIST thật, mô hình numpy đúng từng bit của phần cứng + TFLite làm chuẩn,
@@ -1573,7 +1579,7 @@ Trong cả model: Conv1 32.980 chu kỳ (ít hơn 2.611 so với channel thứ h
 Weight đệm ±1 thay vì 1 cho số chu kỳ như nhau. Ưu điểm: không đổi RTL, đúng từng bit, tự động. Nhược điểm: +1,2 % chu kỳ Conv1 và +456 word DMA; RTL vẫn còn
 lỗi (bật `OPENEYE_PAD_CHANNELS=0` sẽ thấy); host thật (driver CPU) sau này cũng phải đệm như vậy.
 
-### Lỗi #22: weight bằng 0 làm sai định dạng weight nén (phát hiện 2026-10-22, điều tra 2026-10-24, không sửa RTL)
+### Lỗi #22: weight bằng 0 làm sai định dạng weight nén (phát hiện 2026-10-22, điều tra và sửa 2026-10-24, chỉ Python)
 
 Chi tiết: `doc/experiments/2026-10-24_bug22_weight_encoding.md`, công cụ `doc/experiments/2026-10-24_bug22/`.
 
@@ -1594,7 +1600,7 @@ channel) một cột gồm `M0` filter). Mapper bỏ weight 0, entry khác 0 k�
 | F2 | Cột có số entry lẻ được thêm ô đệm `(0,0)`: RTL tính ô đệm là 1 vị trí, mapper thì không mà còn mang mọi số 0 cuối cột sang overhead của cột sau → đếm trùng 1 vị trí, cột sau lệch 1 filter | định dạng không khớp |
 | F3 | Hơn 15 số 0 liên tiếp không vừa overhead 4 bit | định dạng không khớp |
 | F7 | Bộ ghép stream gửi cho mọi PE số word bằng PE (0,0,0); khi nén, PE dài hơn bị cắt | Python |
-| F8 | `SKIP_ZERO_WORDS` bỏ các word 0 ở đuôi → stream weight ngắn hơn `trans_cycles_wght` (độ dài dày mà RTL được cấu hình) → RTL lấy word bias làm weight | Python |
+| F8 | `SKIP_ZERO_WORDS` bỏ các word 0 ở đuôi → stream weight ngắn hơn. `layer_mapper` đặt `trans_cycles_wght` theo stream thực tế nên stream không lệch, nhưng mỗi PE vẫn nhận `used_wght_per_PE/2` word (độ dài dày) từ bộ đệm weight → khối PE không còn khớp dữ liệu (đính chính: ngày 24/10 sáng ghi nhầm là RTL lấy word bias làm weight) | Python |
 | F9 | RTL reset địa chỉ ghi SPad dữ liệu ở mỗi word 0, và PE nhận thêm 1 word sau khối của nó; khối có đuôi word 0 thì word thừa (dữ liệu thật ở layer nhiều lượt truyền) ghi đè địa chỉ 0 và đặt `second_spad_words = 2` → PE treo ở `CALCULATE_PSUM` | định dạng không khớp |
 
 **Bằng chứng:** probe dump mọi lần ghi SPad weight của 48 PE với giá trị weight duy nhất (đối chứng không có số 0: 0/48 PE sai; channel 1 toàn 0: con trỏ
@@ -1606,7 +1612,7 @@ tái hiện cả `second_spad_words = 2` của ca treo; bộ kiểm tra offline 
 nạp weight giải mã sai; mô phỏng RTL Conv2/Conv3 với weight này treo. Các test hiện có không thấy vì `DRAMContents` thay weight 0 bằng ±1
 (`test_conv3x3_sparse` PASS vì ở cấu hình đó RTL nhận đúng 24 word mỗi PE, bằng độ dài dữ liệu nén của mẫu bàn cờ).
 
-**Bản sửa đề xuất (chỉ Python, đã làm thử ngoài `src/`, chờ bạn đồng ý):** bộ mã hóa mới chỉ sinh định dạng RTL giải mã đúng: mỗi cột tự kết thúc ở filter
+**Bản sửa (chỉ Python, đưa vào `src/` ngày 2026-10-24 sau khi bạn đồng ý):** bộ mã hóa mới chỉ sinh định dạng RTL giải mã đúng: mỗi cột tự kết thúc ở filter
 `M0-1` (entry 0 tường minh khi cần, cột rỗng thành `(0, M0-1)`), không mang số 0 sang cột sau, cắt chuỗi số 0 dài bằng `(0, 15)`, không bao giờ tạo word toàn 0,
 lấp phần còn lại của khối PE bằng word `[(0,0), (0,1)]` (giá trị 0, chỉ tạo cột PE không đọc), gửi đủ độ dài (tắt `SKIP_ZERO_WORDS`).
 
@@ -1622,6 +1628,23 @@ lấp phần còn lại của khối PE bằng word `[(0,0), (0,1)]` (giá trị
 Bản nháp đầu (chưa có word lấp đầy) PASS ở layer 1 lượt truyền nhưng treo ở layer nhiều lượt; snapshot trạng thái PE cho thấy `second_spad_words_wght = 2`,
 mô hình truy ra F9. **Hướng phía RTL** (cần bạn đồng ý, chưa làm): cho phép cột rỗng, sửa nghĩa ô đệm, bỏ reset địa chỉ ở word 0; độ dài stream weight thay
 đổi được thì weight 0 còn tiết kiệm được cả DMA.
+
+**Đưa vào `src/` (2026-10-24):** `src/open_eye/conv_wght_encoding.py` (bộ mã hóa), `ConvWghtStreamMapper.write_wght_data_storage` lấy cột từ bố cục dày
+(`write_dense_wght_data_storage` = vòng lặp cũ, giữ số 0 tại chỗ) rồi mã hóa, `SKIP_ZERO_WORDS = False` cho Conv; `DRAMContents` **không còn thay weight
+Conv bằng 0 thành ±1** (Dense, Depthwise giữ như cũ); hook `OPENEYE_TFLITE_CONV=<file>:<tensor>` nạp weight Conv đã huấn luyện từ TFLite
+(`DRAMContents.load_conv_weights_tflite`); `src/open_eye/wght_pipeline_model.py` (mô hình chu kỳ đã khớp RTL) cho unit test.
+
+| Kiểm chứng sau khi đưa vào | Kết quả |
+|---|---|
+| Stream của mapper mới so với mapper đã commit, weight không có số 0 (8 kích thước) | Giống hệt từng word |
+| Stream của mapper mới so với bộ mã hóa đã chạy RTL, 27 ca có số 0 (gồm weight MNIST thật) | Giống hệt từng word |
+| `test/test_conv_wght_encoding.py` (39 test: quy tắc mã hóa, mô hình RTL đọc lại đúng mọi cột với 0–100 % số 0, mapper thật qua mọi PE và mọi lượt truyền, bố cục cũ hỏng trong mô hình) | Pass |
+| Hồi quy RTL: `test_conv_const` 34, `test_mnist_layers` 26 (mapping, Conv MNIST, 9 test ngẫu nhiên nay có 1,4–5,3 % weight bằng 0, **3 test mới với weight MNIST đã huấn luyện**), 2 ca `test_conv3x3_sparse` | 56 pass, 5 xfail như trước (3 channel ×2, #17 không đệm, #9 Conv3 ×2); 1 fail có từ trước (#23) |
+| MNIST với weight đã huấn luyện (`test_trained_mnist_conv`) | Conv1 25.088/25.088, Conv2 12.544/12.544, Conv3 3.136/3.136 output = numpy (Conv3 xfail do #9 ở kiểm tra stream) |
+| `run_profile` 12 case | 9 case một layer 0 chu kỳ lệch; 3 case model −13 … −579 chu kỳ, DMA không đổi; mốc mới `doc/perf/baseline_2026-10-24/` |
+
+Hạn chế đã biết: cột dài hơn 16 filter không giải mã được ở RTL (thanh ghi đếm vị trí 5 bit), mapper hiện không tạo cột như vậy; bộ mã hóa dừng với lỗi
+nếu một cột không mã hóa được mà không sinh word 0 (chỉ xảy ra khi số filter mỗi cột lẻ).
 
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
@@ -1947,3 +1970,11 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   offline trên 6 kích thước × 9 mẫu và weight thật; RTL 12 ca PASS gồm MNIST Conv1/Conv2 thật, Conv3 thật 3.136/3.136 output đúng (fail stream do #9 như
   trước); stream giống hệt khi không có số 0; DMA không đổi. Đính chính phân tích ngày 22/10. Mục 8b, 9,
   `doc/experiments/2026-10-24_bug22_weight_encoding.md`, công cụ `doc/experiments/2026-10-24_bug22/`.
+- **Sửa lỗi #22** (được bạn đồng ý, chỉ Python): bộ mã hóa weight Conv mới `src/open_eye/conv_wght_encoding.py` trong `ConvWghtStreamMapper`
+  (cột tự kết thúc, 0 tường minh, không mang số 0 sang cột sau, chia chuỗi số 0 dài, lấp khối PE bằng word khác 0, gửi đủ độ dài); `DRAMContents` giữ weight
+  Conv bằng 0 thật; hook `OPENEYE_TFLITE_CONV` + 3 test `test_trained_mnist_conv` với weight MNIST đã huấn luyện; `test/test_conv_wght_encoding.py`
+  (39 test, dùng mô hình chu kỳ `src/open_eye/wght_pipeline_model.py`). Stream giống hệt khi không có số 0; hồi quy 56 pass + 5 xfail như trước + 1 fail có
+  từ trước (#23, weight của nó giải mã đúng); 9 case mốc 0 chu kỳ lệch, mốc mới `baseline_2026-10-24`. Đính chính F8 (`trans_cycles_wght` theo stream thực tế).
+- **Ghi nhận #23** (`test_conv3x3_sparse` 32×4×8 → 16 sai từ trước, phía activation thưa) và **#24** (không có hàm kích hoạt: `af_cluster.v` không được dùng
+  và có 2 lỗi, tham chiếu Python không có ReLU). Mục 8b.
+

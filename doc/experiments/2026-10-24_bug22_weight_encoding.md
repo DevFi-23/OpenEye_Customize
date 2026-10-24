@@ -16,7 +16,7 @@ reproduced in RTL simulation and by a cycle model of the RTL that matches it wri
 | F2 | a column with an odd number of entries gets a padding slot `(0, 0)`; the RTL counts that slot as one position, the mapper does not, and also carries all trailing zeros of the column into the overhead of the next column's first entry: one position is counted twice, the next column is off by one filter | format mismatch |
 | F3 | a run of more than 15 zeros does not fit the 4-bit overhead field (columns of more than 16 filters, or carried zeros) | format mismatch |
 | F7 | the serializer emits, for every PE, as many words as PE (0,0,0) has (`create_complete_wght_stream`); with compression the PEs differ and longer ones are cut | Python |
-| F8 | `SKIP_ZERO_WORDS` drops the all-zero tail words, so the weight stream is shorter than `trans_cycles_wght` (the dense length the RTL is configured for) and the RTL takes the following bias words as weights | Python |
+| F8 | `SKIP_ZERO_WORDS` drops the all-zero tail words, so the weight stream gets shorter; `layer_mapper` sets `trans_cycles_wght` to the emitted length (so the stream itself stays aligned), but every PE still receives `used_wght_per_PE / 2` words (the dense count) from the weight buffer, so a PE block no longer matches its data (corrected: an earlier version of this document said the RTL takes bias words as weights) | Python |
 | F9 | the RTL resets the data SPad write address at every all-zero word, and a PE captures one word beyond its block; when the block ends with zero words (compressed data shorter than the block) that extra word, if it is real data (multi-transmission layers), lands at address 0 and sets `second_spad_words` to 2, and the PE hangs in `CALCULATE_PSUM` | format mismatch |
 
 Correction of 2026-10-22 (`2026-10-22_bug17_channel_pad.md` section 3, README section 9 of that day): the conv mapper is
@@ -29,7 +29,7 @@ of 384 PE weight loads decode wrong, Conv3 116 of 384 (Conv1: 0 of 24, its singl
 and Conv3 with these weights fail (hang). Every existing test hides the problem: `DRAMContents` replaces each zero weight by
 +-1, and `test_conv3x3_sparse` passes for a configuration-specific reason (section 6).
 
-**Fix without RTL change** (prototype `encoder.py`, not yet in `src/`): an encoder that only writes what the RTL decodes
+**Fix without RTL change** (prototype `encoder.py`; integrated into `src/` the same day, section 8): an encoder that only writes what the RTL decodes
 correctly. Verified offline on 6 layer shapes x 9 zero patterns and the trained MNIST weights (0 wrong loads) and in RTL
 simulation (12 layer runs pass, incl. MNIST Conv1/Conv2 with the trained weights and the existing sparse test; MNIST Conv3
 with the trained weights: every output equal to numpy, the stream check fails with bug #9 as before). Identical stream for
@@ -138,3 +138,23 @@ configuration, so skipping zeros cannot shorten the stream without an RTL change
 | `mapper_words.py`, `offline_check.py`, `sweep.py` | per-PE mapper words; end-to-end offline check; shape x pattern sweep |
 | `encoder.py` | the candidate encoder |
 | `real_weights.py`, `real_mnist_conv_weights.json` | conv weights of the trained int8 MNIST model and their offline check |
+
+## 8. Fix integrated (2026-10-24, approved)
+
+`src/open_eye/conv_wght_encoding.py` (the encoder of section 4), `ConvWghtStreamMapper.write_wght_data_storage` (columns from
+the dense layout of `write_dense_wght_data_storage`, the old loop without compression, then `encode_columns`;
+`SKIP_ZERO_WORDS = False`), `DRAMContents` keeps real zero conv weights, `OPENEYE_TFLITE_CONV` loads trained conv weights,
+`src/open_eye/wght_pipeline_model.py` for the unit tests (`test/test_conv_wght_encoding.py`, 39 tests).
+
+- Same stream as the committed mapper for weights without zeros (8 shapes) and as the RTL-verified prototype for 27
+  zero-weight cases (incl. the trained MNIST weights).
+- RTL regression: `test_conv_const` 34 pass; `test_mnist_layers` 26: 21 pass, 5 xfail as before (incl. the new
+  `test_trained_mnist_conv`: Conv1 25,088/25,088, Conv2 12,544/12,544, Conv3 3,136/3,136 outputs equal numpy, Conv3
+  xfail by bug #9); `test_conv3x3_sparse` 32x1x4 -> 8 pass, 32x4x8 -> 16 fails as it did before the change (bug #23;
+  its weights decode correctly in the model, so the failure is on the activation side).
+- Profiling: the 9 single-layer cases unchanged; the model cases 13 to 579 cycles faster (random conv weights now keep
+  1 to 5 % zeros), same DMA words: `doc/perf/baseline_2026-10-24/`.
+- Limitation of the offline check (section 3): it treats a shortened stream (F8) as broken for every PE; in RTL such a
+  stream can work (single transmission, no odd columns, equal PE lengths: `test_conv3x3_sparse` 32x1x4 -> 8 with the old
+  encoding). Its other predictions matched every simulated case.
+

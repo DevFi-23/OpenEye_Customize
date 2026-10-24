@@ -27,11 +27,19 @@
    hooks hid bug #18), each followed by tools/verify_conv_output.py, an
    independent numpy recomputation that checks every DMA output word. The
    one-channel layers wider than 16 are padded to two channels (bug #17).
+   Random conv weights keep their zeros since 2026-10-24 (bug #22).
+
+4. test_trained_mnist_conv: the three convolution layers with the weights of
+   the trained int8 model doc/demo_notebooks/mnist_quantized_model.tflite
+   (about 1 % zero weights, which the conv weight encoding got wrong before
+   the bug #22 fix: Conv2 and Conv3 hung), random activations, each followed
+   by the independent check.
 
 The README_FI file documents the findings (sections 8b and 9). Usage:
     pytest test_mnist_layers.py -v -k mapping     # about 30 s per case
     pytest test_mnist_layers.py -v -k mnist       # 4-15 min per layer
     pytest test_mnist_layers.py -v -k random      # 0.5-8 min per layer
+    pytest test_mnist_layers.py -v -k trained     # 4-7 min per layer
 """
 
 import os
@@ -40,7 +48,7 @@ import sys
 import pytest
 
 import test_conv_const as conv
-from open_eye import test_dir
+from open_eye import test_dir, open_eye_dir
 
 THREE_CHANNELS = pytest.mark.xfail(
     strict=True, reason="bug #7: Python packs 3 bytes per pixel, the RTL moves activations in pairs")
@@ -127,3 +135,29 @@ def test_random_data(layer, request, monkeypatch):
                          request=request, input_height=height, quant_amount=quant_amount,
                          dma_bitwidth=64, random_data=True)
     _verify_independently(request)
+
+
+# Weights of the trained int8 MNIST model; id: (width, height, input channels, filters, QUANT_AMOUNT, tensor)
+TRAINED_MODEL = os.path.join(open_eye_dir, os.pardir, os.pardir, "doc", "demo_notebooks", "mnist_quantized_model.tflite")
+TRAINED_LAYERS = {
+    "conv1_28x28_c1_f32": (28, 28, 1, 32, 32, "sequential_1/conv2d_1/convolution"),        # 1 zero weight
+    "conv2_14x14_c32_f64": (14, 14, 32, 64, 64, "sequential_1/conv2d_1_2/convolution"),    # 189 zero weights
+    "conv3_7x7_c64_f64": pytest.param(
+        (7, 7, 64, 64, 64, "sequential_1/conv2d_2_1/convolution"), marks=pytest.mark.xfail(   # 418 zero weights
+            strict=True, reason="bug #9: padding slots of 7-wide rows are non-zero; every result value is correct "
+                                "(tools/verify_conv_output.py)")),
+}
+
+
+@pytest.mark.parametrize("layer", list(TRAINED_LAYERS.values()), ids=list(TRAINED_LAYERS))
+def test_trained_mnist_conv(layer, request, monkeypatch):
+    width, height, channels, filters, quant_amount, tensor = layer
+    monkeypatch.setenv("OPENEYE_DUMP_VERIFY", "1")
+    monkeypatch.setenv("OPENEYE_TFLITE_CONV", f"{os.path.abspath(TRAINED_MODEL)}:{tensor}")
+    monkeypatch.setattr(conv, "INPUT_SIZE_X", width)
+    monkeypatch.setattr(conv, "NUM_FILTERS", filters)
+    conv._run_conv_const("Convolution_Single", 8, 2, num_glb_iact=1, input_channels=channels,
+                         request=request, input_height=height, quant_amount=quant_amount,
+                         dma_bitwidth=64, random_data=True)
+    _verify_independently(request)
+
