@@ -37,7 +37,7 @@
 
 The README_FI file documents the findings (sections 8b and 9). Usage:
     pytest test_mnist_layers.py -v -k mapping     # about 30 s per case
-    pytest test_mnist_layers.py -v -k mnist       # 4-15 min per layer
+    pytest test_mnist_layers.py -v -k test_mnist_conv   # 4-15 min per layer
     pytest test_mnist_layers.py -v -k random      # 0.5-8 min per layer
     pytest test_mnist_layers.py -v -k trained     # 4-7 min per layer
 """
