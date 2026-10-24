@@ -33,6 +33,8 @@ def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, i
             - "MNIST": Conv-MaxPool-Conv-MaxPool-Conv-Dense net on 28x28x2 (16 filters)
             - "MNIST_REAL": the architecture of models/mnist_conv_net.py (32/64/64
               filters, FC 3136 -> 10); `channels` = input depth (2 pads the real 1)
+            - "PAPER_MNIST": the network of Table 2 of the OpenEye paper (arXiv
+              2606.01450): Conv 16, MaxPool, Conv 32, MaxPool, Conv 32, Dense 32, Dense 10
         filters (int): Number of output filters/channels for convolution layers
         kernelsize (int): Size of the convolution kernel (assumes square kernel)
         inputsize_x (int): Width of the input tensor
@@ -150,7 +152,20 @@ def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, i
             model.add(tf.keras.layers.Conv2D(64, (3, 3), padding="same", input_shape=(7, 7, 64), strides=strides))
             model.add(tf.keras.layers.Flatten())
             model.add(tf.keras.layers.Dense(units=10, use_bias=True))
-            
+
+        case "PAPER_MNIST":
+            # Table 2 of the OpenEye paper (arXiv 2606.01450), the network of its
+            # Table 3 timing: 28x28x1 -> Conv 16, MaxPool, Conv 32, MaxPool,
+            # Conv 32, Flatten (1568), Dense 32, Dense 10, random weights.
+            model.add(tf.keras.layers.Conv2D(16, (3, 3), padding="same", input_shape=(28, 28, channels), strides=strides))
+            model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2), strides=(2, 2), padding="valid"))
+            model.add(tf.keras.layers.Conv2D(32, (3, 3), padding="same", input_shape=(14, 14, 16), strides=strides))
+            model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2), strides=(2, 2), padding="valid"))
+            model.add(tf.keras.layers.Conv2D(32, (3, 3), padding="same", input_shape=(7, 7, 32), strides=strides))
+            model.add(tf.keras.layers.Flatten())
+            model.add(tf.keras.layers.Dense(units=32, use_bias=True))
+            model.add(tf.keras.layers.Dense(units=10, use_bias=True))
+
         case "AveragePooling":
             x_axis = inputsize_x
             y_axis = inputsize_y

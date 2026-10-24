@@ -9,7 +9,9 @@ test_profile_conv: one Convolution_Single layer (ramp activations, 3x3 kernel,
 CLUSTER_ROWS=2, CLUSTER_COLUMNS=2). test_profile_model: a whole net whose
 layers are chained on chip (each non-final layer writes its requantized
 results back into the iact buffer), random data with a fixed seed
-(OPENEYE_SEED) so the cycle counts are reproducible. Both run with the cycle
+(OPENEYE_SEED) so the cycle counts are reproducible. test_profile_paper: the
+network of Table 2 of the OpenEye paper on every configuration of its Table 3
+(tools/paper_table3.py runs them and prints the per-layer tables). Both run with the cycle
 and DMA profiler enabled (OPENEYE_PROFILE=1, see
 rtl_test_utils.profile_dma_phases), which also splits the counters per layer.
 The result check of the testbench still applies, so a profile is only
@@ -89,3 +91,24 @@ def test_profile_model(case, request, monkeypatch):
     conv._run_conv_const(layer, 8, 2, num_glb_iact=1, input_channels=channels, request=request,
                          input_height=28, quant_amount=quant_amount, dma_bitwidth=64,
                          random_data=True, expect_layers=6)
+
+
+# Table 3 of the OpenEye paper (arXiv 2606.01450): the network of its Table 2
+# (LAYER=PAPER_MNIST, 7 layers, 28x28x1 input) on every configuration of the
+# table: CLUSTER ROWS x PEs X-axis (NUM_GLB_PSUM) x PEs Y-axis (NUM_GLB_WGHT),
+# CLUSTER_COLUMNS = 2 as in every runner here. Random data with a fixed seed.
+PAPER_CONFIGS = {f"paper_cr{cr}_x{x}_y{y}": (cr, x, y) for y in (3, 4) for x in (2, 4) for cr in (1, 2, 4, 8)}
+
+
+@pytest.mark.parametrize("case", list(PAPER_CONFIGS))
+def test_profile_paper(case, request, monkeypatch):
+    cluster_rows, pes_x, pes_y = PAPER_CONFIGS[case]
+    monkeypatch.setenv("OPENEYE_PROFILE", "1")
+    monkeypatch.setenv("OPENEYE_SEED", "1")
+    monkeypatch.setenv("OPENEYE_FAIL_ON_STALL", "400000")
+    monkeypatch.setenv("OPENEYE_KEEP_GOING", "1")      # time every layer even after a failed buffer check
+    monkeypatch.setattr(conv, "NUM_GLB_PSUM", pes_x)
+    monkeypatch.setattr(conv, "NUM_GLB_WGHT", pes_y)
+    conv._run_conv_const("PAPER_MNIST", 8, cluster_rows, num_glb_iact=1, input_channels=1, request=request,
+                         input_height=28, quant_amount=32, dma_bitwidth=64, random_data=True, expect_layers=7)
+

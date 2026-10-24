@@ -220,7 +220,7 @@ def case_name(path):
     if base != "profile.json":
         return os.path.splitext(base)[0]
     name = os.path.basename(os.path.dirname(path))
-    m = re.search(r"test_profile_(?:conv|model)_(.+?)_?$", name)
+    m = re.search(r"test_profile_(?:conv|model|paper)_(.+?)_?$", name)
     return m.group(1) if m else name
 
 

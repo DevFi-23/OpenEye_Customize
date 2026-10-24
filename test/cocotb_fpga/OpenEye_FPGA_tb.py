@@ -455,6 +455,10 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
         logger.info("OPENEYE_TFLITE_CONV: layer-0 weights from %s (%d zero weights)", tensor_name, zeros)
     # After the debug hooks above, which fill every channel
     channel_pad.fill_padding_channels(model, dram)
+    # OPENEYE_KEEP_GOING: a failed iact buffer check between chained layers is
+    # logged and the model runs on, so the profiler times every layer (the
+    # later layers then compute on wrong inputs); the test still fails at the end.
+    failed_iact_checks = []
     test_amount = 1
     for _ in range(test_amount) :
         for layer_number, layer in enumerate(model):
@@ -533,14 +537,21 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
                                         layer_parameters[layer_number].needed_total_transmissions)
                             # The buffer being checked is the next layer's input, so the
                             # layout parameters that describe it are that layer's.
-                            assert rtl_test_utils.compare_iact_storage(
+                            iact_ok = rtl_test_utils.compare_iact_storage(
                                 ptp, dut, dram.fmap[1 + layer_number], openeye_parameter,
                                 layer_parameters[layer_number + 1])
+                            if not iact_ok and os.environ.get("OPENEYE_KEEP_GOING"):
+                                logger.error("Iact buffer check failed after layer %d (OPENEYE_KEEP_GOING: "
+                                             "the model runs on)", layer_number)
+                                failed_iact_checks.append(layer_number)
+                            else:
+                                assert iact_ok
                     else :
                         if (layer_number == max_layers - 1) :
                             dram.fmap[1 + layer_number] = tum.fill_dram_with_ref(calculated_results, dram.fmap[1 + layer_number], layer_parameters[layer_number], layer_parameters[layer_number+1])
                         if (layer_parameters[layer_number].layer_name != "Pooling") :
                             slo.batchnorm_output(layer_parameters[layer_number], 1, layer_number, dram)
 
+    assert not failed_iact_checks, "iact buffer check failed after layer(s) %s" % failed_iact_checks
     if (only_files == 0) :
         assert dut.rst_ni.value == 1, "rst_ni is not 1!"

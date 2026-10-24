@@ -86,7 +86,7 @@ def case_of(test_id):
 
 def profile_path(case):
     found = []
-    for test in ("conv", "model"):   # test_profile_conv / test_profile_model
+    for test in ("conv", "model", "paper"):   # test_profile_conv / _model / _paper
         found += glob.glob(os.path.join(TEMP_DIR, f"*test_profile_{test}_{case}_", "profile.json"))
     return found[0] if found else None
 

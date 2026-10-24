@@ -162,9 +162,11 @@ OpenEye_orig/
 │   ├── test_profile_phases.py ★  Unit test quy tắc gán pha của profiler
 │   ├── test_channel_pad.py    ★  Unit test đệm channel (lỗi #17)
 │   ├── test_conv_wght_encoding.py ★ Unit test mã hóa weight Conv có số 0 (lỗi #22)
+│   ├── test_paper_table3.py   ★  Unit test của công cụ Bảng 3
 │   └── .temp/                 ☆  Thư mục chạy của từng test (log, header sinh ra, profile.json)
 ├── tools/                     ★  Công cụ của dự án riêng
 │   ├── run_profile.py            Chạy các case đo song song, so sánh với baseline (mục 6)
+│   ├── paper_table3.py        ★  Bảng 3 của paper OpenEye đo bằng profiler, theo từng layer và từng pha (mục 6.14)
 │   ├── lint_check.py, lint_baseline/   Lint theo baseline (mục 9c)
 │   ├── export_vivado.py          Xuất thư mục nguồn + Tcl cho Vivado (mục 6d)
 │   ├── check_dma_trace.py        Kiểm tra DUT nhận đúng stream DMA (mục 9)
@@ -665,6 +667,59 @@ Layer có kích thước iact 7×7 dùng kernel 3×3 (nhãn `Conv 7x7x64->64 k3x
 - Mốc mới gồm cả 12 case (thêm `model_mnist_real_c1` cùng ngày, sau bản đệm channel #17): `doc/perf/baseline_2026-10-22/`, báo cáo
   `doc/perf/baseline_2026-10-22.md` (so với `baseline_2026-10-15`, 250 MHz).
 
+### 6.14 Bảng 3 của paper OpenEye, đo bằng profiler theo từng layer (2026-10-24)
+
+Paper: "OpenEye: A Scalable Open-Source Hardware Accelerator for DNNs" (arXiv 2606.01450). Bảng 3 của paper đo mạng ở Bảng 2 (MNIST 8 bit: Conv 16,
+MaxPool, Conv 32, MaxPool, Conv 32, Dense 1568→32, Dense 32→10) trên 16 cấu hình: số hàng cluster `CLUSTER_ROWS` 1/2/4/8 × PE trục X (`NUM_GLB_PSUM`) 2/4 ×
+PE trục Y (`NUM_GLB_WGHT`) 3/4, ở 200 MHz trên ZU19EG, chỉ với 2 cột "Data Send" và "Proc. Time" cho cả mạng. Paper **không** định nghĩa 2 cột này, không
+nói đo bằng cách nào, số cột cluster, `QUANT_AMOUNT` hay độ thưa; repo không có công cụ tạo ra bảng đó.
+
+**Cách đo ở đây** (chỉ Python, RTL của fork): `LAYER=PAPER_MNIST` (`data_create.py`), 16 case `test_profile.py::test_profile_paper` (`CLUSTER_COLUMNS = 2`,
+DMA 64 bit, `QUANT_AMOUNT = 32`, `NUM_GLB_IACT = 1`, bộ nhớ lý tưởng, `OPENEYE_SEED=1`, weight ngẫu nhiên có số 0 thật, activation ngẫu nhiên không
+thưa), profiler theo layer, thời gian = chu kỳ × 5 ns (200 MHz như paper). `OPENEYE_KEEP_GOING=1`: kiểm tra bộ đệm iact giữa các layer sai thì ghi log và
+chạy tiếp, để layer nào cũng được đo; test vẫn FAIL ở cuối.
+
+```bash
+venv/bin/python tools/paper_table3.py --run --jobs 6 --save doc/perf/paper_table3_<ngày> --report doc/perf/paper_table3_<ngày>.md
+venv/bin/python tools/paper_table3.py doc/perf/paper_table3_2026-10-24        # in lại bảng từ profile đã lưu
+```
+
+Kết quả: `doc/perf/paper_table3_2026-10-24.md` (7 bảng theo layer: hàng = cấu hình, cột = 10 pha của profiler; bảng tổng kèm số của paper).
+
+**Tổng cả mạng so với paper** (ns ở 200 MHz; "nạp" = load_config + load_iact + load_wght + load_bias + load_quant; "xử lý" = phần còn lại):
+
+| CR | X | Y | Tổng (fork) | Nạp | Xử lý | Tỉ lệ nạp | Paper Total | Paper Data Send | Tỉ lệ Data Send (paper) | Tổng / paper |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 2 | 3 | 1.031.780 | 155.525 | 876.255 | 15 % | 299.315 | 70.680 | 24 % | 3,45 |
+| 2 | 2 | 3 | 659.215 | 172.910 | 486.305 | 26 % | 231.265 | 106.720 | 46 % | 2,85 |
+| 4 | 2 | 3 | 464.320 | 180.200 | 284.120 | 39 % | 202.710 | 131.235 | 65 % | 2,29 |
+| 8 | 2 | 3 | 370.595 | 184.145 | 186.450 | 50 % | 177.520 | 132.995 | 75 % | 2,09 |
+| 1 | 4 | 3 | 667.730 | 160.005 | 507.725 | 24 % | 199.230 | 71.960 | 36 % | 3,35 |
+| 2 | 4 | 3 | 448.365 | 153.710 | 294.655 | 34 % | 154.005 | 83.680 | 54 % | 2,91 |
+| 4 | 4 | 3 | 340.885 | 144.150 | 196.735 | 42 % | 128.010 | 85.225 | 67 % | 2,66 |
+| 8 | 4 | 3 | 313.070 | 148.610 | 164.460 | 47 % | 115.340 | 85.580 | 74 % | 2,71 |
+| 1 | 2 | 4 | 1.007.500 | 139.505 | 867.995 | 14 % | 306.095 | 82.785 | 27 % | 3,29 |
+| 2 | 2 | 4 | 663.665 | 180.740 | 482.925 | 27 % | 252.680 | 130.660 | 52 % | 2,63 |
+| 4 | 2 | 4 | 491.310 | 208.100 | 283.210 | 42 % | 232.535 | 162.355 | 70 % | 2,11 |
+| 8 | 2 | 4 | 389.995 | 204.245 | 185.750 | 52 % | 211.880 | 163.135 | 77 % | 1,84 |
+| 1 | 4 | 4 | 642.710 | 143.985 | 498.725 | 22 % | 205.105 | 84.045 | 41 % | 3,13 |
+| 2 | 4 | 4 | 448.335 | 157.700 | 290.635 | 35 % | 167.460 | 99.920 | 60 % | 2,68 |
+| 4 | 4 | 4 | 355.575 | 160.170 | 195.405 | 45 % | 142.365 | 100.985 | 71 % | 2,50 |
+| 8 | 4 | 4 | 320.655 | 156.865 | 163.790 | 49 % | 129.165 | 99.915 | 77 % | 2,48 |
+
+**Đọc kết quả:**
+- Xu hướng giống paper: tăng cluster và PE trục X giảm thời gian xử lý (Conv2 tính 448.930 → 36.785 ns), lợi ích giảm dần; tỉ lệ nạp dữ liệu tăng theo số
+  cluster (fork 15 % → 50 %, paper 24 % → 75 %); PE trục Y = 4 gần như không giúp (kernel 3×3 chỉ dùng 3 hàng PE) mà còn tăng weight phải gửi.
+- Con số tuyệt đối gấp 1,8–3,5 lần paper. Phần nạp gấp 1,3–2,2 lần (riêng bias theo từng pixel output đã là 53.980–58.460 ns ở mọi cấu hình; weight 83.000–
+  148.000 ns), phần xử lý gấp khoảng 4–5,6 lần. Lý do khả dĩ: phiên bản thiết kế khác, activation ngẫu nhiên không thưa (mạng ReLU thật có nhiều số 0 mà PE
+  bỏ qua), paper không nói rõ định nghĩa cột. Tổng nạp đo được khớp ước lượng số word DMA từ bộ sinh stream (ví dụ 153.710 / 153.620 ns).
+- Theo layer (CR=2 X=4 Y=3): Conv2 38 %, Conv3 20 %, Conv1 19 %, Dense 1568→32 18 % (nạp weight 66 % của layer), 2 pooling 4,5 %, Dense 32→10 0,4 %.
+  Pooling, ghi ngược, chuyển đổi iact và nạp bias **không** nhanh lên khi thêm cluster/PE.
+
+**Độ tin cậy:** số chu kỳ là của chính RTL trong mô phỏng (lặp lại được, cộng các layer = tổng). Kết quả tính: với X = 4, layer 0–4 qua kiểm tra bộ đệm,
+layer 5 (Dense nối tiếp Dense) ghi bộ đệm sai (lỗi mới #26) nên kết quả cuối sai; với X = 2, kiểm tra sau layer 1, 3, 4, 5 báo sai nhưng sau layer 2 lại
+đúng (lỗi mới #25). Thời gian của các layer đó vẫn đo được (số word mỗi pha không phụ thuộc giá trị), nhưng đánh dấu FAIL trong bảng.
+
 ## 6b. Đo trên mô phỏng so với chạy trên FPGA thật
 
 **Đường dữ liệu thật:** CPU (ARM) → DDR → AXI DMA IP (MM2S) → AXI4-Stream 64 bit → `OpenEye_FPGA` → AXI4-Stream → AXI DMA (S2MM) → DDR.
@@ -1047,6 +1102,8 @@ dài 96 thay vì 192 chu kỳ.
 | 22 | Conv có **weight bằng 0** tính sai hoặc treo (mọi mẫu số 0 trừ "mỗi cột một số 0 ở đầu"; model MNIST int8 đã huấn luyện: Conv2 140/384, Conv3 116/384 lần nạp weight sai) | Định dạng nén weight: mapper Python không khớp cách `data_pipeline_wght.v` giải mã (cột rỗng, ô đệm, overhead 4 bit, reset địa chỉ ở word 0) và bộ ghép stream | **Đã sửa** (2026-10-24, được bạn đồng ý, **chỉ Python**): `conv_wght_encoding.py`; stream giống hệt khi không có số 0; MNIST Conv1/2/3 với weight đã huấn luyện tính đúng mọi output. Mục 9 |
 | 23 | `test_conv3x3_sparse` 32×4×8 → 16 (iact và weight thưa dạng bàn cờ, `NUM_GLB_IACT=3`) sai: output 0 ở các x lẻ của hàng 1 | ? (phía activation thưa: weight của ca này giải mã đúng theo mô hình RTL) | **Chưa điều tra** (có từ trước bản sửa #22: code cũ cũng fail, kiểu sai khác) |
 | 24 | **Không có hàm kích hoạt**: `af_cluster.v` (ReLU) không được dùng ở đâu, còn 2 lỗi (so sánh `< 0` trên dây không dấu, chọn bit `[a:+b]` sai), testbench riêng lỗi thời; `af_cluster_mode` chỉ reset về 0, không có trường cấu hình | RTL | **Chưa sửa** (ghi nhận 2026-10-24). Tham chiếu Python cũng không có ReLU; cần cho model thật (mục 8d) |
+| 25 | `NUM_GLB_PSUM = 2` (PE trục X = 2): kiểm tra bộ đệm iact sau 2 lớp pooling (và sau Conv3 → Dense, Dense → Dense) của mạng Bảng 2 paper báo sai, nhưng sau Conv2 lại đúng | ? (có thể bố cục mà kiểm tra mong đợi, hoặc pooling ghi ngược) | **Chưa điều tra** (phát hiện 2026-10-24, mục 6.14) |
+| 26 | **Dense nối tiếp Dense trên chip** (Dense 1568→32 → Dense 32→10): bộ đệm iact do Dense đầu ghi có bố cục khác tham chiếu (4 byte thấp/cao của một word nằm ở 2 word), kết quả cuối sai; mọi cấu hình | ? (có thể liên quan #19b: Dense 32 output, K ≥ 508) | **Chưa điều tra** (phát hiện 2026-10-24, mục 6.14) |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-15)
 
@@ -1977,4 +2034,7 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   từ trước (#23, weight của nó giải mã đúng); 9 case mốc 0 chu kỳ lệch, mốc mới `baseline_2026-10-24`. Đính chính F8 (`trans_cycles_wght` theo stream thực tế).
 - **Ghi nhận #23** (`test_conv3x3_sparse` 32×4×8 → 16 sai từ trước, phía activation thưa) và **#24** (không có hàm kích hoạt: `af_cluster.v` không được dùng
   và có 2 lỗi, tham chiếu Python không có ReLU). Mục 8b.
+- **Bảng 3 của paper OpenEye đo bằng profiler** (chỉ Python): `LAYER=PAPER_MNIST`, 16 case `test_profile_paper`, `tools/paper_table3.py` (bảng theo từng
+  layer với 10 pha, bảng tổng so với paper), tùy chọn testbench `OPENEYE_KEEP_GOING`, `test/test_paper_table3.py`. Kết quả `doc/perf/paper_table3_2026-10-24.md`:
+  cùng xu hướng với paper, con số gấp 1,8–3,5 lần. Phát hiện lỗi mới #25 (`NUM_GLB_PSUM = 2`) và #26 (Dense nối tiếp Dense). Mục 6.14.
 
