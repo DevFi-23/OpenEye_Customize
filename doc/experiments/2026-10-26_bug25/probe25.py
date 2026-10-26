@@ -1,6 +1,6 @@
 """Bug #25 probe (cocotb module, run through run25.py): the unmodified OpenEye_FPGA_tb plus switches (environment).
 
-Taken over from the bug #26 probe (doc/experiments/2026-10-24_bug26/probe_dense.py): LAYER=D_<K>_<N1>... Dense chains,
+Taken over from the bug #26 probe (doc/experiments/2026-10-24_bug26/probe_dense.py): LAYER=D_<K>_<N1>... Dense chains, LAYER=PAPER_MNIST_FIRST<n> (the first n layers of the paper's network),
 B26_DUMP, B26_INJECT (after a failed iact check write the expected image into BUFFER_A), B26_WB/B26_EMU (not used here).
 New for bug #25:
   B25_POOLCHECK=<c>  check the input of a pooling layer too, against the conv layout with groups of c channels
@@ -20,6 +20,11 @@ _orig = tb.data_create.create_layer
 
 
 def create_layer(layer_mode, *args, **kw):
+    if layer_mode.startswith("PAPER_MNIST_FIRST"):
+        # the first n layers of the paper's network (the last of them reads its output out)
+        import tensorflow as tf
+        model = _orig("PAPER_MNIST", *args, **kw)
+        return tf.keras.Sequential(model.layers[:int(layer_mode[len("PAPER_MNIST_FIRST"):])])
     if not layer_mode.startswith("D_"):
         return _orig(layer_mode, *args, **kw)
     import tensorflow as tf

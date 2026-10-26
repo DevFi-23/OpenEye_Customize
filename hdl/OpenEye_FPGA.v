@@ -259,6 +259,11 @@ module OpenEye_FPGA #(
     // One write-back group reads one cluster. Extra quantizer instances do
     // not add spatial lanes to that cluster or channels to the transpose.
     localparam integer WRITEBACK_WORDS = TRANS_WORDS < NUM_GLB_PSUM ? TRANS_WORDS : NUM_GLB_PSUM,
+    // Channels of one pixel in the iact buffer layout (used_channels of the next
+    // layer, 4 for a 3x3 kernel): the length of one write-back group. It is
+    // independent of the lane count; WRITEBACK_WORDS <= WRITEBACK_CHANNELS
+    // (NUM_GLB_PSUM 1, 2 or 4). Bug #25, doc/experiments/2026-10-26_bug25_glb_psum2.md.
+    localparam integer WRITEBACK_CHANNELS = 4,
     localparam integer PSUM_OUTPUT_WORDS = DMA_BITWIDTH == 64? 2 : 1
 ) (
     //Clock and Reset
@@ -577,7 +582,7 @@ reg [1023:0] fst_path;
   reg [3:0] iact_converter_mem_off_3_reg[CLUSTER_COLUMNS-1:0][CLUSTER_ROWS-1:0];
   reg [10-1:0] iact_to_psum_x_pos_counter;
   reg [4-1:0] iact_to_psum_trans_counter;
-  reg [$clog2(IACT_RAM_CELLS*(8/WRITEBACK_WORDS))-1:0] iact_to_psum_storage_counter;
+  reg [$clog2(IACT_RAM_CELLS*(8/WRITEBACK_CHANNELS))-1:0] iact_to_psum_storage_counter;
   reg [2*64*IACT_RAM_CELLS-1:0] iact_to_psum_shift_reg;
   reg [2*64*IACT_RAM_CELLS-1:0] iact_to_psum_mux_reg;
   reg iact_to_psum_start_shifting;
@@ -2267,9 +2272,10 @@ end
         //   previous cycle, advances that cell's read address by 1.
         // - At SEND_PSUM_TO_IACT cycle 7, the RAM read, pre-quantization
         //   register, and three quantizer stages have produced valid bytes.
-        // - Transposes a WRITEBACK_WORDS-wide group from filter-major psums
-        //   into pixel-major activation bytes. Only the spatial lanes in
-        //   one cluster participate; unused quantizer instances are ignored.
+        // - Transposes WRITEBACK_WORDS lanes (the pixels of one cluster) x
+        //   WRITEBACK_CHANNELS cycles (channels) from filter-major psums into
+        //   pixel-major activation bytes: one group = the channels of one
+        //   pixel. Unused quantizer instances are ignored.
         // - Shifts groups into the activation RAM write bus and writes a
         //   complete bank row when the storage counter wraps.
         // - After PSUM_IDLE, flushes the remaining groups before returning
@@ -2293,14 +2299,24 @@ end
           end
           if (((fsm_psum_current_state == SEND_PSUM_TO_IACT) & (fsm_psum_cycle >= 7)) | (fsm_cycle != 0)) begin
             fsm_cycle                  <= fsm_cycle + 1;
-            iact_to_psum_x_pos_counter <= 0;
+            if (!iact_to_psum_start_shifting) begin
+              iact_to_psum_x_pos_counter <= 0;
+            end
             iact_to_psum_trans_counter <= iact_to_psum_trans_counter + 1;
 
-            if (iact_to_psum_start_shifting) begin
+            // One group (one pixel) per cycle while lanes are left: lane k in the
+            // cycle with trans_counter k+1. With fewer lanes than channels
+            // (NUM_GLB_PSUM = 2) the remaining cycles of a transposition write
+            // nothing and x_pos holds, so x_pos counts pixels for any lane count.
+            // With WRITEBACK_WORDS = WRITEBACK_CHANNELS a group is written in
+            // every cycle; the constant term lets synthesis drop the comparison
+            // there. Bug #25.
+            if (iact_to_psum_start_shifting &
+                ((WRITEBACK_WORDS >= WRITEBACK_CHANNELS) | (iact_to_psum_trans_counter <= WRITEBACK_WORDS[3:0]))) begin
               iact_to_psum_x_pos_counter <= iact_to_psum_x_pos_counter + 1;
               if (iact_to_psum_x_pos_counter < iact_size_x) begin
                 iact_to_psum_storage_counter <= iact_to_psum_storage_counter + 1;
-                if (iact_to_psum_storage_counter == ((8/WRITEBACK_WORDS)*IACT_RAM_CELLS)-1) begin
+                if (iact_to_psum_storage_counter == ((8/WRITEBACK_CHANNELS)*IACT_RAM_CELLS)-1) begin
                   iact_to_psum_storage_counter <= 0;
                   for (a = 0; a < IACT_RAM_CELLS; a=a+1) begin
                     iact_buffer_en_w[a] <= 1;
@@ -2308,20 +2324,20 @@ end
                 end
 
                 
-                iact_buffer_data_w[(((8/WRITEBACK_WORDS)*IACT_RAM_CELLS)-1)*(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)+:(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)] <= iact_to_psum_shift_reg[0+:(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)];
-                iact_to_psum_shift_reg[(WRITEBACK_WORDS-1)*(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)+:(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)] <= 0;
+                iact_buffer_data_w[(((8/WRITEBACK_CHANNELS)*IACT_RAM_CELLS)-1)*(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)+:(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)] <= iact_to_psum_shift_reg[0+:(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)];
+                iact_to_psum_shift_reg[(WRITEBACK_WORDS-1)*(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)+:(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)] <= 0;
                 for (b = 0; b < WRITEBACK_WORDS-1; b=b+1) begin
-                  iact_to_psum_shift_reg[b*(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)+:(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)] <=
-                  iact_to_psum_shift_reg[(b+1)*(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)+:(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)];
+                  iact_to_psum_shift_reg[b*(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)+:(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)] <=
+                  iact_to_psum_shift_reg[(b+1)*(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)+:(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)];
                 end
-                for (b = 0; b < ((8/WRITEBACK_WORDS)*IACT_RAM_CELLS)-1; b=b+1) begin
-                  iact_buffer_data_w[(((8/WRITEBACK_WORDS)*IACT_RAM_CELLS)-1-(b+1))*(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)+:(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)] <=
-                  iact_buffer_data_w[(((8/WRITEBACK_WORDS)*IACT_RAM_CELLS)-1-b)*(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)+:(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)];
+                for (b = 0; b < ((8/WRITEBACK_CHANNELS)*IACT_RAM_CELLS)-1; b=b+1) begin
+                  iact_buffer_data_w[(((8/WRITEBACK_CHANNELS)*IACT_RAM_CELLS)-1-(b+1))*(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)+:(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)] <=
+                  iact_buffer_data_w[(((8/WRITEBACK_CHANNELS)*IACT_RAM_CELLS)-1-b)*(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)+:(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)];
                 end
               end
             end
 
-            if (iact_to_psum_trans_counter == WRITEBACK_WORDS) begin
+            if (iact_to_psum_trans_counter == WRITEBACK_CHANNELS) begin
               iact_to_psum_trans_counter  <= 1;
               iact_to_psum_shift_reg      <= iact_to_psum_mux_reg;
               iact_to_psum_start_shifting <= 1;
@@ -2342,26 +2358,26 @@ end
               end
             end            
             for (a = 0; a < WRITEBACK_WORDS; a=a+1) begin
-              iact_to_psum_mux_reg[a*(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)+(DATA_IACT_BITWIDTH*(WRITEBACK_WORDS-1))+:DATA_IACT_BITWIDTH] <= quantized_value_reg[a];
+              iact_to_psum_mux_reg[a*(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)+(DATA_IACT_BITWIDTH*(WRITEBACK_CHANNELS-1))+:DATA_IACT_BITWIDTH] <= quantized_value_reg[a];
             end
             for (a = 0; a < WRITEBACK_WORDS; a=a+1) begin
-              for (b = 0; b < WRITEBACK_WORDS-1; b=b+1) begin
-                iact_to_psum_mux_reg[a*(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)+(DATA_IACT_BITWIDTH*(WRITEBACK_WORDS-1)-((b+1)*DATA_IACT_BITWIDTH))+:DATA_IACT_BITWIDTH] <=
-                iact_to_psum_mux_reg[a*(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)+(DATA_IACT_BITWIDTH*(WRITEBACK_WORDS-1)-(b*DATA_IACT_BITWIDTH))+:DATA_IACT_BITWIDTH];
+              for (b = 0; b < WRITEBACK_CHANNELS-1; b=b+1) begin
+                iact_to_psum_mux_reg[a*(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)+(DATA_IACT_BITWIDTH*(WRITEBACK_CHANNELS-1)-((b+1)*DATA_IACT_BITWIDTH))+:DATA_IACT_BITWIDTH] <=
+                iact_to_psum_mux_reg[a*(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)+(DATA_IACT_BITWIDTH*(WRITEBACK_CHANNELS-1)-(b*DATA_IACT_BITWIDTH))+:DATA_IACT_BITWIDTH];
               end
             end
           end
           if ((fsm_psum_current_state == PSUM_IDLE) & (fsm_cycle >= 1)) begin
             iact_to_psum_storage_counter <= iact_to_psum_storage_counter + 1;
-            if (iact_to_psum_storage_counter == ((8/WRITEBACK_WORDS)*IACT_RAM_CELLS)-1) begin
+            if (iact_to_psum_storage_counter == ((8/WRITEBACK_CHANNELS)*IACT_RAM_CELLS)-1) begin
               iact_to_psum_storage_counter <= 0;
               for (a = 0; a < IACT_RAM_CELLS; a=a+1) begin
                 iact_buffer_en_w[a] <= 1;
               end
             end
-            for (b = 0; b < ((8/WRITEBACK_WORDS)*IACT_RAM_CELLS)-1; b=b+1) begin
-              iact_buffer_data_w[(((8/WRITEBACK_WORDS)*IACT_RAM_CELLS)-1-(b+1))*(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)+:(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)] <=
-              iact_buffer_data_w[(((8/WRITEBACK_WORDS)*IACT_RAM_CELLS)-1-b)*(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)+:(DATA_IACT_BITWIDTH*WRITEBACK_WORDS)];
+            for (b = 0; b < ((8/WRITEBACK_CHANNELS)*IACT_RAM_CELLS)-1; b=b+1) begin
+              iact_buffer_data_w[(((8/WRITEBACK_CHANNELS)*IACT_RAM_CELLS)-1-(b+1))*(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)+:(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)] <=
+              iact_buffer_data_w[(((8/WRITEBACK_CHANNELS)*IACT_RAM_CELLS)-1-b)*(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)+:(DATA_IACT_BITWIDTH*WRITEBACK_CHANNELS)];
             end
             if (iact_to_psum_storage_counter == 0) begin            
               select_ram_counter          <= 0;

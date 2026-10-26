@@ -165,9 +165,9 @@ Một test cocotb là một tiến trình; máy 12 nhân / 7 GB RAM chạy song 
 venv/bin/python -m pytest -q test/test_*.py
 ```
 
-Hiện tại: **239 pass, 11 fail** (129 + 110 test mô hình ghi ngược FC của lỗi #26). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
+Hiện tại: **251 pass, 11 fail** (129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
 thay đổi của fork. Các file của fork: `test_profile_report.py`, `test_profile_phases.py`, `test_channel_pad.py`, `test_conv_wght_encoding.py`, `test_paper_table3.py`,
-`test_memory_model.py`, `test_fc_writeback.py`.
+`test_memory_model.py`, `test_fc_writeback.py`, `test_conv_writeback.py`.
 
 ### Test mô phỏng RTL (cocotb qua pytest)
 
@@ -185,6 +185,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ../../venv/bin/python -m pytest -q -p no:cachep
 | | `-k trained` | Conv1/2/3 MNIST với **weight int8 đã huấn luyện** (TFLite) + kiểm tra độc lập | 4–7 phút | Conv1, Conv2 PASS; Conv3 xfail (#9, mọi giá trị đúng) |
 | `test_conv3x3_sparse.py` | id cụ thể | iact và weight thưa dạng bàn cờ, `NUM_GLB_IACT=3` (96 cấu hình, phần lớn chưa từng chạy) | ~6 phút | `[3-4-3-2-1-4-1-32-3-3-1-8]` PASS; `[3-4-3-2-1-8-4-32-3-3-1-16]` FAIL (#23) |
 | `test_dense_chain.py` | (cả file) | 11 chuỗi Dense → Dense trên chip (lỗi #26): K 16–1568, N 8–64, MLP, `CLUSTER_ROWS` 1/2/4, `NUM_GLB_IACT` 3, `NUM_GLB_PSUM` 2 | 20 s – 1,5 phút | 11 PASS |
+| `test_glb_psum2.py` | (cả file) | 7 mô hình nối layer với `NUM_GLB_PSUM=2` (lỗi #25): Conv đơn, Conv → Conv (4/16 channel, hàng 14 pixel), Conv → Pool → Conv (rộng 8, 6), Conv → Pool → Conv → Pool → Conv | 15–50 s | 7 PASS |
 | `test_gemm_layer.py` | (cả file) | 63 test GEMM/Dense | vài phút | 40 PASS, 23 FAIL do bộ kiểm tra ghi FC "live" (#5, báo động giả); với `OPENEYE_SKIP_FC_WRITE_CHECK=1`: 63 PASS (đo 2026-10-19) |
 
 Chạy nhiều test song song (mỗi test một tiến trình), ví dụ cả `test_conv_const.py`:
@@ -218,7 +219,7 @@ Chi tiết: mục 6 (profiler), 6.13 (model nhiều layer), 6.14 (Bảng 3).
 | #22 (weight 0, trước bản sửa) | Các script trong `doc/experiments/2026-10-24_bug22/` mô tả mapper **cũ**; chạy trên commit `f83931e`: `git worktree add ../oe_old f83931e`, rồi chạy script với `PYTHONPATH=../oe_old/src` từ thư mục `../oe_old` | Tài liệu `doc/experiments/2026-10-24_bug22_weight_encoding.md` mục 7 |
 | #22 (sau bản sửa) | `pytest test_mnist_layers.py -k trained`; `venv/bin/python -m pytest -q test/test_conv_wght_encoding.py` | `DUT vs numpy: ... equal, 0 differ` |
 | #23 | `pytest "test_conv3x3_sparse.py::test_conv3x3_8ch_sparse50[3-4-3-2-1-8-4-32-3-3-1-16]"` | Output 0 ở các x lẻ của hàng 1 |
-| #25 (`NUM_GLB_PSUM=2`) | Ca nhỏ nhất: `venv/bin/python doc/experiments/2026-10-26_bug25/run25.py k2 Convolution_Stack 2 GLBP=2 CH=4 H=4` (conv → conv; `GLBP=4` thì PASS). Mạng paper: `venv/bin/python tools/run_profile.py -k paper_cr2_x2_y3` | `test/.temp/b25_k2/cocotb_sim.log`: `Iact buffer check failed after layer 0`, mỗi word đổi chỗ 2 nhóm 2 byte ở giữa |
+| #25 (`NUM_GLB_PSUM=2`, **đã sửa**) | Sau bản sửa: `venv/bin/python -m pytest -q test/cocotb_fpga/test_glb_psum2.py`. Lỗi cũ (trên commit `e062707` qua `git worktree`, như #26). Ca nhỏ nhất: `venv/bin/python doc/experiments/2026-10-26_bug25/run25.py k2 Convolution_Stack 2 GLBP=2 CH=4 H=4` (conv → conv; `GLBP=4` thì PASS). Mạng paper: `venv/bin/python tools/run_profile.py -k paper_cr2_x2_y3` | `test/.temp/b25_k2/cocotb_sim.log`: `Iact buffer check failed after layer 0`, mỗi word đổi chỗ 2 nhóm 2 byte ở giữa |
 | #26 (Dense nối tiếp Dense, **đã sửa**) | Sau bản sửa: `venv/bin/python -m pytest -q test/cocotb_fpga/test_dense_chain.py` (11 test). Lỗi cũ chỉ tái hiện được trên commit trước bản sửa (`142ee6c`): `git worktree add ../oe_old 142ee6c`, rồi trong `../oe_old` chạy `PYTHONPATH=src ../OpenEye_orig/venv/bin/python doc/experiments/2026-10-24_bug26/run_dense.py x16 D_16_8_10 2` (thêm `TRACE_RAM_WRITES=1` để thấy pha ghi ngược không ghi RAM) | `test/.temp/.../cocotb_sim.log`: `Iact buffer check: first N activations only`; bản cũ: `DUT-Value` = input của layer 0 |
 | #24 (không có hàm kích hoạt) | Không có mô phỏng; đọc `hdl/af_cluster.v` (không được khởi tạo ở đâu) | Mục 8b |
 | Weight Conv đã huấn luyện cho test bất kỳ | `OPENEYE_TFLITE_CONV=$PWD/doc/demo_notebooks/mnist_quantized_model.tflite:sequential_1/conv2d_1_2/convolution` (tensor Conv2; Conv1 `sequential_1/conv2d_1/convolution`, Conv3 `sequential_1/conv2d_2_1/convolution`) | Log `OPENEYE_TFLITE_CONV: layer-0 weights from ... (N zero weights)` |
@@ -284,6 +285,7 @@ OpenEye_orig/
 │   ├── channel_pad.py         ★  Đệm input 1 channel thành 2 channel (workaround lỗi #17, mục 9)
 │   ├── conv_wght_encoding.py  ★  Mã hóa weight Conv có số 0 theo đúng cách RTL giải mã (sửa lỗi #22, mục 9)
 │   ├── wght_pipeline_model.py ★  Mô hình chu kỳ của data_pipeline_wght.v (khớp RTL), dùng trong unit test
+│   ├── writeback_model.py     ★  Mô hình chu kỳ của pha ghi ngược psum → iact (vòng đọc + bộ đóng gói), dùng trong unit test (#25, #26)
 │   └── profile_report.py      ★  Báo cáo và so sánh profile (mục 6.5)
 ├── test/
 │   ├── cocotb_fpga/              Testbench top-level FPGA và các bộ test (cách chạy: mục 3c)
@@ -295,6 +297,7 @@ OpenEye_orig/
 │   │   │                         độc lập (lỗi #18), 1 channel rộng 20/28/40 (lỗi #17), 3 Conv với weight MNIST đã huấn luyện (lỗi #22)
 │   │   ├── test_conv3x3_sparse.py  iact và weight thưa dạng bàn cờ, NUM_GLB_IACT=3 (của upstream; một ca còn lỗi #23)
 │   │   ├── test_dense_chain.py ★ 11 chuỗi Dense → Dense trên chip (ghi ngược FC, lỗi #26), MLP, nhiều cấu hình
+│   │   ├── test_glb_psum2.py  ★  7 mô hình nối layer với NUM_GLB_PSUM=2 (ghi ngược Conv, lỗi #25)
 │   │   └── regmap.yaml           Định nghĩa các thanh ghi cấu hình gửi qua DMA (nguồn của dma_storage.v)
 │   ├── cocotb_parallel/          Test của OpenEye_Parallel (SERIAL=0), đã cũ (mục 5.7)
 │   ├── test_memory_model.py   ★  16 unit test của mô hình bộ nhớ
@@ -304,6 +307,7 @@ OpenEye_orig/
 │   ├── test_conv_wght_encoding.py ★ Unit test mã hóa weight Conv có số 0 (lỗi #22)
 │   ├── test_paper_table3.py   ★  Unit test của công cụ Bảng 3
 │   ├── test_fc_writeback.py   ★  Mô hình chu kỳ của pha ghi ngược FC (lỗi #26): 110 test
+│   ├── test_conv_writeback.py ★  Mô hình chu kỳ của pha ghi ngược Conv với 2/4 lane (lỗi #25): 12 test
 │   └── .temp/                 ☆  Thư mục chạy của từng test (log, header sinh ra, profile.json)
 ├── tools/                     ★  Công cụ của dự án riêng
 │   ├── run_profile.py            Chạy các case đo song song, so sánh với baseline (mục 6)
@@ -424,7 +428,7 @@ tối ưu có tác dụng. Có hai loại baseline:
 - **Chu kỳ và DMA** (mô phỏng): **`doc/perf/baseline_2026-10-24/`** (12 case: 9 một layer + 3 cả model, sau bản sửa lỗi #22). Mốc cũ: `baseline_2026-10-22`
   (trước #22), `baseline_2026-10-15` (9 case, sau #18; 9 case này không đổi tới nay), `baseline_2026-10-10` (đo khi lỗi #18 còn: weight đọc gấp đôi,
   case > 4 channel tính sai với weight thật), `doc/perf/baseline.md` và `baseline_2026-10-09*`.
-- **Phần cứng** (Vivado): `doc/synth/2026-10-26_route4ns_fix26_zu7ev/` (tài nguyên, fmax 250 MHz). Các thư mục `doc/synth` cũ hơn là lịch sử.
+- **Phần cứng** (Vivado): `doc/synth/2026-10-26_route4ns_fix25_zu7ev/` (tài nguyên, fmax 250 MHz). Các thư mục `doc/synth` cũ hơn là lịch sử.
 
 ### 5.5 QUANT_AMOUNT
 
@@ -873,6 +877,9 @@ Kết quả: `doc/perf/paper_table3_2026-10-24.md` (7 bảng theo layer: hàng =
 layer 5 (Dense nối tiếp Dense) không ghi kết quả vào bộ đệm (lỗi mới #26) nên kết quả cuối sai; với X = 2, kiểm tra sau layer 1, 3, 4, 5 báo sai (lỗi mới #25; kiểm tra sau
 layer 0 và 2, conv → pooling, thật ra **không được làm** vì testbench không có bố cục cho input của pooling, xem mục 9). Thời gian của các layer đó vẫn đo được (số word mỗi pha không phụ thuộc giá trị), nhưng đánh dấu FAIL trong bảng.
 
+**Sau bản sửa #25 (2026-10-26, `doc/perf/paper_table3_2026-10-26_fix25.md`):** 14/16 cấu hình PASS cả 7 layer; X = 2 với CR 2/4/8 nay đúng và chậm hơn số đo cũ
+4,4–7,8 % (pha ghi ngược Conv trước đây bị cắt nửa chừng); X = 4 không đổi; còn CR 1 X 4 Y 3 (#19b) và CR 1 X 2 (#28). **Mốc Bảng 3 hiện tại: `paper_table3_2026-10-26_fix25`.**
+
 **Sau bản sửa #26 (2026-10-24, `doc/perf/paper_table3_2026-10-24_fix26.md`):** 7/8 cấu hình X = 4 **PASS cả 7 layer** (bộ đệm sau mỗi layer và kết quả cuối);
 CR 1 X 4 Y 3 còn sai ở Dense 1568→32 (lỗi tính #19b); X = 2 vẫn như cũ (#25). Chu kỳ: layer 0–4 giữ nguyên, pha ghi ngược của layer 5 dài thêm 15–21 chu kỳ,
 cả mạng +15 đến +28 chu kỳ (≤ 0,03 %); các bảng thời gian ở trên hầu như không đổi.
@@ -1114,28 +1121,28 @@ Lưu ý:
   Kiểm tra danh sách thiết bị trước khi chọn part.
 - Lưu báo cáo vào repo: chép `reports/utilization.txt`, `reports/timing_summary.txt` và `config.json` vào `doc/synth/<ngày>_<cấu hình>/`.
 
-### Kết quả Vivado hiện tại: mốc phần cứng (2026-10-26, sau các bản sửa #13, #6/#7, #14, 3 commit upstream, #19 và #26)
+### Kết quả Vivado hiện tại: mốc phần cứng (2026-10-26, sau các bản sửa #13, #6/#7, #14, 3 commit upstream, #19, #26 và #25)
 
-Chi tiết: `doc/synth/2026-10-26_route4ns_fix26_zu7ev/SUMMARY.md`. Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 4 ns (250 MHz),
-cấu hình ở bảng trên, RTL = `dev` có bản sửa #26 (so với mốc fix19 chỉ khác 1 dòng của `OpenEye_FPGA.v`). Bản sửa lỗi #18 chỉ là Python, không đổi phần cứng. Vivado được chạy batch từ WSL
+Chi tiết: `doc/synth/2026-10-26_route4ns_fix25_zu7ev/SUMMARY.md`. Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 4 ns (250 MHz),
+cấu hình ở bảng trên, RTL = `dev` có bản sửa #25 (so với mốc fix19 chỉ khác bộ ghi ngược trong `OpenEye_FPGA.v`: #26 và #25). Bản sửa lỗi #18 chỉ là Python, không đổi phần cứng. Vivado được chạy batch từ WSL
 (`cmd.exe /c ... vivado.bat -mode batch -source synth_ooc.tcl -tclargs xczu7ev-ffvc1156-2-e 4 impl`).
 
 | | Sau tổng hợp | **Sau route** | Tỉ lệ ZU7EV (sau route) |
 |---|---:|---:|---:|
-| WNS ở 4 ns / hold | +0,199 ns | **+0,028 ns** / +0,011 ns | đạt 250 MHz |
-| fmax = 1000 / (4 − WNS) | ~263 MHz | **~252 MHz** | |
-| LUT (logic + LUTRAM/SRL) | 65.541 | 63.856 | 27,7 % |
-| Flip-flop | 38.978 | 39.018 | 8,5 % |
+| WNS ở 4 ns / hold | +0,205 ns | **+0,084 ns** / +0,013 ns | đạt 250 MHz |
+| fmax = 1000 / (4 − WNS) | ~264 MHz | **~255 MHz** | |
+| LUT (logic + LUTRAM/SRL) | 65.654 | 63.969 | 27,8 % |
+| Flip-flop | 38.968 | 39.296 | 8,5 % |
 | Block RAM tile (RAMB36 168 + RAMB18 48) | 192 | 192 | **61,5 %** |
 | URAM / DSP | 8 / 4 | 8 / 4 | 8,3 % / 0,2 % |
 
-- **0 ERROR, 0 CRITICAL WARNING**; danh sách cảnh báo giống hệt lần fix19 (chỉ thêm 1 dòng `DRC 23-814` chung của chế độ out-of-context) và lần up3 (lần đó hết 2 cảnh báo Synth 8-689, fix14 hết 10 cảnh báo 8-6090). Các cảnh báo còn lại:
+- **0 ERROR, 0 CRITICAL WARNING**; danh sách cảnh báo giống hệt lần fix26 và fix19 (chỉ khác số dòng `DRC 23-814` chung của chế độ out-of-context) và lần up3 (lần đó hết 2 cảnh báo Synth 8-689, fix14 hết 10 cảnh báo 8-6090). Các cảnh báo còn lại:
   Synth 8-7137 (lỗi #15), 8-6057 (URAM không có thanh ghi pipeline), thanh ghi/cổng không dùng bị loại bỏ, và cảnh báo bình thường của chế độ out-of-context.
 - Mỗi PE thêm **2 FF** (654 → 656): 2 bit cao của bộ đếm `first_spad_words_o` (7 bit) nay được dùng nên không bị loại bỏ.
 - **Tài nguyên theo khối:** mảng PE (`OpenEye_Parallel`, 48 PE) chiếm khoảng 84 % LUT và 85 % FF, mỗi PE khoảng 1.100 LUT và 655 FF; bộ nhân của PE làm bằng
   LUT (`USE_DSP=0`); 4 DSP ở 4 bộ lượng tử. 8 bộ đệm psum (16.384 × 40 bit) chiếm **144/168 RAMB36** (46 % BRAM của chip); 4 `iact_stream_constructor` chiếm
   24 RAMB36 (mỗi khối 364 FF sau bản sửa #6/#7); 48 RAMB18 là SPad của 48 PE; 8 URAM là 4 bộ đệm iact và bộ đệm weight.
-- **Đường găng sau route:** lần fix26 cả 20 đường là dây từ URAM của bộ đệm weight (`wght_buffer`, không có thanh ghi đầu ra) tới đầu vào weight của PE; lần fix19
+- **Đường găng sau route:** lần fix25 là dây từ `psum_buffer_addr_array` tới BRAM của bộ đệm psum và đầu ra bộ cộng trong PE; lần fix26 cả 20 đường là dây từ URAM của bộ đệm weight (`wght_buffer`, không có thanh ghi đầu ra) tới đầu vào weight của PE; lần fix19
   là dây từ `psum_pipeline` (`psum_buffer_addr_array`) tới 144 BRAM của bộ đệm psum; lần up3 đa số nằm trong một PE. Đường găng đổi chỗ theo placement,
   các đường đều sát nhau quanh 4 ns, nên WNS dao động vài chục ps giữa các lần chạy (+0,028 đến +0,117 ns) dù RTL gần như không đổi.
 - **Thời gian thật ở 250 MHz** (bộ nhớ lý tưởng, baseline sau bản sửa #18): `mnist1` 55.048 chu kỳ = 220 µs, `mnist2` 262 µs, `mnist3` 82 µs.
@@ -1152,7 +1159,8 @@ cấu hình ở bảng trên, RTL = `dev` có bản sửa #26 (so với mốc fi
 | 2026-10-19 | `2026-10-19_route4ns_fix14_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #14 (chạy batch từ WSL) | Synth 8-6090: 10 → 0; LUT −112, FF −8 (dao động công cụ); WNS +0,097 ns |
 | 2026-10-21 | `2026-10-21_route4ns_up3_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi lấy 3 commit upstream | Synth 8-689: 2 → 0; FF +101 (+2/PE), LUT −80; WNS +0,070 ns |
 | 2026-10-21 | `2026-10-21_route4ns_fix19_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #19 | Cảnh báo không đổi; FF +24, LUT −60; WNS +0,073 ns |
-| 2026-10-26 | `2026-10-26_route4ns_fix26_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #26 (lần chạy ngày 25/10 bị ngắt khi tắt máy, đã chạy lại) | **Mốc hiện tại** (bảng trên). Cảnh báo không đổi; sau tổng hợp LUT −4, FF −4 (1 cổng OR, phần còn lại là dao động); WNS +0,028 ns |
+| 2026-10-26 | `2026-10-26_route4ns_fix26_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #26 (lần chạy ngày 25/10 bị ngắt khi tắt máy, đã chạy lại) | Cảnh báo không đổi; sau tổng hợp LUT −4, FF −4 (1 cổng OR, phần còn lại là dao động); WNS +0,028 ns |
+| 2026-10-26 | `2026-10-26_route4ns_fix25_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #25 (lần 1 phép kiểm lane chưa được gấp hằng: LUT +92; lần 2 là RTL cuối) | **Mốc hiện tại** (bảng trên). Cảnh báo không đổi; sau tổng hợp LUT +113 (+0,17 %, phần lớn là dao động: các module không đổi cũng lệch ±30), FF −10; WNS +0,084 ns |
 
 Ước lượng Yosys so với Vivado: LUT logic lệch dưới 1 %, nên Yosys dùng tốt để so sánh LUT tương đối. BRAM, URAM và DSP lệch nhiều (Yosys không dùng URAM
 và đưa bộ nhân vào DSP), nên các số này phải lấy từ Vivado.
@@ -1212,7 +1220,7 @@ dài 96 thay vì 192 chu kỳ.
 | Giai đoạn | Nội dung | Trạng thái |
 |---|---|---|
 | 0. Đo lường | Profiler, báo cáo, so sánh, baseline 12 case, mô hình bộ nhớ, mốc phần cứng Vivado, kiểm tra độc lập từng word, đo theo từng layer, Bảng 3 của paper | **Xong** (2026-10-24); còn: hiệu chỉnh mô hình bộ nhớ theo board |
-| 0b. Sửa lỗi tính đúng (phát sinh) | Lỗi làm phần cứng/mô phỏng tính sai | **Đã sửa:** #3, #13, #6, #7 (`NUM_GLB_IACT=3`), #14, #18, #19, #22, #26; #17 có workaround Python; #5 là báo động giả của testbench. **Còn mở:** #9, #12, #18b, #19b, #21, #23, #25, 3 channel (#7), không có hàm kích hoạt (#24) |
+| 0b. Sửa lỗi tính đúng (phát sinh) | Lỗi làm phần cứng/mô phỏng tính sai | **Đã sửa:** #3, #13, #6, #7 (`NUM_GLB_IACT=3`), #14, #18, #19, #22, #25, #26; #17 có workaround Python; #5 là báo động giả của testbench. **Còn mở:** #9, #12, #18b, #19b, #21, #23, #27, #28, 3 channel (#7), không có hàm kích hoạt (#24) |
 | 1. Giảm lưu lượng DMA | Bias theo filter, đóng gói weight, bảng quant theo F hoặc lưu BRAM, readout INT8 | Chưa làm. Đề xuất bắt đầu với bias |
 | 2. Che độ trễ | Double-buffering (`BRANCHES=2`): nạp lượt sau trong lúc lượt hiện tại tính toán | Chưa làm (cần sửa lỗi chọn nửa buffer iact trước) |
 | 3. Mô hình và DSE | Mô hình Python dự đoán chu kỳ và byte, roofline, quét cấu hình | Chưa làm |
@@ -1232,7 +1240,7 @@ dài 96 thay vì 192 chu kỳ.
 | Mốc phần cứng: tổng hợp + place & route Vivado (`tools/export_vivado.py`) | **Xong** (2026-10-12 → 2026-10-21, mục 6d): 250 MHz, 63,9k LUT, 39,3k FF, 192 BRAM tile |
 | Kiểm tra độc lập từng word + test dữ liệu ngẫu nhiên | **Xong** (2026-10-15, mục 6.12) |
 | Baseline sau các bản sửa | **Xong**: `doc/perf/baseline_2026-10-24/` (12 case) |
-| Bảng 3 của paper đo bằng profiler (16 cấu hình, theo layer) | **Xong** (2026-10-24, mục 6.14); sau bản sửa #26: 7/8 cấu hình X = 4 tính đúng cả mạng; còn #25 (X = 2) và #19b (CR 1 X 4 Y 3) |
+| Bảng 3 của paper đo bằng profiler (16 cấu hình, theo layer) | **Xong** (2026-10-24, mục 6.14); sau bản sửa #26 và #25: **14/16 cấu hình tính đúng cả mạng**; còn #19b (CR 1 X 4 Y 3) và #28 (CR 1 X 2) |
 
 ### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-24)
 
@@ -1264,12 +1272,14 @@ dài 96 thay vì 192 chu kỳ.
 | 22 | Conv có **weight bằng 0** tính sai hoặc treo (mọi mẫu số 0 trừ "mỗi cột một số 0 ở đầu"; model MNIST int8 đã huấn luyện: Conv2 140/384, Conv3 116/384 lần nạp weight sai) | Định dạng nén weight: mapper Python không khớp cách `data_pipeline_wght.v` giải mã (cột rỗng, ô đệm, overhead 4 bit, reset địa chỉ ở word 0) và bộ ghép stream | **Đã sửa** (2026-10-24, được bạn đồng ý, **chỉ Python**): `conv_wght_encoding.py`; stream giống hệt khi không có số 0; MNIST Conv1/2/3 với weight đã huấn luyện tính đúng mọi output. Mục 9 |
 | 23 | `test_conv3x3_sparse` 32×4×8 → 16 (iact và weight thưa dạng bàn cờ, `NUM_GLB_IACT=3`) sai: output 0 ở các x lẻ của hàng 1 | ? (phía activation thưa: weight của ca này giải mã đúng theo mô hình RTL) | **Chưa điều tra** (có từ trước bản sửa #22: code cũ cũng fail, kiểu sai khác) |
 | 24 | **Không có hàm kích hoạt**: `af_cluster.v` (ReLU) không được dùng ở đâu, còn 2 lỗi (so sánh `< 0` trên dây không dấu, chọn bit `[a:+b]` sai), testbench riêng lỗi thời; `af_cluster_mode` chỉ reset về 0, không có trường cấu hình | RTL | **Chưa sửa** (ghi nhận 2026-10-24). Tham chiếu Python cũng không có ReLU; cần cho model thật (mục 8d) |
-| 25 | `NUM_GLB_PSUM = 2` (PE trục X = 2): mọi model nối một Conv với layer khác trên chip tính sai (cả 8 hàng X = 2 của Bảng 3). Ghi chú cũ "sau Conv2 lại đúng" là sai: kiểm tra đó bị bỏ qua | **Pha ghi ngược của Conv**: RTL (`RECEIVE_PSUMS_TO_IACT` gom nhóm `WRITEBACK_WORDS` = 2 channel thay vì 4 channel/pixel, và đếm pixel đệm theo nhóm) + Python (`fsm_psum_limit` chia 4 thay vì `NUM_GLB_PSUM`) | **Đã điều tra** (2026-10-26, mục 9, không sửa RTL): Conv, pooling, Dense đều đúng với X = 2 (tiêm ảnh đúng sau mỗi lần ghi ngược thì mạng paper ra kết quả đúng). Python thuần không đủ. **Đề xuất:** khoảng 15 dòng RTL (nhóm luôn 4 channel, chỉ phát W lane) + 1 dòng Python; với `NUM_GLB_PSUM = 4` mạch y như cũ. **Chờ đồng ý sửa RTL** |
+| 25 | `NUM_GLB_PSUM = 2` (PE trục X = 2): mọi model nối một Conv với layer khác trên chip tính sai (cả 8 hàng X = 2 của Bảng 3). Ghi chú cũ "sau Conv2 lại đúng" là sai: kiểm tra đó bị bỏ qua | **Pha ghi ngược của Conv**: RTL (`RECEIVE_PSUMS_TO_IACT` gom nhóm `WRITEBACK_WORDS` = 2 channel thay vì 4 channel/pixel, và đếm pixel đệm theo nhóm) + Python (`fsm_psum_limit` chia 4 thay vì `NUM_GLB_PSUM`) | **Đã sửa** (2026-10-26, được bạn đồng ý): RTL `RECEIVE_PSUMS_TO_IACT` gom nhóm 4 channel/pixel với mọi số lane (`WRITEBACK_CHANNELS`), chỉ phát W lane, `x_pos` đếm theo pixel; Python `fsm_psum_limit` chia theo số lane. Với `NUM_GLB_PSUM = 4` mạch như cũ. Test mới 7/7, hồi quy 146 test 0 FAIL, 12 case mốc 0 chu kỳ lệch, lint 0 mới, Bảng 3 14/16 cấu hình PASS (còn #19b, #28). Mục 9 |
 | 26 | **Dense nối tiếp Dense trên chip** (MLP, Dense 1568→32 → Dense 32→10 của paper): Dense đầu tính psum **đúng** nhưng pha ghi ngược (`SEND_PSUM_TO_IACT` + `RECEIVE_PSUMS_TO_IACT`) **không ghi gì** vào bộ đệm iact, Dense sau đọc lại input của Dense đầu; mọi cấu hình, mọi K, N | Python (`fsm_psum_limit` quá ngắn, vòng đọc psum không cấu hình cho Dense) **và** RTL (bộ đóng gói chỉ biết bố cục conv; nhánh FC bị upstream bỏ ở `1320759`/`8350a00` để giảm LUT) | **Đã sửa** (2026-10-24, được bạn đồng ý): 1 dòng RTL (`x_pos` quay về 0 ở mỗi nhóm khi FC) + thanh ghi Python (`configure_fc_writeback`). 11/11 chuỗi Dense qua RTL, hồi quy 128 test không đổi, 12 case mốc 0 chu kỳ lệch, Bảng 3: 7/8 cấu hình X = 4 tính đúng cả mạng. Mục 9 |
+| 27 | Pooling 4×4 → 2×2 (lần pooling thứ hai của `Conv_Pool_Conv_Pool_Conv` với input 8×8): bộ đệm sau pooling chứa −128 (giá trị khởi đầu của max-pool) và 2 ô không được ghi; xảy ra với cả `NUM_GLB_PSUM` 4 và 2; input 16×16 thì đúng | ? (pooling, kích thước nhỏ) | **Chưa điều tra** (phát hiện 2026-10-26 khi viết test cho #25) |
+| 28 | Conv ở `CLUSTER_ROWS=1` với `NUM_GLB_PSUM=2` tính sai một số output (đường đọc thẳng ra, không có ghi ngược): Conv 14×14 32 → 32 channel sai, 16 → 32 đúng; conv2 của mạng paper (sau pooling) sai ở vài pixel. CR 1 X 4 và CR 2 X 2 đều đúng. Là nguyên nhân của 2 hàng CR 1 X 2 còn FAIL trong Bảng 3 | ? (phép tính, tổ hợp CR = 1 + 2 lane) | **Chưa điều tra** (phát hiện 2026-10-26 khi kiểm chứng bản sửa #25) |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-24)
 
-**Định hướng (mốc phần cứng 2026-10-26 sau bản sửa #26: 63,9k LUT, 39,0k FF, 192 BRAM tile, đạt 250 MHz sau route; mốc chu kỳ `baseline_2026-10-24`: 9 case
+**Định hướng (mốc phần cứng 2026-10-26 sau bản sửa #25: 64,0k LUT, 39,3k FF, 192 BRAM tile, đạt 250 MHz sau route; mốc chu kỳ `baseline_2026-10-24`: 9 case
 một layer giống hệt `baseline_2026-10-15`, thêm 3 model):**
 
 | # | Việc | Loại | Vì sao | Trạng thái |
@@ -1285,12 +1295,12 @@ luyện: kẹp int8, ReLU (#24) (mục 8d) |
 | F | Pipeline đường găng iact converter (`OpenEye_FPGA.v` 943–950) | Sửa RTL (fmax) | Tính trước các tích tham số một lần mỗi layer | Chỉ làm nếu fmax sau route chưa đủ |
 | G | `USE_DSP=1` cho PE | Sửa RTL (tài nguyên) | Bộ nhân 48 PE đang dùng LUT, còn 1.724 DSP trống | Khi cần thêm cluster |
 | H | Lỗi #14, #15 (cảnh báo "simulation mismatch") | Phân tích, có thể sửa RTL | Cùng loại rủi ro với #13 | #14 **xong** (2026-10-19); #15 chưa |
-| I | Lỗi #26 (Dense nối tiếp Dense) và #25 (`NUM_GLB_PSUM=2`) | Điều tra (Python trước) | Chặn mạng của paper và mọi model có 2 Dense; Bảng 3 chưa có cấu hình nào tính đúng hết | #26 **đã sửa** (2026-10-24, 1 dòng RTL + Python, mục 9); #25 **đã điều tra** (2026-10-26): cần sửa RTL khoảng 15 dòng + 1 dòng Python, chờ đồng ý (mục 9) |
+| I | Lỗi #26 (Dense nối tiếp Dense) và #25 (`NUM_GLB_PSUM=2`) | Điều tra (Python trước) | Chặn mạng của paper và mọi model có 2 Dense; Bảng 3 chưa có cấu hình nào tính đúng hết | #26 **đã sửa** (2026-10-24, 1 dòng RTL + Python, mục 9); #25 **đã sửa** (2026-10-26, mục 9) |
 | J | Bảng 3 với activation thưa (giả lập ReLU) | Chỉ Python | Phần xử lý của fork chậm hơn paper 4–5,6 lần; xem bao nhiêu là do activation không thưa | Đề xuất |
 | K | Hàm kích hoạt (#24) + kẹp int8 trong `quantization_unit` | Sửa RTL | Cần cho model thật (mục 8d) | Chờ đồng ý |
 
 Thứ tự đề xuất: A, B, B2, C2 (kiến trúc MNIST chạy đủ) **đã xong**; tiếp theo là C (bias theo filter: Bảng 3 cho thấy bias chiếm khoảng 54.000–58.000 ns ở mọi
-cấu hình), I (#25; #26 đã sửa), rồi D.
+cấu hình), rồi D (I: #25, #26 đã sửa).
 Mỗi thay đổi RTL: test, `run_profile --compare`, Yosys (so sánh nhanh LUT), Vivado ở các mốc quan trọng.
 
 **Kế hoạch theo giai đoạn (số liệu theo `baseline_2026-10-15`; 9 case này không đổi trong `baseline_2026-10-24`):**
@@ -1342,11 +1352,11 @@ kết quả ra.
 | `LAYER=MNIST` của `data_create.py` (Conv 2→16, Pool, Conv 16→16, Pool, Conv 7×7 16→16, Dense 784→10), `NUM_GLB_IACT` 1 và 3 | **PASS** cả 6 layer |
 | Kiến trúc MNIST thật (`models/mnist_conv_net.py`: Conv 32, Pool, Conv 64, Pool, Conv 7×7 64, FC 3136→10), đầu vào **đệm thành 2 channel**, `QUANT_AMOUNT=64` | **PASS** cả 6 layer |
 | Như trên với **1 channel** (đúng model gốc) | FAIL ở bộ đệm iact sau Conv1 (lỗi #17); **PASS từ 2026-10-22** nhờ đệm 2 channel bằng Python (`model_mnist_real_c1`, 241.250 chu kỳ = 965 µs; 240.671 sau #22) |
-| `LAYER=PAPER_MNIST` (mạng Bảng 2 của paper: Conv 16, Pool, Conv 32, Pool, Conv 32, Dense 1568→32, Dense 32→10), 16 cấu hình | Trước bản sửa #26 FAIL ở mọi cấu hình (Dense nối tiếp Dense không ghi kết quả vào bộ đệm). **Sau bản sửa #26 (2026-10-24): 7/8 cấu hình X = 4 PASS cả 7 layer**; CR 1 X 4 Y 3 còn sai ở Dense 1568→32 (lỗi tính #19b); X = 2 còn #25 (mục 6.14, 9) |
+| `LAYER=PAPER_MNIST` (mạng Bảng 2 của paper: Conv 16, Pool, Conv 32, Pool, Conv 32, Dense 1568→32, Dense 32→10), 16 cấu hình | Trước bản sửa #26 FAIL ở mọi cấu hình. Sau bản sửa #26 (2026-10-24): 7/8 cấu hình X = 4 PASS. **Sau bản sửa #25 (2026-10-26): 14/16 cấu hình PASS cả 7 layer**; còn CR 1 X 4 Y 3 (lỗi tính #19b ở Dense 1568→32) và CR 1 X 2 (lỗi tính #28 ở Conv) (mục 6.14, 9) |
 
 **Còn thiếu để mô phỏng đúng model MNIST thật (ngữ nghĩa của testbench):** (1) lỗi #17: **đã làm** đệm 1 → 2 channel bằng Python (2026-10-22, channel thêm
 toàn 0, +472 chu kỳ = +1,5 % Conv1, mục 9; sửa RTL vẫn là lựa chọn sau này); (2) dựng phần cứng với `QUANT_AMOUNT=64`; (3) nới ngưỡng phát hiện treo (layer 64 filter tính 90.000 chu kỳ trong trạng thái 11);
-(4) model khác: #19b, #21 (Dense N > 32 làm layer cuối), #25 (`NUM_GLB_PSUM=2`), layer nhiều lượt truyền (#26, 2 Dense nối tiếp: đã sửa 2026-10-24).
+(4) model khác: #19b, #21 (Dense N > 32 làm layer cuối), #28 (`CLUSTER_ROWS=1` với `NUM_GLB_PSUM=2`), #27 (pooling 4×4 → 2×2), layer nhiều lượt truyền (#26 và #25 đã sửa 2026-10-24/26).
 
 **Còn thiếu để chạy model int8 đã huấn luyện với kết quả đúng:** tham chiếu giữa các layer (`batchnorm_output`) chỉ là `floor(mant·x/2^shift)`, không kẹp,
 không ReLU, nên PASS ở trên không nói gì về độ chính xác. Cần: (I) ~~lỗi #22: weight 0 thật~~ **đã sửa 2026-10-24** (chỉ Python, mục 9); (A) kẹp int8 trong `quantization_unit.v` (thiếu → 9,3 % theo mô phỏng ngày 19/10); (B) ReLU
@@ -1988,7 +1998,7 @@ và **kết quả cuối đúng**: Conv, Pooling, Dense và ghi ngược Dense �
 chưa chạy được); thứ tự byte không đổi được bằng vòng đọc (hai nhóm liền nhau luôn đến từ hai lane = hai pixel khác nhau); bỏ cách một nhóm thì cần đổi `iact_x_add_up`,
 thứ bộ chuyển đổi Conv đang dùng. Chỉ G3 là Python.
 
-**Đề xuất (chờ bạn đồng ý, sửa RTL khoảng 15 dòng trong `RECEIVE_PSUMS_TO_IACT`):** `localparam WRITEBACK_CHANNELS = 4` làm độ dài nhóm (byte/nhóm, số chu kỳ mỗi lần
+**Đề xuất (sửa RTL khoảng 15 dòng trong `RECEIVE_PSUMS_TO_IACT`; đã được bạn đồng ý và áp dụng, xem mục "Sửa lỗi #25" ngay sau):** `localparam WRITEBACK_CHANNELS = 4` làm độ dài nhóm (byte/nhóm, số chu kỳ mỗi lần
 chuyển vị, số nhóm mỗi hàng bộ đệm, độ rộng các lát bus), số lane vẫn là `WRITEBACK_WORDS`; mỗi lần chuyển vị chỉ phát `WRITEBACK_WORDS` nhóm (lane), các chu kỳ còn lại
 không dịch và `x_pos` giữ nguyên, nên `x_pos` đếm theo pixel. Với `WRITEBACK_WORDS = 4` mọi điều kiện luôn đúng: **mạch y hệt hiện tại** (mọi test và mốc phần cứng dùng
 cấu hình này). Cộng 1 dòng Python: `fsm_psum_limit` chia cho `min(TRANS_WORDS, NUM_GLB_PSUM)` thay vì 4.
@@ -2005,6 +2015,39 @@ hiện tại cho X = 2 đang nhanh hơn thực tế khoảng 4 % vì pha ghi ng�
 Lịch sử: `WRITEBACK_WORDS` có từ `4ed008a` (19/9, Hendrik Woehrle), thay bộ đóng gói cũ (chế độ 4/2/1 byte mỗi pixel), chỉ được kiểm chứng với `NUM_GLB_PSUM = 4`.
 
 Chi tiết: `doc/experiments/2026-10-26_bug25_glb_psum2.md`, công cụ `doc/experiments/2026-10-26_bug25/` (`run25.py`, `probe25.py`, `model25.py`).
+
+### Sửa lỗi #25: ghi ngược Conv khi `NUM_GLB_PSUM = 2` (2026-10-26, được bạn đồng ý)
+
+Làm đúng đề xuất ở mục trên.
+
+| File | Thay đổi |
+|---|---|
+| `hdl/OpenEye_FPGA.v` | `localparam WRITEBACK_CHANNELS = 4`. Trong `RECEIVE_PSUMS_TO_IACT`, độ dài nhóm (số chu kỳ mỗi lần chuyển vị, lúc nạp lại `iact_to_psum_trans_counter`, số nhóm mỗi hàng bộ đệm, độ rộng các lát của thanh ghi chuyển vị/dịch và bus ghi RAM, độ rộng bộ đếm lưu trữ) dùng hằng số này; số lane vẫn là `WRITEBACK_WORDS`. Chỉ ghi nhóm khi `iact_to_psum_trans_counter <= WRITEBACK_WORDS` (so 4 bit; OR với hằng `WRITEBACK_WORDS >= WRITEBACK_CHANNELS` để với 4 lane công cụ tổng hợp bỏ hẳn phép so sánh), các chu kỳ còn lại `x_pos` giữ nguyên (chỉ về 0 trước nhóm đầu tiên); pha flush dùng cùng kích thước nhóm |
+| `src/open_eye/layer_parameters.py` | `fsm_psum_limit` của Conv ghi ngược chia cho `min(TRANS_WORDS, NUM_GLB_PSUM)` thay vì 4 |
+| `src/open_eye/writeback_model.py` (mới) | Mô hình chu kỳ (vòng đọc + bộ đóng gói, số lane và độ dài nhóm tách riêng), dùng chung cho unit test |
+| `test/test_conv_writeback.py` (mới) | 12 test: pixel đúng thứ tự với 2 và 4 lane, hàng rộng 6, 7, 8, 14, 28; cách gom cũ với 2 lane tái hiện đúng kiểu đổi byte |
+| `test/test_fc_writeback.py` | Dùng mô hình chung (nhóm 4 channel): ghi ngược Dense vẫn đúng thứ tự với 2 và 4 lane |
+| `test/cocotb_fpga/test_glb_psum2.py` (mới) | 7 test RTL với `NUM_GLB_PSUM = 2` |
+
+Với `NUM_GLB_PSUM = 4` mọi điều kiện mới luôn đúng: mạch như trước khi sửa. Lỗi mới #27 (pooling 4×4 → 2×2, mục 8b) phát hiện khi viết test.
+
+**Kiểm chứng:**
+
+| Kiểm tra | Kết quả |
+|---|---|
+| `test_glb_psum2.py` (RTL, mới) | **7/7 PASS** (bộ đệm và kết quả cuối) |
+| Đối chứng âm: RTL cũ (`e062707`) + Python mới | Conv đơn PASS; 3 ca có ghi ngược FAIL đúng kiểu đổi nhóm 2 byte: dòng RTL là cần thiết, test bắt được lỗi |
+| Unit test | `test_conv_writeback.py` 12/12, `test_fc_writeback.py` 110/110; tổng 251 pass, 11 fail có từ trước |
+| Hồi quy RTL 146 test (`test_conv_const`, `test_mnist_layers`, `test_gemm_layer`, `test_pooling`, `test_nets`, `test_dense_chain`, `test_glb_psum2`) | **141 PASS + 5 xfail đã biết, 0 FAIL** |
+| `run_profile` 12 case so với mốc | 12/12 PASS, **0 chu kỳ và 0 word DMA lệch** |
+| Lint cấu hình mặc định | `parallel` 36, `fpga` 463: **0 mới** (phép so sánh bộ đếm viết 4 bit để không thêm cảnh báo WIDTHEXPAND) |
+| Lint với `NUM_GLB_PSUM=2` (RTL mới so với RTL cũ, cùng cấu hình) | Không có cảnh báo mới |
+| Bảng 3 chạy lại (`doc/perf/paper_table3_2026-10-26_fix25.md`; chạy trên bản RTL đầu, trước khi OR thêm hằng vào phép kiểm lane, không đổi hành vi; hồi quy và 12 case mốc đã chạy lại trên RTL cuối) | **14/16 cấu hình PASS** (trước: 7/16). X = 2 với CR 2/4/8: FAIL → PASS, chu kỳ +4,4 % đến +7,8 % (pha ghi ngược Conv không còn bị cắt). X = 4: giống hệt từng chu kỳ. Còn sai: CR 1 X 4 Y 3 (#19b) và CR 1 X 2 Y 3/Y 4 (lỗi mới #28) |
+| Vivado tổng hợp + place & route ở 4 ns (`doc/synth/2026-10-26_route4ns_fix25_zu7ev/`) | **0 ERROR, 0 CRITICAL WARNING**, cảnh báo như mốc fix26; sau tổng hợp LUT +113 (+0,17 %, trong biên dao động giữa các lần chạy), FF −10; BRAM/URAM/DSP không đổi; WNS +0,205 / **+0,084 ns**, đạt 250 MHz; đường găng không nằm ở bộ ghi ngược. Lần chạy đầu (phép kiểm lane chưa gấp hằng) LUT +92; RTL cuối OR thêm hằng `WRITEBACK_WORDS >= WRITEBACK_CHANNELS` |
+| Kiểm tra tương đương hình thức bằng Yosys (thử) | **Không dùng được**: quy trình báo "tương đương" cả với một sai khác cố ý cài vào, nên không phải bằng chứng |
+
+**Lỗi mới #28:** Conv ở `CLUSTER_ROWS=1` với `NUM_GLB_PSUM=2` tính sai (không phải ghi ngược): 3 layer đầu của mạng paper với conv2 là layer cuối (đọc thẳng ra)
+sai ở một số pixel với CR 1 X 2, đúng với CR 1 X 4; một Conv 14×14 32 → 32 channel nạp qua DMA sai với CR 1 X 2, đúng với CR 1 X 4 và CR 2 X 2. Chưa điều tra.
 
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
@@ -2377,3 +2420,12 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   vì `NUM_GLB_PSUM`. Đính chính: kiểm tra "sau Conv2" không đúng mà bị bỏ qua. Đề xuất khoảng 15 dòng RTL (y hệt mạch cũ khi `NUM_GLB_PSUM = 4`) + 1 dòng Python,
   kiểm chứng bằng giả lập trong mô phỏng và mô hình chu kỳ; chi phí +4,4 % chu kỳ cho mạng paper X = 2. **Chờ đồng ý sửa RTL.** Mục 8b, 9,
   `doc/experiments/2026-10-26_bug25_glb_psum2.md`, công cụ `doc/experiments/2026-10-26_bug25/`.
+- **Sửa lỗi #25** (được bạn đồng ý): ghi ngược Conv với `NUM_GLB_PSUM = 2`. RTL `RECEIVE_PSUMS_TO_IACT`: nhóm ghi ngược luôn 4 channel/pixel (`WRITEBACK_CHANNELS`),
+  chỉ phát đủ số lane thật, `x_pos` đếm theo pixel; với 4 lane mọi điều kiện mới là hằng đúng (mạch như cũ). Python: `fsm_psum_limit` chia theo số lane.
+  Mô hình chu kỳ dùng chung `src/open_eye/writeback_model.py`; test mới `test/cocotb_fpga/test_glb_psum2.py` (7) và `test/test_conv_writeback.py` (12).
+  Kiểm chứng: 7/7; đối chứng âm (RTL cũ) FAIL đúng kiểu đổi byte; hồi quy 146 test 141 PASS + 5 xfail, 0 FAIL; 12 case mốc 0 chu kỳ / 0 word DMA lệch; lint 0 mới
+  (cả cấu hình 2 lane); Bảng 3 (`doc/perf/paper_table3_2026-10-26_fix25.md`, mốc Bảng 3 mới) **14/16 cấu hình PASS** (X = 2 với CR 2/4/8 nay đúng, chậm hơn số đo cũ
+  4,4–7,8 % vì pha ghi ngược không còn bị cắt; X = 4 giống hệt); Vivado 4 ns (`doc/synth/2026-10-26_route4ns_fix25_zu7ev/`, **mốc phần cứng mới**): 0 CRITICAL,
+  LUT +113 (+0,17 %, dao động), WNS +0,084 ns. Thử kiểm tra tương đương hình thức bằng Yosys: quy trình không phát hiện được sai khác cài sẵn nên không dùng.
+  Lỗi mới: **#27** (pooling 4×4 → 2×2 sai, cả 4 lane), **#28** (Conv ở `CLUSTER_ROWS=1` với 2 lane tính sai: 2 hàng CR 1 X 2 của Bảng 3). Mục 8b, 9,
+  `doc/experiments/2026-10-26_bug25_glb_psum2.md` mục 9.

@@ -1270,7 +1270,11 @@ class LayerParameters(object):
         else:
             psum_cycles = 1
         if (layer_number != max_layers - 1):
-            self.fsm_psum_limit = math.ceil(self.iact_x_add_up * self.filters * self.iact_size_y /4)
+            # SEND_PSUM_TO_IACT reads the pixels of one cluster per cycle, one per
+            # write-back lane (WRITEBACK_WORDS in OpenEye_FPGA.v). The fixed 4 ended
+            # the write-back half way with NUM_GLB_PSUM = 2 (bug #25).
+            writeback_lanes = min(params.TRANS_WORDS, params.NUM_GLB_PSUM)
+            self.fsm_psum_limit = math.ceil(self.iact_x_add_up * self.filters * self.iact_size_y / writeback_lanes)
             self.fsm_psum_limit = self.fsm_psum_limit + 11
         else:
             self.fsm_psum_limit = ((self.iact_x_add_up * psum_cycles * self.different_kernels_per_calculation * self.needed_wght_cycles * self.used_psum_per_PE * self.iact_size_y)//8) + 12

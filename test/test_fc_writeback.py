@@ -2,11 +2,9 @@
 # SPDX-License-Identifier: SHL-2.1
 """Write-back of a Dense layer into the iact buffer (bug #26), checked on a cycle model of the RTL.
 
-The model follows hdl/psum_pipeline.v (SEND_PSUM_TO_IACT: address and cluster-select loops) and hdl/OpenEye_FPGA.v
-(RECEIVE_PSUMS_TO_IACT: WRITEBACK_WORDS-lane transposition, group filter, storage counter, flush in PSUM_IDLE), with
-the pipeline timing seen in RTL simulation (doc/experiments/2026-10-24_bug26_dense_writeback.md, section 3): the value
-read for loop step s reaches the main FSM at cycle 7 + s of the state, and after the state ends the quantizer output
-runs on for three cycles and then holds. The registers come from LayerParameters.configure_fc_writeback.
+The model (open_eye.writeback_model) follows hdl/psum_pipeline.v (SEND_PSUM_TO_IACT: address and cluster-select loops)
+and hdl/OpenEye_FPGA.v (RECEIVE_PSUMS_TO_IACT: lanes x 4-channel transposition, group filter, storage counter, flush in
+PSUM_IDLE). The registers come from LayerParameters.configure_fc_writeback.
 """
 import math
 import types
@@ -14,6 +12,7 @@ import types
 import pytest
 
 from open_eye.layer_parameters import LayerParameters
+from open_eye.writeback_model import pack, read_sequence
 
 
 def writeback_registers(n_filters, cx, cells, macs=2):
@@ -29,89 +28,13 @@ def writeback_registers(n_filters, cx, cells, macs=2):
     return lp
 
 
-def read_sequence(lp, clusters, steps):
-    """(cluster, address) of loop step 0, 1, ...: the psum_cycle_addr_* and psum_cluster_select_* counters."""
-    lim, inc = lp.psum_pagu_loop_limit, lp.psum_pagu_addr_inc
-    cs_lim, cs_inc = lp.psum_pagu_cs_limit[:4] + [0], lp.psum_pagu_cs_inc[:4] + [0]
-    addr, cnt = [0] * 5, [0] * 5
-    sel, scnt = [0] * 4, [0] * 4
-    out = []
-    for _ in range(steps):
-        out.append((sel[0], addr[0]))
-        # address loops (5 levels): the counter of a level that wraps loads the next level's address + increment
-        level = 0
-        while level < 5 and cnt[level] == lim[level]:
-            cnt[level] = 0
-            level += 1
-        if level < 5:
-            cnt[level] += 1
-        nxt = addr[level] + inc[level] if level < 5 else addr[4] + inc[4]
-        for i in range(min(level, 4) + 1):
-            addr[i] = nxt
-        # cluster-select loops (4 levels), modulo the cluster count
-        level = 0
-        while level < 4 and scnt[level] == cs_lim[level]:
-            scnt[level] = 0
-            level += 1
-        if level < 4:
-            scnt[level] += 1
-            nxt = (sel[level] + cs_inc[level]) % clusters
-            for i in range(level + 1):
-                sel[i] = nxt
-        else:
-            sel = [0] * 4
-    return out
+def fc_values(filters):
+    """Lane values of a Dense write-back: lane 0 carries the result read in that step, the other lanes other GLBs."""
+    return lambda s, a: filters[s] if a == 0 else -1
 
 
-def pack(values, limit, w, cells, iact_size_x=1, add_up=10**6, fc=True):
-    """Buffer rows RECEIVE_PSUMS_TO_IACT writes when value s of `values` reaches it at cycle 7 + s of the state."""
-    groups = 8 * cells // w
-    held = values[min(limit - 3, len(values) - 1)]
-
-    def quant(c):                       # quantizer output in cycle c (state ends after cycle `limit`)
-        s = c - 7
-        return values[s] if c <= limit + 4 else held
-
-    mux = [[0] * w for _ in range(w)]
-    shift = [[0] * w for _ in range(w)]
-    bus = [[0] * w for _ in range(groups)]
-    trans = x_pos = sc = 0
-    shifting = False
-    rows = []
-    c = 7
-    while True:
-        idle = c > limit
-        if idle and sc == 0:
-            return rows
-        write = False
-        # capture branch
-        new_x = 0
-        new_trans = trans + 1
-        new_shift, new_bus, new_sc = shift, bus, sc
-        if shifting:
-            new_x = x_pos + 1
-            if x_pos < iact_size_x:
-                new_sc = sc + 1
-                if sc == groups - 1:
-                    new_sc, write = 0, True
-                new_bus = bus[1:] + [shift[0]]
-                new_shift = shift[1:] + [[0] * w]
-        new_mux = [lane[1:] + [quant(c) if a == 0 else 0] for a, lane in enumerate(mux)]
-        new_shifting = shifting
-        if trans == w:
-            new_trans, new_shift, new_shifting = 1, [list(l) for l in mux], True
-            if x_pos >= add_up - 1 or fc:
-                new_x = 0
-        if idle:                        # flush: count and shift every cycle, the top group as above
-            new_sc = sc + 1
-            write = False
-            if sc == groups - 1:
-                new_sc, write = 0, True
-            new_bus = bus[1:groups] + [new_bus[-1]]
-        mux, shift, bus, trans, x_pos, sc, shifting = new_mux, new_shift, new_bus, new_trans, new_x, new_sc, new_shifting
-        if write:
-            rows.append([b for g in bus for b in g])
-        c += 1
+def fc_rows(filters, limit, lanes, cells, **kw):
+    return pack(fc_values(filters), limit, lanes, cells, iact_size_x=1, fc=True, **kw)
 
 
 CONFIGS = [(n, cx, cells, w) for n in (4, 8, 10, 16, 32, 40, 64, 96, 128)
@@ -129,7 +52,7 @@ def test_writeback_order(n, cx, cells, w):
     assert all(cl < cx and addr < reps * p for cl, addr in seq)
     filters = [(addr // p) * cx * p + cl * p + addr % p for cl, addr in seq]
     assert filters[:reps * cx * p] == list(range(reps * cx * p))
-    rows = pack(filters, lp.fsm_psum_limit, w, cells)
+    rows = fc_rows(filters, lp.fsm_psum_limit, w, cells)
     flat = [v for row in rows for v in row]
     assert len(rows) == math.ceil(reps * cx * p / (8 * cells))
     assert flat[:n] == list(range(n))
@@ -140,7 +63,7 @@ def test_old_wrap_duplicates_groups():
     lp = writeback_registers(8, 2, 4)
     seq = read_sequence(lp, 4, lp.fsm_psum_limit)
     filters = [(addr // 4) * 8 + cl * 4 + addr % 4 for cl, addr in seq]
-    rows = pack(filters, lp.fsm_psum_limit, 4, 4, add_up=16, fc=False)
+    rows = pack(fc_values(filters), lp.fsm_psum_limit, 4, 4, iact_size_x=1, add_up=16)
     assert rows[0] == [0, 1, 2, 3] * 8          # the RTL simulation showed f0..f3 eight times (run wb16k)
 
 
@@ -149,5 +72,5 @@ def test_padding_matches_rtl():
     lp = writeback_registers(10, 2, 4)
     seq = read_sequence(lp, 4, lp.fsm_psum_limit)
     filters = [cl * 6 + addr % 6 for cl, addr in seq]
-    rows = pack(filters, lp.fsm_psum_limit, 4, 4)
+    rows = fc_rows(filters, lp.fsm_psum_limit, 4, 4)
     assert rows[0][:16] == list(range(12)) + [0, 1, 2, 3]
