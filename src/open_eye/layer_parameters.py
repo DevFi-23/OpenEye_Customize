@@ -1675,6 +1675,8 @@ class LayerParameters(object):
         self.psum_output_words = int(self.output_cycles * self.used_psum_per_PE
                                      * params.Clusters_X * self.needed_wght_cycles)
         self.iact_x_pos_inc = math.ceil(params.NUM_GLB_WGHT*self.used_iact_per_PE/2) * params.Clusters_Y
+        if self.send_values_out == 0:
+            self.configure_fc_writeback(params)
         logger.debug("Needed transmissions: " + str(self.needed_wght_transmissions))
         logger.debug("Needed transmissions: " + str(self.needed_psum_transmissions))
         logger.debug("Needed transmissions: " + str(self.needed_total_transmissions))
@@ -1687,6 +1689,40 @@ class LayerParameters(object):
         logger.debug("Needed transmissions PSUM    : " + str(self.needed_psum_transmissions))
         logger.debug("Needed transmissions TOTAL   : " + str(self.needed_total_transmissions))
         return
+
+    def configure_fc_writeback(self, params):
+        """Write-back registers of a Dense layer that keeps its output on chip (bug #26).
+
+        The result of filter f = r*CX*P + c*P + a sits in GLB 0 of cluster
+        column c (cluster row 0) at psum buffer address r*P + a (P =
+        used_psum_per_PE, CX = cluster columns, r = psum transmission), the
+        layout DensePsumStreamMapper writes the bias in. SEND_PSUM_TO_IACT reads
+        one cluster per cycle (lane 0 = its GLB 0), so the read loops walk the
+        filters in order: P addresses per column, CX columns, the next
+        transmission P addresses further on. RECEIVE_PSUMS_TO_IACT keeps lane 0
+        of every group (iact_size_x = 1 in dense_mapper), which writes the
+        outputs as the flat input of the next Dense layer.
+
+        The main FSM captures from cycle 7 of the state on and keeps group j
+        (values W*j .. W*j+W-1, W = WRITEBACK_WORDS) at cycle 8 + W*(j+1), so
+        a buffer row of 8*IACT_RAM_CELLS values is complete at cycle
+        8 + 8*IACT_RAM_CELLS*m. Ending SEND_PSUM_TO_IACT one cycle after
+        the last group of a full buffer row leaves the storage counter at 0, so
+        the flush in PSUM_IDLE stops at once instead of shifting copies of the
+        last group into the row. The reads past the last filter wrap to filter
+        0, so no unwritten address is read; those values land behind the N
+        outputs, where the next layer's weights are zero.
+        See doc/experiments/2026-10-24_bug26_dense_writeback.md.
+        """
+        p = self.used_psum_per_PE
+        cx = params.Clusters_X
+        reps = self.needed_psum_transmissions
+        row = 8 * params.IACT_RAM_CELLS
+        self.fsm_psum_limit = 8 + row * math.ceil(reps * cx * p / row)
+        self.psum_pagu_loop_limit[:5] = [p - 1, cx - 1, reps - 1, 255, 0]
+        self.psum_pagu_addr_inc[:5] = [1, 0, p, 0, 0]
+        self.psum_pagu_cs_limit[:3] = [p - 1, cx - 1, 0]
+        self.psum_pagu_cs_inc[:3] = [0, 1, 0]
 
     def write_gemm_layer(self, layer_parameters, layer, params, layer_number, max_layers):
         """Compute configuration parameters for a GEMM layer (output-stationary).

@@ -1,6 +1,7 @@
-# 2026-10-24: bug #26 investigated - a Dense layer never writes its output back for a following Dense (no RTL change)
+# 2026-10-24: bug #26 - a Dense layer never writes its output back for a following Dense (investigated, then fixed)
 
-No RTL and no repository code was changed. Tools in `2026-10-24_bug26/` (section 9). Platform of all runs unless noted:
+Sections 1-9: the investigation, without any RTL or repository code change. Section 10: the fix, made the same day with
+the user's approval (one RTL line + Python), and its verification. Tools in `2026-10-24_bug26/` (section 9). Platform of all runs unless noted:
 2x2 clusters (`CLUSTER_COLUMNS=2`, `CLUSTER_ROWS=2`), `NUM_GLB_PSUM=4`, `NUM_GLB_WGHT=3`, `NUM_GLB_IACT=1`,
 `IACT_RAM_CELLS=4`, `TRANS_WORDS=8` (so `WRITEBACK_WORDS = min(TRANS_WORDS, NUM_GLB_PSUM) = 4`), DMA 64 bit, psum 20 bit,
 random data, `OPENEYE_SEED=1`.
@@ -29,7 +30,7 @@ only blocker.
 `SEND_PSUM_TO_IACT` disappeared in `8350a00` (2026-07-20, "Optimized PSUM Flow for LUT Efficiency"), which replaced the
 hand-written read patterns by generic counter loops. Section 5.
 
-**Proposed fix** (needs approval, RTL): one line in `OpenEye_FPGA.v` (the `x_pos` wrap also fires for a fully connected
+**Fix** (proposed in section 7, approved and applied the same day, section 10): one line in `OpenEye_FPGA.v` (the `x_pos` wrap also fires for a fully connected
 layer) plus Python register settings for a Dense that keeps its output on chip. Validated by **emulating** the RTL line in
 cocotb (the testbench deposits the value the new line would store; the RTL source is untouched): 11 Dense chains (MLP
 included) and the paper network in 4 hardware configurations all give the right final result, and the buffer checks pass
@@ -161,7 +162,7 @@ per output value out (FC readout carries one psum per word) plus `ceil(N/8)` wor
 32 + 4 words for the paper's 1568->32 -> 32->10 (that layer's weight load alone is 10.560 DMA words). The testbench only reads
 outputs after the last layer today and would need intermediate outputs and DUT-to-host quantization. Not prototyped.
 
-## 7. Proposed fix: one RTL line + Python, validated by emulation
+## 7. Proposed fix: one RTL line + Python, validated by emulation (applied: section 10)
 
 RTL (`hdl/OpenEye_FPGA.v`, `RECEIVE_PSUMS_TO_IACT`, the `x_pos` wrap at the group reload):
 
@@ -240,3 +241,33 @@ venv/bin/python doc/experiments/2026-10-24_bug26/run_dense.py x16 D_16_8_10 2   
 venv/bin/python doc/experiments/2026-10-24_bug26/run_dense.py i16 D_16_8_10 2 B26_INJECT=1          # section 4
 venv/bin/python doc/experiments/2026-10-24_bug26/run_dense.py e16 D_16_8_10 2 B26_WB=1 B26_WB_KEEP_ADDUP=1 B26_LIMIT_ROWS=1 B26_EMU=1
 ```
+
+## 10. The fix (2026-10-24, approved by the user)
+
+| File | Change |
+|---|---|
+| `hdl/OpenEye_FPGA.v` (`RECEIVE_PSUMS_TO_IACT`) | `if ((iact_to_psum_x_pos_counter >= iact_x_add_up - 1) | fully_connected_layer)`: the only RTL change (section 7) |
+| `src/open_eye/layer_parameters.py` | `configure_fc_writeback`, called by `write_dense_layer` when `send_values_out == 0`: `fsm_psum_limit`, address loops, cluster-select loops (section 7) |
+| `src/open_eye/dense_mapper.py` | register `iact_size_x` = 1 for a Dense that keeps its output on chip (unchanged, `ceil(K/2)`, for a last Dense) |
+| `src/open_eye/rtl_test_utils.py`, `test/cocotb_fpga/OpenEye_FPGA_tb.py` | `compare_iact_storage(..., valid_values=N)` after a Dense layer: compares the N outputs, not the padding behind them |
+| `src/open_eye/data_create.py` | model case `DENSE_CHAIN_<K>_<N1>_<N2>...` |
+| `test/cocotb_fpga/test_dense_chain.py` (new) | 11 Dense chains / configurations through the RTL |
+| `test/test_fc_writeback.py` (new) | cycle model of `SEND_PSUM_TO_IACT` + `RECEIVE_PSUMS_TO_IACT` with the registers of `configure_fc_writeback`: 108 configurations (N 4-128, 1/2/4 cluster columns, `IACT_RAM_CELLS` 4/8, `WRITEBACK_WORDS` 2/4) plus the two behaviours seen in RTL (old wrap: first group eight times; padding = f0..f3) |
+
+Nothing changes for a conv layer (`fully_connected_layer = 0`) or a last Dense (registers as before), so single-layer
+results and cycle counts stay the same.
+
+### Verification
+
+| Check | Result |
+|---|---|
+| `test_dense_chain.py` (RTL, new) | **11/11 PASS**: buffer check (first N activations) and final result; K 16-1568, N 8-64 (2 psum transmissions), MLP (two junctions), `CLUSTER_ROWS` 1/2/4, `NUM_GLB_IACT=3`, `NUM_GLB_PSUM=2` (`WRITEBACK_WORDS=2`); 19-78 s each |
+| Negative control: old RTL (commit `142ee6c`, git worktree) + the new Python | FAIL as predicted: the buffer row is `f0..f3` repeated (`0xfefb0303fefb0303`), so the RTL line is needed and the test catches the bug |
+| `test/test_fc_writeback.py` (cycle model, new) | **110/110 PASS**; the model reproduces both RTL observations (old wrap: first group eight times; padding f0..f3 for 64->10); `fsm_psum_limit` has a margin of about +-3 cycles around the chosen value, the old `P + 3` breaks the row |
+| Unit tests `test/test_*.py` | 239 pass, 11 fail (the 11 pre-existing `test_dense_output.py` failures) |
+| Regression (RTL), 128 tests, `OPENEYE_SKIP_FC_WRITE_CHECK=1` | **123 PASS + 5 xfail, 0 FAIL**, identical to before: `test_conv_const` 34/34, `test_mnist_layers` 21 + 5 xfail (#7 x2, #17, #9 x2), `test_gemm_layer` 63/63, `test_pooling` 4/4, `test_nets` (LAYER=MNIST, 6 layers) 1/1 |
+| `run_profile` 12 cases vs `doc/perf/baseline_2026-10-24` | 12/12 PASS, **0 cycles and 0 DMA words** different (no case has a Dense -> Dense junction) |
+| Lint (`tools/lint_check.py`, Verilator 5.020) | `parallel` 36, `fpga` 463: **0 new, 0 fixed** |
+| Paper network, Table 3 rerun (`tools/paper_table3.py`, 16 configurations, `doc/perf/paper_table3_2026-10-24_fix26`) | X = 4: **7 of 8 configurations PASS all 7 layers** (before: all 8 failed after layer 5). Still failing: CR 1 X 4 Y 3 after layer 5 = bug #19b (the Dense 1568->32 computes wrong at `CLUSTER_ROWS=1`, section 7). X = 2: unchanged, the checks after layers 1, 3, 4 fail (bug #25) and layer 5 inherits wrong inputs |
+| Cost on the paper network | layer 5 write-back phase 109-131 -> 130-146 cycles; whole network **+15 to +28 cycles** of 62.600-206.400 (<= 0.03 %); layers 0-4 identical cycle for cycle |
+| Vivado synthesis + place and route at 4 ns (`doc/synth/2026-10-26_route4ns_fix26_zu7ev/`) | **0 ERROR, 0 CRITICAL WARNING**, warnings as in fix19; post-synthesis LUT -4 / FF -4; BRAM/URAM/DSP unchanged; WNS +0.199 / **+0.028 ns**, 250 MHz met; the critical paths (weight URAM -> PE) do not involve the write-back |

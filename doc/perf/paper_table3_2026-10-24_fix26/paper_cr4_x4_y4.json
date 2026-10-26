@@ -1,0 +1,602 @@
+{
+ "config": {
+  "LAYER": "PAPER_MNIST",
+  "NUM_FILTERS": "4",
+  "KERNEL_SIZE_X": "3",
+  "KERNEL_SIZE_Y": "3",
+  "INPUT_SIZE_X": "8",
+  "INPUT_SIZE_Y": "28",
+  "INPUT_CHANNELS": "1",
+  "STRIDE": "1",
+  "OPENEYE_SEED": "1",
+  "DMA_BITWIDTH": 64,
+  "DATA_PSUM_BITWIDTH": 20,
+  "CLUSTER_ROWS": 4,
+  "CLUSTER_COLUMNS": 2,
+  "NUM_GLB_IACT": 1,
+  "NUM_GLB_WGHT": 4,
+  "NUM_GLB_PSUM": 4,
+  "QUANT_AMOUNT": "32",
+  "CLOCK_NS": 10,
+  "MEMORY": {
+   "name": "ideal (legacy driver)"
+  }
+ },
+ "total_cycles": 71136,
+ "layer_starts": [
+  0,
+  14806,
+  17425,
+  41168,
+  42611,
+  57409,
+  70750
+ ],
+ "phases": {
+  "load_config": {
+   "cycles": 158,
+   "in_offered": 140,
+   "in_accepted": 140,
+   "out_words": 0,
+   "in_stall": 12,
+   "out_stall": 0
+  },
+  "load_iact": {
+   "cycles": 100,
+   "in_offered": 100,
+   "in_accepted": 100,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "load_wght": {
+   "cycles": 19944,
+   "in_offered": 19944,
+   "in_accepted": 19944,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "load_bias": {
+   "cycles": 11692,
+   "in_offered": 11692,
+   "in_accepted": 11692,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "load_quant": {
+   "cycles": 140,
+   "in_offered": 140,
+   "in_accepted": 100,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "convert_iact": {
+   "cycles": 5999,
+   "in_offered": 5,
+   "in_accepted": 0,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "writeback": {
+   "cycles": 6201,
+   "in_offered": 0,
+   "in_accepted": 0,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "compute": {
+   "cycles": 22912,
+   "in_offered": 0,
+   "in_accepted": 0,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "pooling": {
+   "cycles": 3976,
+   "in_offered": 2,
+   "in_accepted": 0,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "readout": {
+   "cycles": 14,
+   "in_offered": 0,
+   "in_accepted": 0,
+   "out_words": 12,
+   "in_stall": 0,
+   "out_stall": 0
+  }
+ },
+ "layers": [
+  {
+   "index": 0,
+   "start_cycle": 0,
+   "phases": {
+    "load_config": {
+     "cycles": 20,
+     "in_offered": 20,
+     "in_accepted": 20,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "load_iact": {
+     "cycles": 100,
+     "in_offered": 100,
+     "in_accepted": 100,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "load_wght": {
+     "cycles": 288,
+     "in_offered": 288,
+     "in_accepted": 288,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "load_bias": {
+     "cycles": 7168,
+     "in_offered": 7168,
+     "in_accepted": 7168,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "load_quant": {
+     "cycles": 20,
+     "in_offered": 20,
+     "in_accepted": 20,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "convert_iact": {
+     "cycles": 1091,
+     "in_offered": 1,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "writeback": {
+     "cycles": 3629,
+     "in_offered": 0,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "compute": {
+     "cycles": 2490,
+     "in_offered": 0,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    }
+   },
+   "total_cycles": 14806,
+   "info": {
+    "name": "Convolution2D",
+    "iact_size_x": 28,
+    "iact_size_y": 28,
+    "channels": 1,
+    "filters": 16,
+    "kernel": [
+     3,
+     3
+    ],
+    "stride": 1,
+    "skip_iact": 0,
+    "send_values_out": 0,
+    "pad_channels": 0
+   }
+  },
+  {
+   "index": 1,
+   "start_cycle": 14806,
+   "phases": {
+    "load_config": {
+     "cycles": 23,
+     "in_offered": 20,
+     "in_accepted": 20,
+     "out_words": 0,
+     "in_stall": 2,
+     "out_stall": 0
+    },
+    "load_quant": {
+     "cycles": 20,
+     "in_offered": 20,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "pooling": {
+     "cycles": 2576,
+     "in_offered": 1,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    }
+   },
+   "total_cycles": 2619,
+   "info": {
+    "name": "Pooling",
+    "iact_size_x": 28,
+    "iact_size_y": 28,
+    "channels": 16,
+    "filters": 1,
+    "kernel": [],
+    "stride": 2,
+    "skip_iact": 1,
+    "send_values_out": 1,
+    "pad_channels": 0
+   }
+  },
+  {
+   "index": 2,
+   "start_cycle": 17425,
+   "phases": {
+    "load_config": {
+     "cycles": 23,
+     "in_offered": 20,
+     "in_accepted": 20,
+     "out_words": 0,
+     "in_stall": 2,
+     "out_stall": 0
+    },
+    "load_wght": {
+     "cycles": 4608,
+     "in_offered": 4608,
+     "in_accepted": 4608,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "load_bias": {
+     "cycles": 3584,
+     "in_offered": 3584,
+     "in_accepted": 3584,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "load_quant": {
+     "cycles": 20,
+     "in_offered": 20,
+     "in_accepted": 20,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "convert_iact": {
+     "cycles": 2375,
+     "in_offered": 1,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "writeback": {
+     "cycles": 1909,
+     "in_offered": 0,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "compute": {
+     "cycles": 11224,
+     "in_offered": 0,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    }
+   },
+   "total_cycles": 23743,
+   "info": {
+    "name": "Convolution2D",
+    "iact_size_x": 14,
+    "iact_size_y": 14,
+    "channels": 16,
+    "filters": 32,
+    "kernel": [
+     3,
+     3
+    ],
+    "stride": 1,
+    "skip_iact": 1,
+    "send_values_out": 0,
+    "pad_channels": 0
+   }
+  },
+  {
+   "index": 3,
+   "start_cycle": 41168,
+   "phases": {
+    "load_config": {
+     "cycles": 23,
+     "in_offered": 20,
+     "in_accepted": 20,
+     "out_words": 0,
+     "in_stall": 2,
+     "out_stall": 0
+    },
+    "load_quant": {
+     "cycles": 20,
+     "in_offered": 20,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "pooling": {
+     "cycles": 1400,
+     "in_offered": 1,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    }
+   },
+   "total_cycles": 1443,
+   "info": {
+    "name": "Pooling",
+    "iact_size_x": 14,
+    "iact_size_y": 14,
+    "channels": 32,
+    "filters": 1,
+    "kernel": [],
+    "stride": 2,
+    "skip_iact": 1,
+    "send_values_out": 1,
+    "pad_channels": 0
+   }
+  },
+  {
+   "index": 4,
+   "start_cycle": 42611,
+   "phases": {
+    "load_config": {
+     "cycles": 23,
+     "in_offered": 20,
+     "in_accepted": 20,
+     "out_words": 0,
+     "in_stall": 2,
+     "out_stall": 0
+    },
+    "load_wght": {
+     "cycles": 4608,
+     "in_offered": 4608,
+     "in_accepted": 4608,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "load_bias": {
+     "cycles": 896,
+     "in_offered": 896,
+     "in_accepted": 896,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "load_quant": {
+     "cycles": 20,
+     "in_offered": 20,
+     "in_accepted": 20,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "convert_iact": {
+     "cycles": 1511,
+     "in_offered": 1,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "writeback": {
+     "cycles": 517,
+     "in_offered": 0,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "compute": {
+     "cycles": 7223,
+     "in_offered": 0,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    }
+   },
+   "total_cycles": 14798,
+   "info": {
+    "name": "Convolution2D",
+    "iact_size_x": 7,
+    "iact_size_y": 7,
+    "channels": 32,
+    "filters": 32,
+    "kernel": [
+     3,
+     3
+    ],
+    "stride": 1,
+    "skip_iact": 1,
+    "send_values_out": 0,
+    "pad_channels": 0
+   }
+  },
+  {
+   "index": 5,
+   "start_cycle": 57409,
+   "phases": {
+    "load_config": {
+     "cycles": 23,
+     "in_offered": 20,
+     "in_accepted": 20,
+     "out_words": 0,
+     "in_stall": 2,
+     "out_stall": 0
+    },
+    "load_wght": {
+     "cycles": 10368,
+     "in_offered": 10368,
+     "in_accepted": 10368,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "load_bias": {
+     "cycles": 32,
+     "in_offered": 32,
+     "in_accepted": 32,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "load_quant": {
+     "cycles": 20,
+     "in_offered": 20,
+     "in_accepted": 20,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "convert_iact": {
+     "cycles": 935,
+     "in_offered": 1,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "writeback": {
+     "cycles": 146,
+     "in_offered": 0,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "compute": {
+     "cycles": 1817,
+     "in_offered": 0,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    }
+   },
+   "total_cycles": 13341,
+   "info": {
+    "name": "Dense",
+    "iact_size_x": 1568,
+    "iact_size_y": 1,
+    "channels": 1,
+    "filters": 32,
+    "kernel": [
+     0
+    ],
+    "stride": 1,
+    "skip_iact": 1,
+    "send_values_out": 0,
+    "pad_channels": 0
+   }
+  },
+  {
+   "index": 6,
+   "start_cycle": 70750,
+   "phases": {
+    "load_config": {
+     "cycles": 23,
+     "in_offered": 20,
+     "in_accepted": 20,
+     "out_words": 0,
+     "in_stall": 2,
+     "out_stall": 0
+    },
+    "load_wght": {
+     "cycles": 72,
+     "in_offered": 72,
+     "in_accepted": 72,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "load_bias": {
+     "cycles": 12,
+     "in_offered": 12,
+     "in_accepted": 12,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "load_quant": {
+     "cycles": 20,
+     "in_offered": 20,
+     "in_accepted": 20,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "convert_iact": {
+     "cycles": 87,
+     "in_offered": 1,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "compute": {
+     "cycles": 158,
+     "in_offered": 0,
+     "in_accepted": 0,
+     "out_words": 0,
+     "in_stall": 0,
+     "out_stall": 0
+    },
+    "readout": {
+     "cycles": 14,
+     "in_offered": 0,
+     "in_accepted": 0,
+     "out_words": 12,
+     "in_stall": 0,
+     "out_stall": 0
+    }
+   },
+   "total_cycles": 386,
+   "info": {
+    "name": "Dense",
+    "iact_size_x": 32,
+    "iact_size_y": 1,
+    "channels": 1,
+    "filters": 10,
+    "kernel": [
+     0
+    ],
+    "stride": 1,
+    "skip_iact": 1,
+    "send_values_out": 1,
+    "pad_channels": 0
+   }
+  }
+ ],
+ "pending": {}
+}

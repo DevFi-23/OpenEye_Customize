@@ -2330,7 +2330,14 @@ end
               // counter at the row period so the padding pixels are dropped by
               // the (x_pos < iact_size_x) test above instead of being written as
               // an extra word row.
-              if (iact_to_psum_x_pos_counter >= iact_x_add_up - 1) begin
+              // A fully connected layer has one result per cycle, in lane 0 (GLB 0
+              // of the cluster column the psum FSM selects); lanes 1.. are other
+              // GLBs. The counter restarts with every group, so with iact_size_x = 1
+              // (dense_mapper) only the lane-0 groups are written: the outputs in
+              // filter order, the flat layout of the next Dense layer's input
+              // (iact_x_add_up stays the layer's input size for the FC converter).
+              // Bug #26, doc/experiments/2026-10-24_bug26_dense_writeback.md.
+              if ((iact_to_psum_x_pos_counter >= iact_x_add_up - 1) | fully_connected_layer) begin
                 iact_to_psum_x_pos_counter <= 0;
               end
             end            

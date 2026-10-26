@@ -35,6 +35,9 @@ def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, i
               filters, FC 3136 -> 10); `channels` = input depth (2 pads the real 1)
             - "PAPER_MNIST": the network of Table 2 of the OpenEye paper (arXiv
               2606.01450): Conv 16, MaxPool, Conv 32, MaxPool, Conv 32, Dense 32, Dense 10
+            - "MLP": Dense 6 -> 32 -> 16 -> 4
+            - "DENSE_CHAIN_<K>_<N1>_<N2>...": Dense layers K -> N1 -> N2 ... on an
+              input of shape (1, 1, K) (on-chip Dense -> Dense write-back, bug #26)
         filters (int): Number of output filters/channels for convolution layers
         kernelsize (int): Size of the convolution kernel (assumes square kernel)
         inputsize_x (int): Width of the input tensor
@@ -217,6 +220,11 @@ def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, i
                 input_shape=(x_axis, y_axis, channels), 
                 strides=strides
             ))"""
+        case _ if layer_mode.startswith("DENSE_CHAIN_"):
+            sizes = [int(v) for v in layer_mode[len("DENSE_CHAIN_"):].split("_")]
+            model.add(tf.keras.layers.Dense(input_shape=(1, 1, sizes[0]), units=sizes[1], use_bias=True))
+            for units in sizes[2:]:
+                model.add(tf.keras.layers.Dense(units=units, use_bias=True))
         case "MLP":
             inputsize_x = 6
             model.add(tf.keras.layers.Dense(input_shape=(1,1,inputsize_x), units=32, use_bias = True))

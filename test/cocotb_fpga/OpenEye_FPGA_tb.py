@@ -537,9 +537,14 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
                                         layer_parameters[layer_number].needed_total_transmissions)
                             # The buffer being checked is the next layer's input, so the
                             # layout parameters that describe it are that layer's.
+                            # A Dense layer writes its N outputs back in filter order and
+                            # pads the last buffer row with don't-care values (bug #26).
+                            valid_values = None
+                            if layer_parameters[layer_number].fully_connected:
+                                valid_values = layer_parameters[layer_number].filters
                             iact_ok = rtl_test_utils.compare_iact_storage(
                                 ptp, dut, dram.fmap[1 + layer_number], openeye_parameter,
-                                layer_parameters[layer_number + 1])
+                                layer_parameters[layer_number + 1], valid_values=valid_values)
                             if not iact_ok and os.environ.get("OPENEYE_KEEP_GOING"):
                                 logger.error("Iact buffer check failed after layer %d (OPENEYE_KEEP_GOING: "
                                              "the model runs on)", layer_number)

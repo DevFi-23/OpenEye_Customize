@@ -1449,7 +1449,7 @@ def iact_cells_per_group(oep):
                      / oep.DMA_BITWIDTH)
 
 
-def compare_iact_storage(ptp, dut, iact_ref, oep, layer_params):
+def compare_iact_storage(ptp, dut, iact_ref, oep, layer_params, valid_values=None):
     """Compare the iact double-buffer contents with reference activations.
 
     The expected buffer image comes from the same mapper that builds the DMA
@@ -1465,6 +1465,11 @@ def compare_iact_storage(ptp, dut, iact_ref, oep, layer_params):
         oep: OpenEye parameters
         layer_params: Parameters of the layer that reads this buffer, i.e. the
             next layer - it owns used_channels and iact_cycles_one_word_all_ram
+        valid_values: compare only the first valid_values activations of the
+            flat (Dense) image. A Dense layer that writes its output back fills
+            the rest of the last buffer row with copies of its first outputs;
+            the next layer's weights for those positions are zero, so they are
+            don't-care (bug #26). None compares every byte.
 
     Returns:
         bool: True when every word matches, False on any mismatch.
@@ -1484,6 +1489,13 @@ def compare_iact_storage(ptp, dut, iact_ref, oep, layer_params):
         logger.warning("No iact buffer layout known for layer '%s'; skipping the check.",
                        getattr(layer_params, "layer_name", "?"))
         return True
+
+    masks = [(1 << 64) - 1] * len(expected)
+    if valid_values is not None:
+        logger.info("Iact buffer check: first %d activations only (the rest is padding)", valid_values)
+        masks = [sum(0xFF << (8 * b) for b in range(8) if 8 * index + b < valid_values)
+                 for index in range(len(expected))]
+        expected = [word & mask for word, mask in zip(expected, masks)]
 
     cells_per_group = iact_cells_per_group(oep)
     try:
@@ -1506,6 +1518,8 @@ def compare_iact_storage(ptp, dut, iact_ref, oep, layer_params):
         cell = index % oep.IACT_RAM_CELLS
         addr = index // oep.IACT_RAM_CELLS
         dut_word = _ram_word(dut.BUFFER_A[cell].iact_layer_buffer.impl.mem[half_offset + addr])
+        if dut_word is not None:
+            dut_word &= masks[index]
         if dut_word != ref_word:
             error_found = True
             errors_logged += 1

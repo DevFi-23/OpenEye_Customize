@@ -191,7 +191,11 @@ class DenseMapper(LayerMapper):
             "iact_converter_buffer_addr_max_cycles": layer_params.iact_converter_buffer_addr_max_cycles,
             "iact_channels_per_pe": layer_params.used_iact_per_PE,
             "fc_size_reg": layer_params.iact_size_x,
-            "iact_size_x": math.ceil(layer_params.iact_size_x/2),
+            # The FC converter takes the input size from fc_size_reg; iact_size_x
+            # is only read by the write-back (RECEIVE_PSUMS_TO_IACT keeps the
+            # groups with x_pos < iact_size_x). A Dense that keeps its output on
+            # chip keeps lane 0 of every group (bug #26, configure_fc_writeback).
+            "iact_size_x": math.ceil(layer_params.iact_size_x/2) if layer_params.send_values_out else 1,
             "iact_size_y": layer_params.iact_size_y,
             "iact_size_c": layer_params.iact_size_c,
             "padding_x": layer_params.padding_x,
