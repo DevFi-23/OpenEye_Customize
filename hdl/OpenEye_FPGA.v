@@ -447,6 +447,7 @@ reg [1023:0] fst_path;
   wire [8-1:0]psum_pagu_addr_inc_2;
   wire [8-1:0]psum_pagu_addr_inc_3;
   wire [8-1:0]psum_pagu_addr_inc_4;
+  wire [8-1:0]quant_clamp_low;    // Lower saturation bound of the quantizers + 128 (0: int8, 128: ReLU at 0).
 
 
   // -----------------------------------------------------------------------
@@ -2703,6 +2704,7 @@ end
       .quant_offset_flat(quant_offset_flat),
       .quant_exp_flat(quant_exp_flat),
       .quant_mant_flat(quant_mant_flat),
+      .quant_clamp_low(quant_clamp_low),
       .fsm_psum_limit(fsm_psum_limit),
       .psum_buffer_en_r(psum_buffer_en_r),
       .psum_buffer_en_w(psum_buffer_en_w),
@@ -3169,7 +3171,8 @@ end
         .psum_pagu_addr_inc_1(psum_pagu_addr_inc_1),
         .psum_pagu_addr_inc_2(psum_pagu_addr_inc_2),
         .psum_pagu_addr_inc_3(psum_pagu_addr_inc_3),
-        .psum_pagu_addr_inc_4(psum_pagu_addr_inc_4)
+        .psum_pagu_addr_inc_4(psum_pagu_addr_inc_4),
+        .quant_clamp_low(quant_clamp_low)
     );
 
 

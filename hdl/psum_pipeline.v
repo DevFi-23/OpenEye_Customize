@@ -70,6 +70,9 @@ module psum_pipeline #(
     input wire [8*QUANT_AMOUNT-1:0] quant_offset_flat,
     input wire [7*QUANT_AMOUNT-1:0] quant_exp_flat,
     input wire [25*QUANT_AMOUNT-1:0] quant_mant_flat,
+    // Lower saturation bound of the quantizers + 128 (register quant_clamp_low):
+    // 0 -> -128 (plain int8 saturation), 128 -> 0 (ReLU with zero point 0).
+    input wire [7:0] quant_clamp_low,
     input wire [ 16:0] fsm_psum_limit,
     input wire [ 15:0] output_words,
     input wire [  3:0] psum_cluster_limit_0,
@@ -938,6 +941,10 @@ module psum_pipeline #(
     end
   end
 
+// quant_clamp_low holds act_min + 128; subtracting 128 from an 8-bit value is
+// flipping its top bit (bug fix "int8 saturation", see quantization_unit.v).
+wire signed [7:0] quant_act_min = quant_clamp_low ^ 8'h80;
+
 genvar gi;
 generate
   for (gi = 0; gi < TRANS_WORDS; gi = gi + 1) begin : gen_quant_unit
@@ -954,6 +961,7 @@ generate
         .psum_data      (pre_quantized_value[gi]),
         .quant_offset   (quant_offset[current_filter]),
         .current_shift  (current_shift),
+        .act_min        (quant_act_min),
         .quantized_value(quant_result[gi])
     );
   end

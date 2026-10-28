@@ -1,0 +1,16 @@
+ 99.23 %  TFLite int8 (emulator, = interpreter)  (30 s)
+  9.33 %  H0 hardware today, Python-only mapping, psum 20 bit  (25 s)  max|psum| per layer: 130,965 1,012,117 1,720,553 10,876,119 255,676
+  9.55 %  H1 same, psum 32 bit  (33 s)  max|psum| per layer: 130,965 1,012,117 1,812,982 10,834,437 203,633
+ 97.58 %  H2 + clamp int8  (34 s)  max|psum| per layer: 130,965 810,324 1,221,850 1,069,817 54,546
+ 96.31 %  H3 + per-filter M (fix #12)  (28 s)  max|psum| per layer: 154,390 831,241 1,157,814 1,030,856 140,197
+ 96.34 %  H4 + mantissa 25 bit (fix slice)  (24 s)  max|psum| per layer: 154,243 831,470 1,157,628 1,029,398 140,117
+ 99.24 %  H5 + padding = zp_in  (38 s)  max|psum| per layer: 154,243 699,611 805,493 1,058,852 156,787
+ 99.22 %  H6 + rounding via bias  (37 s)  max|psum| per layer: 154,001 699,800 809,352 1,063,584 160,228
+ 99.23 %  H6' as H6 but mantissa 8 bit  (39 s)  max|psum| per layer: 154,147 700,959 809,215 1,062,398 160,347
+ 96.48 %  H6'' as H6 but padding 0 raw  (39 s)  max|psum| per layer: 154,001 830,349 1,159,119 1,031,082 142,328
+ 99.25 %  S1 symmetric zp=0, ReLU clamp at 0, psum 32  (38 s)  max|psum| per layer: 67,690 226,527 301,562 365,571 79,661
+ 99.25 %  S2 symmetric, psum 20  (40 s)  max|psum| per layer: 67,690 226,527 301,562 365,571 79,661
+ 99.23 %  S3 symmetric, psum 20, mantissa 8  (40 s)  max|psum| per layer: 67,691 226,514 301,387 364,914 79,907
+  9.33 %  S4 symmetric but NO clamp (wrap)  (40 s)  max|psum| per layer: 67,690 320,513 456,992 1,770,566 164,927
+
+[exited with code 0]

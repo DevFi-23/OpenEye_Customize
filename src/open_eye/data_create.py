@@ -38,6 +38,12 @@ def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, i
             - "MLP": Dense 6 -> 32 -> 16 -> 4
             - "DENSE_CHAIN_<K>_<N1>_<N2>...": Dense layers K -> N1 -> N2 ... on an
               input of shape (1, 1, K) (on-chip Dense -> Dense write-back, bug #26)
+            - any of the above with the suffix "_RELU": every Conv2D/Dense except the
+              last one gets activation='relu' (a fused ReLU, realised by the
+              quantizer's saturation, LayerParameters.act_min = 0)
+        Test hook OPENEYE_QUANT_SHIFT=<s>: every Conv2D/Dense quantizes with
+        multiplier 1 and shift s (quantization_factor), so a small s drives values
+        out of the int8 range and exercises the saturation.
         filters (int): Number of output filters/channels for convolution layers
         kernelsize (int): Size of the convolution kernel (assumes square kernel)
         inputsize_x (int): Width of the input tensor
@@ -68,6 +74,9 @@ def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, i
         tf.keras.utils.set_random_seed(int(_seed))
         np.random.seed(int(_seed))
     model = tf.keras.models.Sequential()
+    relu = layer_mode.endswith("_RELU")
+    if relu:
+        layer_mode = layer_mode[:-len("_RELU")]
     match layer_mode:
         case "Convolution_Single":
             model.add(tf.keras.layers.Conv2D(filters, (kernelsize_x, kernelsize_y), padding="same", input_shape=(inputsize_x, inputsize_y, channels), strides=strides))
@@ -237,6 +246,17 @@ def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, i
             model.add(tf.keras.layers.Dense(units=outputsize, use_bias=True))"""
         case _:
             logger.error("Layer not detected!")
+
+    weighted = [layer for layer in model.layers
+                if isinstance(layer, (tf.keras.layers.Conv2D, tf.keras.layers.Dense))]
+    if relu:
+        for layer in weighted[:-1]:
+            layer.activation = tf.keras.activations.get("relu")
+    shift = os.environ.get("OPENEYE_QUANT_SHIFT")
+    if shift:
+        for layer in weighted:
+            outputs = layer.units if isinstance(layer, tf.keras.layers.Dense) else layer.filters
+            layer.quantization_factor = [[1, int(shift)] for _ in range(outputs)]
 
     # Compile the model
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])

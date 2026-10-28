@@ -30,6 +30,19 @@ import math
 import logging
 logger = logging.getLogger("cocotb")
 
+def activation_min(layer):
+    """Lower saturation bound for a layer's quantized output: 0 if the layer applies a ReLU after its sum, else -128.
+
+    A ReLU right after a Conv/Dense needs no activation hardware: the quantizer clamps its output to
+    [act_min, 127] anyway, and with zero point 0 the quantized ReLU is max(q, 0). Recognised: a Keras layer
+    with activation='relu' and an imported layer (tflite2model / onnx2model / pytorch2model) with relu=True.
+    """
+    if getattr(layer, "relu", False) is True:
+        return 0
+    activation = getattr(layer, "activation", None)
+    return 0 if getattr(activation, "__name__", "") == "relu" else -128
+
+
 class LayerParameters(object):
     """Configuration parameters for a single neural network layer on OpenEye accelerator.
 
@@ -311,6 +324,9 @@ class LayerParameters(object):
         self.iact_x_lines = 3              # X-lines for activation storage
         self.quantize = [[0 for _ in range(2)]for _ in range(params.QUANT_AMOUNT)]  # Quantization params
         self.offset =  [0 for _ in range(params.QUANT_AMOUNT)]  # Quantization offsets
+        # Lower saturation bound of the quantized outputs (quantization_unit.v): -128 is plain int8
+        # saturation, 0 a fused ReLU for activations quantized with zero point 0 (as all of this flow's).
+        self.act_min = -128
 
         # === Programmable Adress Generation Unit ===
         self.iact_read_limit_0 = 0
@@ -652,6 +668,7 @@ class LayerParameters(object):
             for f in range(self.filters):
                 self.quantize[f][0] = 1
                 self.quantize[f][1] = 7
+        self.act_min = activation_min(layer)
 
         # Store input activation dimensions
         self.iact_size_x = self.input_shape[1]
@@ -1529,6 +1546,11 @@ class LayerParameters(object):
         for f in range(self.filters):
             self.quantize[f][0] = 1
             self.quantize[f][1] = 9
+        if hasattr(layer, 'quantization_factor'):
+            for f in range(self.filters):
+                self.quantize[f][0] = layer.quantization_factor[f][0]
+                self.quantize[f][1] = layer.quantization_factor[f][1]
+        self.act_min = activation_min(layer)
         if (layer_number != 0): 
             self.skipIact = 1
         self.input_shape = layer.input.shape

@@ -1,0 +1,5 @@
+ 99.21 %  S5 symmetric, clamp, #12 NOT fixed, mantissa 8, psum 20  (35 s)
+ 99.21 %  S6 symmetric, clamp, #12 NOT fixed, mantissa 25, psum 32  (33 s)
+ 99.25 %  S7 symmetric, clamp, per-filter, mantissa 8, psum 20, floor (no rounding bias)  (34 s)
+ 99.20 %  H7 asymmetric, clamp, padding=zp, #12 NOT fixed, mantissa 8, psum 32  (34 s)
+ 35.03 %  H8 asymmetric, clamp, padding=zp, per-filter, mantissa 8, psum 20  (35 s)

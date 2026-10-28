@@ -280,6 +280,8 @@ class DenseMapper(LayerMapper):
             "psum_pagu_addr_inc_2" : layer_params.psum_pagu_addr_inc[2],
             "psum_pagu_addr_inc_3" : layer_params.psum_pagu_addr_inc[3],
             "psum_pagu_addr_inc_4" : layer_params.psum_pagu_addr_inc[4],
+            # quantizer saturation: lower bound + 128 (0: int8 saturation, 128: ReLU)
+            "quant_clamp_low": layer_params.act_min + 128,
             "gemm_mode": getattr(layer_params, "gemm_mode", 0)
             })
             

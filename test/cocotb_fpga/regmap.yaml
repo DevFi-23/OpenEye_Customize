@@ -104,6 +104,9 @@ registers:
   - {name: psum_pagu_addr_inc_2, width: 8}
   - {name: psum_pagu_addr_inc_3, width: 8}
   - {name: psum_pagu_addr_inc_4, width: 8}
+  # Lower saturation bound of the quantizers + 128 (0: -128 = plain int8 saturation, 128: 0 = ReLU with
+  # zero point 0). Last field: fits into the last status word, so the word count does not change.
+  - {name: quant_clamp_low, width: 8}
   
 
 

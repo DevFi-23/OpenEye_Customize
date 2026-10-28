@@ -102,19 +102,28 @@ def batchnorm_output(layer_parameters, divide_value, layer_number, dram):
        - Applies per-channel quantization with scale and shift
        - Uses floor division to maintain integer arithmetic
     2. Dense layers:
-       - Applies simple division by divide_value
+       - Applies filter 0's multiplier and shift (as the hardware, bug #12)
        - Uses floor division for result
+    Both saturate to [layer_parameters.act_min, 127], as quantization_unit.v does.
     
     All operations are performed in-place on dram[layer_number + 1].
     """
+    # The quantizer (quantization_unit.v) saturates to [act_min, 127]: -128 is plain int8 saturation,
+    # 0 a fused ReLU. Values that stay inside int8 are unchanged.
+    act_min = getattr(layer_parameters, "act_min", -128)
+
+    def saturate(value):
+        return max(act_min, min(127, value))
+
     #if "Conv" in str(layer_parameters.layer_name):
     try:
         for f in range(len(dram.fmap[1 + layer_number])):
             for x in range(len(dram.fmap[1 + layer_number][f])):
                 for y in range(len(dram.fmap[1 + layer_number][f][x])):
-                    dram.fmap[1 + layer_number][f][x][y] = math.floor((layer_parameters.quantize[f][0]*dram.fmap[1 + layer_number][f][x][y])/(2**layer_parameters.quantize[f][1]))
+                    dram.fmap[1 + layer_number][f][x][y] = saturate(math.floor((layer_parameters.quantize[f][0]*dram.fmap[1 + layer_number][f][x][y])/(2**layer_parameters.quantize[f][1])))
     #elif "Dense" in str(layer_parameters.layer_name):
     except:
+        # Dense: the hardware uses filter 0's multiplier and shift for every output (bug #12)
         for f in range(len(dram.fmap[1 + layer_number])):
-            dram.fmap[1 + layer_number][f] = math.floor(dram.fmap[1 + layer_number][f]/(2**layer_parameters.quantize[0][1]))
+            dram.fmap[1 + layer_number][f] = saturate(math.floor((layer_parameters.quantize[0][0]*dram.fmap[1 + layer_number][f])/(2**layer_parameters.quantize[0][1])))
 

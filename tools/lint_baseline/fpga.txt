@@ -378,4 +378,3 @@
 4	WIDTHTRUNC | hdl/psum_pipeline.v | Operator ASSIGNDLY expects 12 bits on the Assign RHS, but Assign RHS's VARREF 'psum_cycle_addr_3_next' generates 14 bits.
 5	WIDTHTRUNC | hdl/psum_pipeline.v | Operator ASSIGNDLY expects 12 bits on the Assign RHS, but Assign RHS's VARREF 'psum_cycle_addr_4_next' generates 14 bits.
 4	WIDTHTRUNC | hdl/psum_pipeline.v | Operator ASSIGNW expects 4 bits on the Assign RHS, but Assign RHS's COND generates 32 bits.
-1	WIDTHTRUNC | hdl/quantization_unit.v | Operator ASSIGNDLY expects 8 bits on the Assign RHS, but Assign RHS's SHIFTRS generates 46 bits.
