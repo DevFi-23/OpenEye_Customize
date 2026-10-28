@@ -1,0 +1,24 @@
+1. accuracy, 10,000 MNIST test images (TFLite int8: 99.23 %)
+  zp -128  | wrap, low 8 bits (old RTL)           |   9.55 %  (48 s)
+  zp -128  | upper bound 127 only, low end wraps  |   8.08 %  (60 s)
+  zp -128  | lower bound only (ReLU), high wraps  |  97.38 %  (31 s)
+  zp -128  | int8 clamp [-128, 127], no ReLU      |  97.58 %  (25 s)
+  zp -128  | clamp [act_min, 127] (new RTL)       |  97.58 %  (23 s)
+  zp 0     | wrap, low 8 bits (old RTL)           |   9.22 %  (28 s)
+  zp 0     | upper bound 127 only, low end wraps  |  43.95 %  (29 s)
+  zp 0     | lower bound only (ReLU), high wraps  |  99.18 %  (29 s)
+  zp 0     | int8 clamp [-128, 127], no ReLU      |  55.24 %  (23 s)
+  zp 0     | clamp [act_min, 127] (new RTL)       |  99.25 %  (23 s)
+2. quantizer outputs before the clamp, 1,000 images
+  zp -128  quantizer 0: > 127  0.23 %  < -128 67.78 %  < act_min (-128)  67.8 %  min -439  max 316  wrap != clamp  68.0 %
+  zp -128  quantizer 1: > 127  0.01 %  < -128 76.68 %  < act_min (-128)  76.7 %  min -452  max 193  wrap != clamp  76.7 %
+  zp -128  quantizer 2: > 127  0.00 %  < -128 86.65 %  < act_min (-128)  86.7 %  min -824  max 187  wrap != clamp  86.6 %
+  zp -128  quantizer 3: > 127  0.00 %  < -128 63.51 %  < act_min (-128)  63.5 %  min -367  max -23  wrap != clamp  63.5 %
+  zp 0     quantizer 0: > 127  0.00 %  < -128  0.17 %  < act_min (0)  70.6 %  min -190  max 128  wrap != clamp  70.6 %
+  zp 0     quantizer 1: > 127  0.00 %  < -128  0.02 %  < act_min (0)  81.1 %  min -190  max 127  wrap != clamp  81.1 %
+  zp 0     quantizer 2: > 127  0.00 %  < -128  0.08 %  < act_min (0)  77.4 %  min -207  max 137  wrap != clamp  77.4 %
+  zp 0     quantizer 3: > 127  0.04 %  < -128  0.39 %  < act_min (0)  66.3 %  min -188  max 151  wrap != clamp  66.4 %
+3. conv1, filter 0, test image 0 (TFLite requantization: s_out 0.0027657, zp_out -128, M 0.00335)
+  position 658: psum   53077  requantized    50  clamp   50 (real 0.492)  wrap   50 (real 0.492)
+  position 286: psum   -6443  requantized  -150  clamp -128 (real 0.000)  wrap  106 (real 0.647)
+  position 436: psum  -52917  requantized  -305  clamp -128 (real 0.000)  wrap  -49 (real 0.218)

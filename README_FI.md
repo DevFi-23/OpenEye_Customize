@@ -2078,6 +2078,70 @@ Tham chiếu Python cũng không kẹp nên mọi test PASS (dữ liệu test ch
 "số 0 thật". TFLite làm đúng như vậy ("fused ReLU" = `act_min = max(−128, zp_out)`; model đã huấn luyện có zp_out = −128 ở mọi layer ReLU nên ReLU trùng kẹp int8).
 Với activation zero point 0: `act_min = 0` cho Conv/Dense có ReLU, −128 cho layer khác.
 
+**Lỗi quấn vòng cụ thể là gì** (đo thêm 2026-10-28, không đổi RTL: `doc/experiments/2026-10-28_int8/wrap.py`, kết quả `wrap_result.txt`). Tầng 3 cũ
+`quantized_value <= prod_s2 >>> shift_s2;` gán kết quả 46 bit vào thanh ghi 8 bit: Verilog bỏ 38 bit cao (lấy theo modulo 256), không có gì kiểm tra giá trị có nằm trong
+[−128, 127] hay không (lint `WIDTHTRUNC ... SHIFTRS generates 46 bits` đã báo đúng dòng này). Phép cộng offset, nhân `mant`, dịch `shift` đều đúng; thiếu bước thứ tư là
+đưa kết quả về khoảng int8, và đó là bộ kẹp được thêm vào.
+
+| Giá trị đúng sau phép dịch | RTL cũ (quấn vòng) | RTL mới, act_min = −128 | RTL mới, ReLU (act_min = 0) |
+|---:|---:|---:|---:|
+| 100 | 100 | 100 | 100 |
+| 127 | 127 | 127 | 127 |
+| 128 | **−128** | 127 | 127 |
+| 130 | **−126** | 127 | 127 |
+| 200 | **−56** | 127 | 127 |
+| 256 | **0** | 127 | 127 |
+| 300 | **44** | 127 | 127 |
+| −5 | −5 | −5 | 0 |
+| −129 | **127** | −128 | 0 |
+| −150 | **106** | −128 | 0 |
+| −200 | **56** | −128 | 0 |
+| −300 | **−44** | −128 | 0 |
+
+Hai lỗi: (1) giá trị vượt 127 bị lật thành số âm, sai số 256 thay vì vài đơn vị, và đầu ra không còn đơn điệu theo đầu vào (răng cưa); (2) không có cận dưới nên không làm
+được ReLU, giá trị dưới −128 bị lật thành số dương.
+
+Độ chính xác khi chỉ giữ từng nửa của phép kẹp (model MNIST int8 đã huấn luyện, 10.000 ảnh test, TFLite 99,23 %; zp −128 = activation như TFLite, chưa sửa #12,
+mantissa 8 bit, psum 32 bit; zp 0 = activation đối xứng, ReLU ở cận 0, theo từng filter, mantissa 8 bit, psum 20 bit):
+
+| Đầu ra bộ lượng tử | zp −128 | zp 0 |
+|---|---:|---:|
+| Quấn vòng, lấy 8 bit thấp (RTL cũ) | **9,55 %** | **9,22 %** |
+| Chỉ kẹp trên 127, phía dưới vẫn quấn | 8,08 % | 43,95 % |
+| Chỉ kẹp dưới (ReLU), phía trên vẫn quấn | 97,38 % | 99,18 % |
+| Kẹp int8 [−128, 127], không ReLU | 97,58 % | 55,24 % |
+| Kẹp [act_min, 127] (RTL mới) | **97,58 %** | **99,25 %** |
+
+Cột zp −128 dừng ở 97,58 % vì đệm viền bằng 0 thay vì zp và lỗi #12, không liên quan đến phép kẹp (mục điều tra ở trên: 99,24 % khi sửa cả hai).
+
+Tỉ lệ đầu ra bộ lượng tử (trước khi kẹp) nằm ngoài khoảng, 1.000 ảnh; với zp −128, cận dưới −128 chính là ReLU:
+
+| Đầu ra của | zp −128: > 127 | zp −128: < −128 (vùng ReLU) | zp 0: > 127 | zp 0: < 0 (vùng ReLU) | zp 0: < −128 |
+|---|---:|---:|---:|---:|---:|
+| conv1 | 0,23 % | 67,8 % (nhỏ nhất −439) | 0,00 % | 70,6 % | 0,17 % |
+| conv2 | 0,01 % | 76,7 % (−452) | 0,00 % | 81,1 % | 0,02 % |
+| conv3 | 0,00 % | 86,7 % (−824) | 0,00 % | 77,4 % | 0,08 % |
+| fc1 | 0,00 % | 63,5 % (−367) | 0,04 % | 66,3 % | 0,39 % |
+
+Ví dụ thật: conv1, filter 0, ảnh test số 0, lượng tử lại theo TFLite (s_out = 0,0027657, zp_out = −128, M = 0,00335; giá trị thực = (int8 + 128) × s_out):
+
+| Vị trí | psum | × M + zp | Kẹp (TFLite, RTL mới) | Quấn vòng (RTL cũ) |
+|---|---:|---:|---|---|
+| 658 (đặc trưng mạnh nhất) | 53.077 | 50 | 50, thực 0,492 | 50, thực 0,492 |
+| 286 | −6.443 | −150 | −128, thực **0** (ReLU) | 106, thực **0,647** |
+| 436 | −52.917 | −305 | −128, thực **0** | −49, thực 0,218 |
+
+Kết luận:
+
+- **Phía âm gây gần hết thiệt hại.** Khi lượng tử hoá trước (offline), TFLite xoá op ReLU, chọn zp_out = −128 để khoảng int8 chỉ biểu diễn [0, max], và để phép kẹp
+  lúc chạy đưa phần âm về 0. 64–87 % đầu ra mỗi layer nằm ở phần đó. Quấn vòng biến chúng thành số tuỳ ý: ở vị trí 286, chỗ "không có đặc trưng" thành 0,647, lớn hơn cả
+  đặc trưng mạnh nhất thật (0,492). Qua 4 layer chỉ còn ~9 %, ngang đoán bừa 10 chữ số.
+- **Phía dương ít ảnh hưởng với model này:** nhờ hiệu chỉnh, ≤ 0,23 % đầu ra vượt 127; bỏ kẹp trên chỉ mất 0,07–0,2 điểm. Nhưng mỗi lần tràn vẫn sai 256 và lật dấu, nên
+  với model khác hoặc dữ liệu ngoài vùng hiệu chỉnh thì thiệt hại lớn hơn.
+- **Lượng tử hoá trước không thay được bước này.** Offline chỉ chốt tham số (weight int8, bias int32, s_out, zp_out, M → `mant`/`shift`). Đầu ra từng layer phụ thuộc
+  ảnh đầu vào nên phải lượng tử lại lúc chạy, ở mỗi layer và với mỗi ảnh; kernel int8 của TFLite cũng kẹp ở đúng bước này (`max(act_min)`, `min(act_max)` rồi ép int8).
+- **Với zp 0, kẹp int8 thường mà không có ReLU chỉ được 55 %**: vì vậy bản sửa có thanh ghi `quant_clamp_low` để đặt cận dưới 0.
+
 **Bản sửa:**
 
 | File | Thay đổi |
@@ -2505,3 +2569,8 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   `activation='relu'` → 0), mapper gửi thanh ghi, tham chiếu kẹp như phần cứng, hậu tố model `_RELU`, móc `OPENEYE_QUANT_SHIFT`. Test mới: `test_int8_clamp.py` (9 RTL),
   `test/cocotb_quantization/` (bộ lượng tử, 2), `test/test_int8_clamp.py` (11). Kiểm chứng: 9/9 + 2/2; đối chứng âm trên RTL cũ 9/9 FAIL; hồi quy 157 test 0 FAIL; 12 case
   mốc 0 chu kỳ lệch; lint fpga 463 → 462 (bớt đúng cảnh báo cắt bit của lỗi này). Vivado 4 ns (`doc/synth/2026-10-28_route4ns_clamp_zu7ev/`, **mốc phần cứng mới**): 0 CRITICAL, LUT +1,3 %, WNS +0,076 ns, đạt 250 MHz. Mục 8b (#24, #29, #30), 8c (K), 8d, 9.
+- **Số liệu lỗi quấn vòng** (chỉ đo, không đổi RTL): công cụ mới `doc/experiments/2026-10-28_int8/wrap.py` (+ `wrap_result.txt`). Bảng giá trị ví dụ quấn vòng / kẹp;
+  độ chính xác khi chỉ giữ từng nửa phép kẹp (quấn vòng 9,55 % / 9,22 %; chỉ kẹp trên 8,08 % / 43,95 %; chỉ kẹp dưới 97,38 % / 99,18 %; kẹp đủ 97,58 % / 99,25 %, với
+  zp −128 / zp 0); tỉ lệ đầu ra ngoài khoảng (vùng ReLU 64–87 % mỗi layer, vượt 127 ≤ 0,23 %); ví dụ conv1 (−150 → 106: chỗ lẽ ra 0 thành giá trị thực 0,647, lớn
+  hơn đặc trưng mạnh nhất 0,492). Kết luận: thiệt hại gần hết ở phía âm (ReLU gộp bị mất), lượng tử hoá trước không thay được bước kẹp lúc chạy. Mục 9 (#30),
+  `doc/experiments/2026-10-28_int8_clamp.md` mục 3b.
