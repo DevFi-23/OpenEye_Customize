@@ -1388,6 +1388,16 @@ không ảnh hưởng độ chính xác model MNIST (−0,04 điểm) nhưng c�
 365.571), đệm 0 đúng, không cần cộng zero point, giữ được bỏ-qua-số-0 (63–83 % activation là 0 sau ReLU). Lượng tử bất đối xứng kiểu TFLite (zp −128) thì cần thêm
 psum 32 bit, đệm viền bằng zero point (RTL) và mất bỏ-qua-số-0.
 
+**Đường model thật của toolchain (kiểm tra 2026-10-30, không sửa gì):** testbench có sẵn đường này khi `USE_RANDOM_VALUES=0`: `models/mnist_conv_net.py`
+(`SimpleMNISTConvNet`, PyTorch) → `onnx2model.get_model` (xuất ONNX, `quantize_dynamic` weight int8, tách thành `HardwareLayer`) → `LayerParameters` → `DRAMContents`
+→ mapper → RTL. Makefile chỉ chọn `LAYER`, kích thước, tham số phần cứng và cờ này; nó không ghi đè bias/weight. Kết quả: `onnx2model` cho đủ 6 layer (gồm 2 layer
+pooling để cấu hình pooling trên RTL, cờ ReLU, weight int8, bias int32), `LayerParameters` nhận được (khác `tflite2model`: `TFLite_dense` không có `.kernel` mà
+`LayerParameters` đọc ở `layer_parameters.py:643/1360/1557`). Nhưng dữ liệu thật không tới RTL: testbench tạo `SimpleMNISTConvNet()` chưa huấn luyện (file đã huấn luyện
+`doc/demo_notebooks/mnist_unquantized_model.pth` khớp kiến trúc nhưng không được nạp); `DRAM.py` nhân weight int8 với 127 (tràn int8, dòng 215), ghi đè bias Conv = 1
+(253), bias Dense = c+1 (260), weight Dense ngẫu nhiên (228), input ngẫu nhiên (273); `quantize` lấy mặc định [1, 7]/[1, 9]; `act_min` bỏ qua `has_relu`
+(`activation_min` chỉ đọc `relu`/`activation`); `quantize_dynamic` không cho scale activation nên không suy ra được `mant`/`shift`. Chạy RTL theo đường này (MNIST_REAL,
+QUANT_AMOUNT 64): FAIL ở bộ đệm sau pooling đầu, 784/784 word sai (DUT 0/−128, tham chiếu giá trị nhỏ); chưa điều tra (đường này không có test nào).
+
 **Đo pha khi chạy nhiều layer (phân tích ngày 2026-10-22, đã làm xong cùng ngày):** khi đó profiler cộng dồn mọi layer, và với layer trung gian thì tính toán diễn ra trong trạng thái 11 nên bị ghi là `writeback`
 (`compute = 0`). Bản thử `probe_model.py` tách theo từng lần vào `GET_PARAMETERS` và tách trạng thái 10/11 theo FSM psum (1–3 = tính toán, 4/6 = ghi ngược).
 Model MNIST thật (2 channel, bộ nhớ lý tưởng): **244.052 chu kỳ = 976 µs ở 250 MHz**; tính toán 62 %, nạp weight 16 %, nạp bias 10 % (40 % của Conv1), ghi ngược
@@ -2656,3 +2666,7 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
 - **Kiểm tra upstream có lỗi #31 không:** có. Code (`upstream/main` = `93f0e82`): điều kiện bắt đầu lượt của PE và cơ chế đếm/kích hoạt lượt theo bus iact ready
   giống hệt `dev` (từ `a83260d` 2025-03-19 và `337bd44` 2025-07-22). Chạy trên RTL và testbench của upstream trong worktree (`run31_upstream.py`, probe chèn input
   không sửa file của upstream): ngẫu nhiên và hàng 1–2 toàn 0 PASS, hàng 0–1 toàn 0 FAIL, mọi giá trị sai bằng bias. Mục 9.
+- **Đường model thật của toolchain** (`USE_RANDOM_VALUES=0`: PyTorch `SimpleMNISTConvNet` → `onnx2model` → `LayerParameters` → `DRAMContents` → RTL), kiểm tra theo câu
+  hỏi của bạn, không sửa gì: Makefile không ghi đè bias/weight; cấu trúc model thật đi qua toolchain được (6 layer, pooling cấu hình cho RTL) nhưng dữ liệu bị thay ở
+  Python (weight ×127, bias 1 / c+1, Dense và input ngẫu nhiên, `quantize` mặc định, ReLU bị bỏ qua) và model không được nạp trọng số đã huấn luyện; RTL theo đường
+  này FAIL sau pooling đầu (chưa điều tra). Lỗi `LayerParameters` với `tflite2model` là thiếu thuộc tính `kernel` (đường TFLite không nối với toolchain). Mục 8d.
