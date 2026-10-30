@@ -194,7 +194,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ../../venv/bin/python -m pytest -q -p no:cachep
 | `test_dense_chain.py` | (cả file) | 11 chuỗi Dense → Dense trên chip (lỗi #26): K 16–1568, N 8–64, MLP, `CLUSTER_ROWS` 1/2/4, `NUM_GLB_IACT` 3, `NUM_GLB_PSUM` 2 | 20 s – 1,5 phút | 11 PASS |
 | `test_glb_psum2.py` | (cả file) | 7 mô hình nối layer với `NUM_GLB_PSUM=2` (lỗi #25): Conv đơn, Conv → Conv (4/16 channel, hàng 14 pixel), Conv → Pool → Conv (rộng 8, 6), Conv → Pool → Conv → Pool → Conv | 15–50 s | 7 PASS |
 | `test_int8_clamp.py` | (cả file) | 9 mô hình kiểm kẹp int8 và ReLU gộp (#30): tràn (`OPENEYE_QUANT_SHIFT`), ReLU (hậu tố `_RELU`), cả hai; Conv → Conv, Conv → Pool → Conv, chuỗi Dense, MLP, `NUM_GLB_PSUM=2`, mạng paper có ReLU | 15 s – 3 phút | 9 PASS |
-| `test_real_model.py` | (cả file) | Model PyTorch MNIST đã huấn luyện đi trọn đường toolchain (`onnx2model` lượng tử tĩnh → `LayerParameters` → `DRAMContents` → RTL), ảnh test 0 và 1 (mục 8d) | ~11 phút | 2 xfail (#32, #35: Conv1/Pool1, Conv2/Pool2 khớp từng bit, Conv3 sai) |
+| `test_real_model.py` | (cả file) | Model PyTorch MNIST đã huấn luyện đi trọn đường toolchain (`onnx2model` lượng tử tĩnh → `LayerParameters` → `DRAMContents` → RTL), ảnh test 0 và 1 (mục 8d) | ~11 phút | 2 xfail (Conv1/Pool1, Conv2/Pool2 khớp từng bit, Conv3 sai: ảnh 0 do #32 + #31, ảnh 1 do #32) |
 | `test/cocotb_quantization/test_quantization_unit.py` | (cả file) | Testbench riêng của `quantization_unit` (12.188 output mỗi test so với mô hình Python, psum 20 và 32 bit) | ~2 s | 2 PASS |
 | `test_gemm_layer.py` | (cả file) | 63 test GEMM/Dense | vài phút | 40 PASS, 23 FAIL do bộ kiểm tra ghi FC "live" (#5, báo động giả); với `OPENEYE_SKIP_FC_WRITE_CHECK=1`: 63 PASS (đo 2026-10-19) |
 
@@ -234,6 +234,7 @@ Chi tiết: mục 6 (profiler), 6.13 (model nhiều layer), 6.14 (Bảng 3).
 | #24 (không có hàm kích hoạt) | Không có mô phỏng; đọc `hdl/af_cluster.v` (không được khởi tạo ở đâu) | Mục 8b |
 | #31 (lượt rỗng, không cần model thật) | `venv/bin/python doc/experiments/2026-10-30_bug31/run31.py s_zy02 zy:0:2` (Conv 8×4×4, hai hàng input đầu bằng 0, khoảng 40 s); ảnh MNIST: `run31.py img0 image:0 W=28 H=28 CH=1 NF=4`; Dense: `run31.py d_z0 zk:0:512 L=DENSE_CHAIN_3136_10 K=3136`; công tắc theo dõi `B31_WATCH`, `B31_CONV`, `B31_ENC` (docstring của `probe31.py`) | `RESULT ... DUT == bias at ...` |
 | #31, #32, #33 (dữ liệu MNIST thật) | Code chạy model thật đã gỡ khỏi `dev` (revert theo yêu cầu, nhật ký 2026-10-30); chạy trên commit `440f36d`: `git worktree add ../oe_ptq 440f36d`, rồi trong `../oe_ptq`: `export PYTHONPATH=$PWD/src` (venv cài `open_eye` dạng editable trỏ vào `OpenEye_orig/src`), `cp ../OpenEye_orig/doc/demo_notebooks/mnist_quantized_model.tflite doc/demo_notebooks/` (file `.tflite` bị `.gitignore` bỏ qua), `../OpenEye_orig/venv/bin/python -m pytest -q "test/cocotb_fpga/test_ptq_mnist.py::test_ptq_layer[conv1-0]"` (id khác: `conv2-0`, `conv3-0`, `fc1_probe-0`; các ca đánh `xfail(strict)`); thêm `OPENEYE_DUMP_VERIFY=1` rồi `tools/verify_conv_output.py test/.temp/<thư mục test>` để có toàn bộ output. #32 tái hiện không cần model thật: Conv 7×7×64 → 64 ngẫu nhiên với `OPENEYE_BIAS_STEP` | `DUT vs numpy: ... differ`; Conv1: DUT = bias; Conv3: lệch hằng số theo cặp filter |
+| #32 (thứ tự bias) và #35 (= #31 ở Conv3) | Conv nhỏ có 2 nhóm kernel, bias khác nhau (khoảng 1 phút): `venv/bin/python doc/experiments/2026-10-30_bug32/run32.py w7f8 rand W=7 H=2 CH=4 NF=8 OPENEYE_BIAS_STEP=3 B32_BIAS=4` (thêm `B32_REVERSE=1` = giả lập bản sửa Python; 4 nhóm: `W=4 NF=16`); model thật trên RTL kèm dump mọi lần kiểm tra bộ đệm (khoảng 10 phút): `run35.py img0 0 [B32_REVERSE=1]`, rồi `analyze35.py test/.temp/b35_img0/dump` và `scan31.py check 0 both test/.temp/b35_img0/dump`; mức ảnh hưởng trên N ảnh (chỉ Python, khoảng 2 phút cho 1000 ảnh): `scan31.py 1000` | `RESULT ... DUT vs numpy 0/112 differ`; `model == RTL at 3136 of 3136` |
 | Weight Conv đã huấn luyện cho test bất kỳ | `OPENEYE_TFLITE_CONV=$PWD/doc/demo_notebooks/mnist_quantized_model.tflite:sequential_1/conv2d_1_2/convolution` (tensor Conv2; Conv1 `sequential_1/conv2d_1/convolution`, Conv3 `sequential_1/conv2d_2_1/convolution`) | Log `OPENEYE_TFLITE_CONV: layer-0 weights from ... (N zero weights)` |
 
 ### Biến môi trường của testbench
@@ -314,7 +315,7 @@ OpenEye_orig/
 │   │   ├── test_dense_chain.py ★ 11 chuỗi Dense → Dense trên chip (ghi ngược FC, lỗi #26), MLP, nhiều cấu hình
 │   │   ├── test_glb_psum2.py  ★  7 mô hình nối layer với NUM_GLB_PSUM=2 (ghi ngược Conv, lỗi #25)
 │   │   ├── test_int8_clamp.py ★  9 mô hình kiểm kẹp int8 và ReLU gộp (#30)
-│   │   ├── test_real_model.py ★  Model PyTorch MNIST đã huấn luyện qua đường toolchain trên RTL (2 xfail: #32, #35)
+│   │   ├── test_real_model.py ★  Model PyTorch MNIST đã huấn luyện qua đường toolchain trên RTL (2 xfail: #32, #31)
 │   │   └── regmap.yaml           Định nghĩa các thanh ghi cấu hình gửi qua DMA (nguồn của dma_storage.v)
 │   ├── cocotb_parallel/          Test của OpenEye_Parallel (SERIAL=0), đã cũ (mục 5.7)
 │   ├── test_memory_model.py   ★  16 unit test của mô hình bộ nhớ
@@ -343,7 +344,7 @@ OpenEye_orig/
 │   │                             baseline_2026-10-22/, baseline_2026-10-15/, baseline_2026-10-10/ (mốc cũ), mem_typical_2026-10-10/, ...
 │   ├── synth/                 ★  Báo cáo Vivado theo từng lần chạy (mỗi thư mục có SUMMARY.md)
 │   ├── experiments/           ★  Báo cáo thí nghiệm và điều tra lỗi (#13, #6/#7, #18, #14, #19, cherry-pick upstream, model nhiều layer,
-│   │                             #17 đệm channel, #22 mã hoá weight, #26 Dense nối tiếp Dense, #25 NUM_GLB_PSUM=2, int8/kẹp/ReLU #30 + bộ giả lập model int8) kèm script probe/lockstep để chạy lại
+│   │                             #17 đệm channel, #22 mã hoá weight, #26 Dense nối tiếp Dense, #25 NUM_GLB_PSUM=2, int8/kẹp/ReLU #30 + bộ giả lập model int8, #31 lượt rỗng, #32 thứ tự bias + #35) kèm script probe/lockstep để chạy lại
 │   ├── lint/                  ★  Output lint gốc
 │   ├── reports/               ★  Báo cáo tiến độ (Word): BaoCao_TienDo_OpenEye_2026-10-10.docx, BaoCao_TienDo_OpenEye_2026-10-15.docx
 │   ├── OpenEye_FPGA_documentation.md, test_status_handover.md   Tài liệu của upstream
@@ -1242,7 +1243,7 @@ dài 96 thay vì 192 chu kỳ.
 | Giai đoạn | Nội dung | Trạng thái |
 |---|---|---|
 | 0. Đo lường | Profiler, báo cáo, so sánh, baseline 12 case, mô hình bộ nhớ, mốc phần cứng Vivado, kiểm tra độc lập từng word, đo theo từng layer, Bảng 3 của paper | **Xong** (2026-10-24); còn: hiệu chỉnh mô hình bộ nhớ theo board |
-| 0b. Sửa lỗi tính đúng (phát sinh) | Lỗi làm phần cứng/mô phỏng tính sai | **Đã sửa:** #3, #13, #6, #7 (`NUM_GLB_IACT=3`), #14, #18, #19, #22, #25, #26, #30 (kẹp int8, ReLU gộp), #34 (MaxPool của `onnx2model` thành average, Python); #17 có workaround Python; #5 là báo động giả của testbench. **Còn mở:** #9, #12, #18b, #19b, #21, #23, #27, #28, #29, #31 (đã điều tra, gồm cả #33: lượt rỗng làm mất các lượt sau), #32 (lộ ra với dữ liệu MNIST thật, 2026-10-30; xác nhận lại với model PyTorch thật), #35 (Conv3 cột cuối khi ghi ngược), 3 channel (#7), không có hàm kích hoạt (#24) |
+| 0b. Sửa lỗi tính đúng (phát sinh) | Lỗi làm phần cứng/mô phỏng tính sai | **Đã sửa:** #3, #13, #6, #7 (`NUM_GLB_IACT=3`), #14, #18, #19, #22, #25, #26, #30 (kẹp int8, ReLU gộp), #34 (MaxPool của `onnx2model` thành average, Python); #17 có workaround Python; #5 là báo động giả của testbench. **Còn mở:** #9, #12, #18b, #19b, #21, #23, #27, #28, #29, #31 (đã điều tra, gồm cả #33 và #35: lượt rỗng làm mất các lượt sau; chặn 86 % ảnh MNIST thật ở Conv3), #32 (đã điều tra 2026-10-30: thứ tự word bias khi nhiều filter chung một địa chỉ psum; hướng sửa Python chờ đồng ý), 3 channel (#7), không có hàm kích hoạt (#24) |
 | 1. Giảm lưu lượng DMA | Bias theo filter, đóng gói weight, bảng quant theo F hoặc lưu BRAM, readout INT8 | Chưa làm. Đề xuất bắt đầu với bias |
 | 2. Che độ trễ | Double-buffering (`BRANCHES=2`): nạp lượt sau trong lúc lượt hiện tại tính toán | Chưa làm (cần sửa lỗi chọn nửa buffer iact trước) |
 | 3. Mô hình và DSE | Mô hình Python dự đoán chu kỳ và byte, roofline, quét cấu hình | Chưa làm |
@@ -1301,10 +1302,10 @@ dài 96 thay vì 192 chu kỳ.
 | 29 | Dense K = 3136 với ≥ 32 output tính sai trên RTL (chuỗi 3136 → 64 → 10, 3136 → 32 → 10 sai từ kiểm tra bộ đệm sau Dense đầu); 2560 → 32, 2048 → 32, 1024/512/256 → 64, 3136 → 16, 3136 → 10 đúng. Chặn Dense 3136 → 64 của model MNIST int8 đã huấn luyện | ? (có thể cùng họ #19b) | **Chưa điều tra** (phát hiện 2026-10-28) |
 | 30 | Bộ lượng tử **không kẹp int8**: lấy 8 bit thấp, giá trị tràn bị quấn vòng (130 → −126, −129 → 127); tham chiếu Python cũng không kẹp nên mọi test PASS (dữ liệu test chưa từng tràn). Đưa model MNIST int8 thật vào phần cứng: **9,3 %** thay vì 99,2 % (giả lập) | `quantization_unit.v` | **Đã sửa** (2026-10-28, được bạn đồng ý): kẹp về `[act_min, 127]`, `act_min` theo layer (thanh ghi `quant_clamp_low`). Test mới 9/9 RTL + 2/2 bộ lượng tử, đối chứng âm 9/9 FAIL trên RTL cũ, hồi quy 157 test 0 FAIL, 12 case mốc 0 chu kỳ lệch, lint 462. Mục 9 |
 | 31 | Conv/Dense **mất mọi lượt tính từ một lượt rỗng trở đi**: lượt mà không PE nào có activation khác 0 (Conv 3×3: cửa sổ 3 hàng input toàn 0 trên phần hàng một lượt phủ; Dense: một khối K input của lượt toàn 0) và mọi lượt sau không được tính, output giữ bias (+ các lượt trước); layer vẫn chạy hết, không treo. Ảnh MNIST thật: Conv1 ra bias ở cả 25.088 output (hàng trên của ảnh trống), Conv2 ở 12.320/12.544. Dữ liệu test ngẫu nhiên không có số 0 (`DRAMContents` thay 0 bằng ±1) nên không lộ | RTL điều khiển: PE chỉ bắt đầu lượt khi có activation khác 0 (`PE.v:1135`); `OpenEye_FPGA.v` đếm lượt (Process 2) và khởi động lượt converter/weight kế tiếp (Process 5) khi bus iact ready của mảng PE rời trạng thái toàn 1, việc chỉ xảy ra khi có PE bắt đầu tính | **Đã điều tra** (2026-10-30, không sửa RTL; mục 9; **upstream `93f0e82` cũng bị**, đã chạy thử): hướng sửa A (PE rỗng vẫn đi trọn giao thức một lượt) hoặc B (đếm lượt theo sự kiện tường minh), cần bạn đồng ý; giả lập chỉ một xung ready là chưa đủ |
-| 32 | Conv3 7×7×64 → 64: **bias của cặp filter (2k, 2k+1) bị đổi chỗ** (output = đúng + b[2k+1] − b[2k] ở filter 2k và ngược lại, ở mọi vị trí; các tích đúng). Mọi test trước đây cho mọi filter bias 1 nên không thấy; Conv1/Conv2 không đổi chỗ | ? (thứ tự bias: `psum_stream_mapper` hoặc RTL; cấu hình 7 pixel / 4 cột cluster) | **Chưa điều tra** (phát hiện 2026-10-30; tái hiện rẻ không cần model thật: Conv 7×7×64 → 64, dữ liệu ngẫu nhiên, `OPENEYE_BIAS_STEP`; hoặc tái hiện: commit `440f36d` qua `git worktree` (mục 3c)) |
+| 32 | Conv3 7×7×64 → 64: **bias của cặp filter (2k, 2k+1) bị đổi chỗ** (output = đúng + b[2k+1] − b[2k] ở filter 2k và ngược lại, ở mọi vị trí; các tích đúng). Xảy ra khi một địa chỉ bộ đệm psum chứa nhiều filter (`different_kernels_per_calculation` = 2: cặp đổi chỗ; = 4: nhóm 4 filter đảo ngược); Conv1/Conv2 của model là 1 nên đúng. Mọi test trước đây cho mọi filter bias 1 nên không thấy. Upstream cùng code | Thứ tự word bias: `psum_stream_mapper` gửi filter theo thứ tự tăng, còn `psum_pipeline.v` (GET_BIAS) dịch word vào từ dưới nên word đầu nằm ở lane trên cùng (cluster row 1), trong khi tính toán và đọc ra đặt nhóm kernel 0 ở cluster 0 | **Đã điều tra** (2026-10-30, không sửa RTL, `doc/experiments/2026-10-30_bug32_bias_order.md`): giả lập bản sửa Python (đảo thứ tự nhóm kernel trong stream bias) cho output đúng ở mọi ca; **chờ bạn đồng ý** sửa trong `psum_stream_mapper.py` |
 | 33 | Dense 3136 → 10 (10 output đầu của fc1 đã huấn luyện) với input thật: ảnh test 0 sai cả 10 output, ảnh 1 đúng | **Cùng nguyên nhân #31**: kết quả của ảnh 0 bằng đúng bias + tích của input 0…2653; input 2654 mở đầu chuỗi 109 số 0 (một lượt rỗng); chuỗi 0 dài nhất của ảnh 1 là 75 | **Đã điều tra** (2026-10-30): gộp vào #31 |
 | 34 | Đường model thật (`USE_RANDOM_VALUES=0`): layer MaxPool của `onnx2model` bị cấu hình thành **average pooling** (`pooling_mode` 1, giới hạn vòng lặp 8/16 thay vì 112): `onnx2model.get_model` đặt tên mọi layer bằng loại (`pooling2d`), còn `LayerParameters.write_pooling_layer` chọn max khi tên chứa `max`. RTL sai từ bộ đệm sau pooling đầu (784/784 word). Upstream có cùng code | Python (`onnx2model`) | **Đã sửa** (2026-10-30, chỉ Python): layer MaxPool tên `max_pooling2d`; xác nhận trên RTL (đổi tên bằng probe → qua kiểm tra sau pool1, pool2). Mục 8d |
-| 35 | Conv3 7×7×64 → 64 của model thật khi **ghi ngược** cho Dense: cột cuối (x = 6) của hàng 7 pixel sai (nhỏ hơn) ở 3/16 word sai đã ghi; 13/16 còn lại do #32. Conv3 chạy đơn (đọc thẳng ra) với dữ liệu ngẫu nhiên thì mọi giá trị đúng | ? (có thể họ #9, hàng 7 pixel) | **Chưa điều tra** (phát hiện 2026-10-30) |
+| 35 | Conv3 7×7×64 → 64 của model thật khi ghi ngược cho Dense: ghi chép cũ là "cột cuối x = 6 sai" (đọc nhầm layout) | **Chính là #31**: các output sai nằm ở **hàng output cuối y = 6**; trong cửa sổ của hàng này nhóm channel 44–47 không có activation khác 0 → lượt đó và mọi lượt sau bị mất (mô hình khớp DUT 448/448 giá trị) | **Đã điều tra** (2026-10-30): gộp vào #31 (`doc/experiments/2026-10-30_bug32_bias_order.md`) |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-24)
 
@@ -1418,8 +1419,12 @@ QUANT_AMOUNT 64): FAIL ở bộ đệm sau pooling đầu, 784/784 word sai (DUT
 
 Kiểm chứng toolchain không cần RTL (`test/test_onnx_model_flow.py`, 6/6): tham chiếu của testbench so với ONNX Runtime chạy cùng model int8, từng layer: chỉ khác
 do làm tròn (Conv1/Pool1 lệch ≤ 1; Conv2…Conv3 lệch ≤ 3, ≥ 98 % lệch ≤ 1), lớp dự đoán trùng ORT và nhãn; trên 100 ảnh test đầu, tham chiếu đúng 100 % và trùng lớp với ORT int8 100 %. Trên RTL (`test_real_model.py`, ảnh 0 và 1):
-Conv1 + ReLU + Pool1 và Conv2 + ReLU + Pool2 **khớp từng bit**; Conv3 sai (112/392 và 138/392 word đúng): 13/16 word sai đã ghi giải thích được bằng #32 (bias cặp
-filter đổi chỗ), 3/16 ở cột cuối của hàng 7 pixel (lỗi mới #35); test đánh `xfail(strict)`. Dense của model này là 3136 → 10 nên không vướng #29.
+Conv1 + ReLU + Pool1 và Conv2 + ReLU + Pool2 **khớp từng bit**; Conv3 sai (112/392 và 138/392 word đúng); test đánh `xfail(strict)`. Dense của model này là
+3136 → 10 nên không vướng #29. Điều tra cùng ngày (`doc/experiments/2026-10-30_bug32_bias_order.md`): ảnh 0 = #32 ở mọi vị trí + #31 ở hàng output cuối
+của Conv3, ảnh 1 = chỉ #32 (mô hình khớp DUT 3136/3136 giá trị ở cả hai); "#35, cột cuối" là đọc nhầm layout, thực ra là #31. **Giả lập bản sửa Python của #32
+trong mô phỏng: ảnh 1 chạy trọn model trên RTL, PASS, khớp từng bit ở mọi layer, DUT ra lớp 2 = nhãn** (ảnh MNIST thật đầu tiên qua cả mạng đã huấn luyện trên
+phần cứng). Quét 1000 ảnh test (chỉ Python, mô hình lỗi đã kiểm chứng trên RTL với ảnh 0, 1, 7): Conv3 có lượt rỗng (#31) ở **861/1000 ảnh** (Conv2: 0);
+độ chính xác 99,5 % nếu không lỗi, 99,5 % chỉ với #32, 72,9 % chỉ với #31, **61,9 % với cả hai** (Dense tính đúng; phía Dense của #31 chưa mô hình hoá).
 
 **Đo pha khi chạy nhiều layer (phân tích ngày 2026-10-22, đã làm xong cùng ngày):** khi đó profiler cộng dồn mọi layer, và với layer trung gian thì tính toán diễn ra trong trạng thái 11 nên bị ghi là `writeback`
 (`compute = 0`). Bản thử `probe_model.py` tách theo từng lần vào `GET_PARAMETERS` và tách trạng thái 10/11 theo FSM psum (1–3 = tính toán, 4/6 = ghi ngược).
@@ -2265,6 +2270,34 @@ compute hoặc converter phát xong) thay cho bus ready, và FSM psum không ch�
 rủi ro hồi quy cao hơn. Đề xuất A. Kiểm chứng: các ca `run31.py` ở trên khớp numpy, hồi quy, mốc chu kỳ (lượt có dữ liệu không được đổi), Vivado. Không có
 workaround chỉ bằng Python (làm mọi lượt khác rỗng là đổi dữ liệu).
 
+### Điều tra lỗi #32 và #35 (2026-10-30, không sửa RTL, không sửa `src/`)
+
+Chi tiết: `doc/experiments/2026-10-30_bug32_bias_order.md`, công cụ `doc/experiments/2026-10-30_bug32/` (`probe32.py` bọc probe31 và testbench gốc: `B32_BIAS`
+ghi giá trị bias từng lane khi nạp, `B32_REVERSE` giả lập bản sửa Python, `B35_DUMP` lưu mọi lần kiểm tra bộ đệm iact; `run32.py` một layer conv, `run35.py` model
+thật, `analyze35.py`, `explain35.py`, `scan31.py`).
+
+**#32, nguyên nhân:** Conv3 (7×7×64 → 64) là layer duy nhất của model có `different_kernels_per_calculation` = 2: hai filter tính cùng lúc trên hai hàng cluster,
+filter 2p ở cluster row 0, 2p+1 ở row 1 (tính toán và đọc ra đều đếm lane từ cluster 0). Stream bias (`psum_stream_mapper`, serial) gửi mỗi filter thành 4 word
+(8 word khi chỉ một nhóm kernel), filter theo thứ tự tăng; `psum_pipeline.v` (GET_BIAS) dịch từng word vào **từ dưới lên** và ghi một địa chỉ sau 8 word, nên word
+đầu (filter 2p) rơi vào lane trên cùng = cluster row 1, đang tính filter 2p+1. Một nhóm kernel: 8 word cùng một bias nên thứ tự không quan trọng; 2 nhóm: cặp đổi
+chỗ; 4 nhóm (hàng ≤ 4 pixel, ≥ 13 filter): nhóm 4 filter đảo ngược. Đo trong mô phỏng (bias 1 + 3f, Conv 7×2 4 ch 8 filter): lần ghi bias đầu
+`cr0 = 4 (b1), cr1 = 1 (b0)`; DUT − numpy = +3/−3 xen kẽ; Conv 4×2 16 filter: +9/+3/−3/−9. Đảo thứ tự nhóm kernel trong stream bias (`B32_REVERSE`): **0 sai** ở
+cả hai. Bị che vì mọi test cũ cho mọi filter bias 1 (test bias khác nhau `test_conv_channel_order` chỉ có 4 filter, một nhóm). Upstream cùng mapper và cùng
+cách dịch (đọc code).
+
+**#35 = #31:** với bản sửa #32 giả lập, 113 output sai của Conv3 (ảnh 0) đều ở **hàng output cuối y = 6**, không phải một cột. Các hàng 0–5 khớp đúng tham chiếu;
+cửa sổ của hàng 6 (input hàng 5, 6 và hàng đệm 0) có nhóm channel 44–47 toàn 0 → lượt (hàng 6, refresh 0, nhóm 11) rỗng, nó và mọi lượt sau mất: mô hình
+"bias + nhóm 0…10 cho filter 0–31, chỉ bias cho filter 32–63" khớp DUT **448/448**. Mô hình #31 (+ #32) của `scan31.py` khớp RTL 3136/3136 ở ảnh 0 (có/không
+sửa #32), ảnh 1 (có/không) và ảnh 7 (lượt rỗng ở hàng đầu). Ghi chép cũ "cột x = 6" là do đọc chỉ số pixel thành 7x + y thay vì x + 7y.
+
+**Kết quả:** với #32 sửa (giả lập), **ảnh test 1 chạy trọn model đã huấn luyện trên RTL, PASS, khớp từng bit, DUT ra lớp 2 = nhãn**. Ảnh 0 và 86 % ảnh test còn
+vướng #31 ở Conv3 (lượt rỗng đầu tiên ở hàng 0: 429 ảnh, hàng 6: 377, hàng 5: 52); độ chính xác ước tính 61,9 % hôm nay, 72,9 % khi sửa #32, 99,5 % khi sửa cả #31.
+
+**Hướng sửa (cần bạn đồng ý, chưa làm):** #32 bằng Python (đề xuất): `PsumStreamMapper.get_psum_stream` gửi các filter của mỗi địa chỉ bộ đệm psum theo thứ tự
+ngược (filter cuối của nhóm trước), đúng như `B32_REVERSE`: cùng số word, không đổi chu kỳ, không sửa RTL, stream không đổi khi chỉ một nhóm kernel; kiểm chứng
+bằng unit test thứ tự stream, test RTL bias khác nhau với 2 và 4 nhóm kernel (khoảng 1 phút mỗi ca), model thật ảnh 1 (lúc đó `test_real_model[1]` PASS), hồi quy.
+Thay thế: dịch word bias từ trên xuống trong `psum_pipeline.v` (sửa RTL, không lợi hơn). #31: hướng A trong `PE.v` như mục trên.
+
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
 **Số liệu mục này là của ngày 2026-10-10.** Hiện tại (baseline lint `tools/lint_baseline/`, sau các bản sửa #14, #19 và #30): `fpga` **462**, `parallel` **36** (#30 xoá cảnh báo
@@ -2700,4 +2733,12 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   MaxPool; `activation_min` đọc `has_relu`; `DRAMContents` giữ nguyên weight/bias int8 của model và hoán vị weight Dense; testbench nạp `.pth` đã huấn luyện và ảnh
   test thật (`OPENEYE_MODEL_WEIGHTS`, `OPENEYE_INPUT_IMAGE`). Kiểm chứng: `test/test_onnx_model_flow.py` 6/6 (tham chiếu = ONNX Runtime trừ làm tròn, lớp đúng);
   unit test 268 pass, 11 fail có từ trước. RTL với model thật: Conv1/Pool1/Conv2/Pool2 khớp từng bit, Conv3 sai do #32 (13/16 word) và **lỗi mới #35** (cột cuối hàng
-  7 pixel khi ghi ngược, 3/16 word); `test/cocotb_fpga/test_real_model.py` 2 xfail.
+  7 pixel khi ghi ngược, 3/16 word; điều tra sau đó: thực ra là #31 ở hàng output cuối, mục dưới); `test/cocotb_fpga/test_real_model.py` 2 xfail.
+- **Điều tra lỗi #32 và #35** (theo yêu cầu, không sửa RTL, không sửa `src/`; mục 9, `doc/experiments/2026-10-30_bug32_bias_order.md`, công cụ
+  `doc/experiments/2026-10-30_bug32/`): **#32** là thứ tự word bias: khi một địa chỉ bộ đệm psum chứa nhiều filter (Conv3: 2 nhóm kernel trên 2 hàng cluster),
+  `psum_pipeline.v` dịch word bias vào từ dưới nên word đầu rơi vào cluster cuối, ngược với thứ tự `psum_stream_mapper` gửi và với cách tính/đọc ra; cặp filter đổi
+  bias (4 nhóm: đảo cả nhóm 4). Giả lập bản sửa Python (đảo thứ tự nhóm trong stream bias) cho 0 sai. **#35 chính là #31**: output sai ở hàng output cuối của Conv3
+  (cửa sổ có nhóm channel 44–47 toàn 0 → lượt rỗng); "cột cuối" là đọc nhầm layout; đóng #35, gộp vào #31. Mô hình lỗi khớp RTL 3136/3136 ở ảnh 0, 1, 7. **Với #32
+  sửa giả lập, ảnh test 1 chạy trọn model đã huấn luyện trên RTL: PASS, khớp từng bit, lớp 2 = nhãn.** Quét 1000 ảnh: #31 chặn 86 % ảnh ở Conv3; độ chính xác ước tính
+  61,9 % hôm nay, 72,9 % khi sửa #32, 99,5 % khi sửa cả #31. Sửa lại lý do `xfail` của `test_real_model.py` (ảnh 0: #32 + #31, ảnh 1: #32) và ghi chú đính chính trong
+  `2026-10-30_onnx_model_flow.md`. Hướng sửa #32 bằng Python và hướng A cho #31 chờ bạn đồng ý.

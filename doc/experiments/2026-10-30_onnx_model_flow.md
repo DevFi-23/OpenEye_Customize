@@ -87,6 +87,11 @@ same class as ONNX Runtime and the label, psums below 2^19).
 | after conv2 + ReLU + pool2 (conv3's input, 392 words) | **bit-exact** |
 | after conv3 (the Dense input, 392 words) | wrong: 112 (image 0) and 138 (image 1) of 392 words right |
 
+**Correction (same day, `2026-10-30_bug32_bias_order.md`):** the "bug #35" below is bug #31: the 3 words are at conv3's
+last output line (y = 6), not the last column (the pixel index was read as 7x + y); in that line's window the channel chunk
+44..47 is all zero, an empty pass, and every later pass of conv3 is lost. "Bug #31 did not trigger" is wrong for image 0.
+Image 0 = #32 everywhere + #31 at y = 6, image 1 = #32 only (the model matches the DUT at 3,136 of 3,136 values for both).
+
 The conv3 outputs, recomputed with the biases of the filter pairs (2k, 2k+1) swapped (bug #32), match the DUT in 13 of
 the 16 logged wrong words (the plain reference matches none of them and all 16 logged reference values). The other 3
 are the last column (x = 6) of the 7-wide rows (pixels 6, 13, 20, ..., 41), smaller in the DUT: **bug #35**, new, not
@@ -100,5 +105,5 @@ Regression after the change: unit tests 268 pass (262 + 6), 11 pre-existing fail
 
 ## 6. Next
 
-Bug #32 and #35 block the Dense layer of this model on RTL (the Dense is 3136 -> 10, so bug #29 does not apply);
+Bug #32 and #35 (= #31, see the correction in section 5) block the Dense layer of this model on RTL (the Dense is 3136 -> 10, so bug #29 does not apply);
 bug #31 can still hit other inputs and models. Fix A for #31 and investigations of #32 / #35 need the user's approval.
