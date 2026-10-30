@@ -68,13 +68,11 @@ Commit mới hơn, xem ngày 2026-10-21: `81173dc` (2026-10-20, Barsch32) làm c
 | `e78e5b7` (21/10) | `OpenEye_FPGA.v`: xoá dòng `temp_var = 0;` ở cuối một khối tuần tự ("Probably fixed a reset error") | Dòng này nằm **ngoài** cặp `if (!rst_n) ... else ...` của khối `always @(posedge clk_i, negedge rst_n)` (dòng 1296), nên chạy cả ở cạnh xuống của reset: khối không còn đúng mẫu reset bất đồng bộ mà công cụ tổng hợp nhận dạng. `temp_var` chỉ là biến tạm (gán rồi dùng ngay và đặt lại 0 ở dòng 1196–1198), nên xoá dòng này **không đổi chức năng**, chỉ làm sạch mẫu reset. Lấy được (RTL, cần bạn đồng ý) |
 
 **Kiểm tra lại ngày 2026-10-30** (`git fetch upstream`, `upstream/main` = `93f0e82`): thêm **15 commit** (23–29/10) sau `e78e5b7`, **chưa lấy**:
-DAG (`c342d04`, merge `b4b643a`: `DRAMContents`, tham chiếu và testbench đổi sang dict theo tên layer, ca `Residual_Block` trong `data_create`),
-nới độ rộng địa chỉ và vòng lặp cho mạng lớn (`655a2ae` của DenLeb: `iact_read_limit_*`/`iact_write_limit_*` 18 bit, vòng psum 12/24 bit trong
-`regmap.yaml` và `psum_pipeline.v`), Verilator (`80d6e67`, `d1da389`), `551cf85` đưa `iact_stream_constructor.v` về trước `23be043`, `3258813` sửa xếp
-weight conv nhiều channel và thưa, `c2bf7a9` chạy `make_stream` tuần tự, `57781cd`/`93f0e82` sửa nhỏ. **Không commit nào đụng tới lượng tử hoá**:
-`DRAM.py` vẫn `floor(127·w)`, Dense ngẫu nhiên, bias 1 / c+1, input ngẫu nhiên; tham chiếu vẫn không kẹp; bộ lượng tử RTL vẫn lấy 8 bit thấp;
-notebook MNIST đưa file `.tflite` vào `MODEL_PATH` mà testbench mở bằng `tf.keras.models.load_model` (chỉ đọc Keras). Không có giải pháp PTQ để lấy.
-Phần DAG viết lại `DRAM.py` và testbench nên sẽ xung đột với các thay đổi Python của `dev` (#22, #26, PTQ) nếu sau này hợp nhất.
+DAG (`c342d04`, merge `b4b643a`: `DRAMContents`, tham chiếu và testbench đổi sang dict theo tên layer, ca `Residual_Block`), nới độ rộng địa chỉ và vòng
+lặp cho mạng lớn (`655a2ae`: `iact_read_limit_*`/`iact_write_limit_*` 18 bit, vòng psum 12/24 bit trong `regmap.yaml` và `psum_pipeline.v`), Verilator
+(`80d6e67`, `d1da389`), `551cf85` đưa `iact_stream_constructor.v` về trước `23be043`, `3258813` sửa xếp weight conv nhiều channel và thưa, `c2bf7a9`,
+`57781cd`, `93f0e82` sửa nhỏ. **Không commit nào động tới lượng tử hoá** (`DRAM.py` vẫn `floor(127·w)`, Dense ngẫu nhiên, bias 1 / c+1; bộ lượng tử RTL
+vẫn lấy 8 bit thấp; testcase `model_test` vẫn tắt). Phần DAG viết lại `DRAM.py` và testbench nên sẽ xung đột với các thay đổi Python của `dev` nếu hợp nhất.
 
 **Đã làm (2026-10-21, được bạn đồng ý):** `git cherry-pick -x b6fa369 2c8c324 2bf497d` (giữ tác giả gốc, mỗi commit ghi lại hash upstream nên sau này `git merge upstream/main` nhận ra), cộng một commit riêng mở rộng 0 tường minh cho `filters_reg_M0`. Kiểm chứng: mục 9, `doc/experiments/2026-10-21_upstream_cherry_pick.md`.
 
@@ -174,10 +172,9 @@ Một test cocotb là một tiến trình; máy 12 nhân / 7 GB RAM chạy song 
 venv/bin/python -m pytest -q test/test_*.py
 ```
 
-Hiện tại: **278 pass, 11 fail** (129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8 + 16 test PTQ;
-khoảng 75 giây, phần lớn là `test_ptq.py` chạy tham chiếu của testbench trên model 6 layer). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
+Hiện tại: **262 pass, 11 fail** (129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
 thay đổi của fork. Các file của fork: `test_profile_report.py`, `test_profile_phases.py`, `test_channel_pad.py`, `test_conv_wght_encoding.py`, `test_paper_table3.py`,
-`test_memory_model.py`, `test_fc_writeback.py`, `test_conv_writeback.py`, `test_int8_clamp.py`, `test_ptq.py`.
+`test_memory_model.py`, `test_fc_writeback.py`, `test_conv_writeback.py`, `test_int8_clamp.py`.
 
 ### Test mô phỏng RTL (cocotb qua pytest)
 
@@ -197,7 +194,6 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ../../venv/bin/python -m pytest -q -p no:cachep
 | `test_dense_chain.py` | (cả file) | 11 chuỗi Dense → Dense trên chip (lỗi #26): K 16–1568, N 8–64, MLP, `CLUSTER_ROWS` 1/2/4, `NUM_GLB_IACT` 3, `NUM_GLB_PSUM` 2 | 20 s – 1,5 phút | 11 PASS |
 | `test_glb_psum2.py` | (cả file) | 7 mô hình nối layer với `NUM_GLB_PSUM=2` (lỗi #25): Conv đơn, Conv → Conv (4/16 channel, hàng 14 pixel), Conv → Pool → Conv (rộng 8, 6), Conv → Pool → Conv → Pool → Conv | 15–50 s | 7 PASS |
 | `test_int8_clamp.py` | (cả file) | 9 mô hình kiểm kẹp int8 và ReLU gộp (#30): tràn (`OPENEYE_QUANT_SHIFT`), ReLU (hậu tố `_RELU`), cả hai; Conv → Conv, Conv → Pool → Conv, chuỗi Dense, MLP, `NUM_GLB_PSUM=2`, mạng paper có ReLU | 15 s – 3 phút | 9 PASS |
-| `test_ptq_mnist.py` | (cả file) | Model MNIST int8 đã huấn luyện trên ảnh test 0 và 1 qua PTQ (mục 8e): Conv1, Conv2, Conv3, 10 output đầu của fc1 từng layer, và cả model trên chip | 2–7 phút | 1 PASS (fc1 ảnh 1) + 9 xfail (#31, #32, #33) |
 | `test/cocotb_quantization/test_quantization_unit.py` | (cả file) | Testbench riêng của `quantization_unit` (12.188 output mỗi test so với mô hình Python, psum 20 và 32 bit) | ~2 s | 2 PASS |
 | `test_gemm_layer.py` | (cả file) | 63 test GEMM/Dense | vài phút | 40 PASS, 23 FAIL do bộ kiểm tra ghi FC "live" (#5, báo động giả); với `OPENEYE_SKIP_FC_WRITE_CHECK=1`: 63 PASS (đo 2026-10-19) |
 
@@ -235,7 +231,7 @@ Chi tiết: mục 6 (profiler), 6.13 (model nhiều layer), 6.14 (Bảng 3).
 | #25 (`NUM_GLB_PSUM=2`, **đã sửa**) | Sau bản sửa: `venv/bin/python -m pytest -q test/cocotb_fpga/test_glb_psum2.py`. Lỗi cũ (trên commit `e062707` qua `git worktree`, như #26). Ca nhỏ nhất: `venv/bin/python doc/experiments/2026-10-26_bug25/run25.py k2 Convolution_Stack 2 GLBP=2 CH=4 H=4` (conv → conv; `GLBP=4` thì PASS). Mạng paper: `venv/bin/python tools/run_profile.py -k paper_cr2_x2_y3` | `test/.temp/b25_k2/cocotb_sim.log`: `Iact buffer check failed after layer 0`, mỗi word đổi chỗ 2 nhóm 2 byte ở giữa |
 | #26 (Dense nối tiếp Dense, **đã sửa**) | Sau bản sửa: `venv/bin/python -m pytest -q test/cocotb_fpga/test_dense_chain.py` (11 test). Lỗi cũ chỉ tái hiện được trên commit trước bản sửa (`142ee6c`): `git worktree add ../oe_old 142ee6c`, rồi trong `../oe_old` chạy `PYTHONPATH=src ../OpenEye_orig/venv/bin/python doc/experiments/2026-10-24_bug26/run_dense.py x16 D_16_8_10 2` (thêm `TRACE_RAM_WRITES=1` để thấy pha ghi ngược không ghi RAM) | `test/.temp/.../cocotb_sim.log`: `Iact buffer check: first N activations only`; bản cũ: `DUT-Value` = input của layer 0 |
 | #24 (không có hàm kích hoạt) | Không có mô phỏng; đọc `hdl/af_cluster.v` (không được khởi tạo ở đâu) | Mục 8b |
-| #31, #32, #33 (model thật qua PTQ) | `venv/bin/python -m pytest -q "test/cocotb_fpga/test_ptq_mnist.py::test_ptq_layer[conv1-0]"` (thay id: `conv2-0`, `conv3-0`, `fc1_probe-0`); thêm `OPENEYE_DUMP_VERIFY=1` rồi `venv/bin/python tools/verify_conv_output.py test/.temp/<thư mục test>` để có toàn bộ output | `DUT vs numpy: ... differ`; Conv1: DUT = bias |
+| #31, #32, #33 (dữ liệu MNIST thật) | Code chạy model thật đã gỡ khỏi `dev` (revert theo yêu cầu, nhật ký 2026-10-30); chạy trên commit `440f36d`: `git worktree add ../oe_ptq 440f36d`, rồi trong `../oe_ptq`: `export PYTHONPATH=$PWD/src` (venv cài `open_eye` dạng editable trỏ vào `OpenEye_orig/src`), `cp ../OpenEye_orig/doc/demo_notebooks/mnist_quantized_model.tflite doc/demo_notebooks/` (file `.tflite` bị `.gitignore` bỏ qua), `../OpenEye_orig/venv/bin/python -m pytest -q "test/cocotb_fpga/test_ptq_mnist.py::test_ptq_layer[conv1-0]"` (id khác: `conv2-0`, `conv3-0`, `fc1_probe-0`; các ca đánh `xfail(strict)`); thêm `OPENEYE_DUMP_VERIFY=1` rồi `tools/verify_conv_output.py test/.temp/<thư mục test>` để có toàn bộ output. #32 tái hiện không cần model thật: Conv 7×7×64 → 64 ngẫu nhiên với `OPENEYE_BIAS_STEP` | `DUT vs numpy: ... differ`; Conv1: DUT = bias; Conv3: lệch hằng số theo cặp filter |
 | Weight Conv đã huấn luyện cho test bất kỳ | `OPENEYE_TFLITE_CONV=$PWD/doc/demo_notebooks/mnist_quantized_model.tflite:sequential_1/conv2d_1_2/convolution` (tensor Conv2; Conv1 `sequential_1/conv2d_1/convolution`, Conv3 `sequential_1/conv2d_2_1/convolution`) | Log `OPENEYE_TFLITE_CONV: layer-0 weights from ... (N zero weights)` |
 
 ### Biến môi trường của testbench
@@ -247,7 +243,6 @@ Chi tiết: mục 6 (profiler), 6.13 (model nhiều layer), 6.14 (Bảng 3).
 | `OPENEYE_DUMP_VERIFY=1` | Ghi `verify_layer0.pkl` cho `tools/verify_conv_output.py` | tắt |
 | `OPENEYE_PAD_CHANNELS=0` | Tắt đệm channel của lỗi #17 | bật |
 | `OPENEYE_TFLITE_CONV=<file>:<tensor>` | Weight Conv layer 0 lấy từ model TFLite int8 | tắt |
-| `OPENEYE_PTQ=<file .tflite>:<chỉ số ảnh>` | Model int8 đã huấn luyện trên một ảnh test MNIST, lượng tử cho phần cứng bằng `open_eye.ptq` (mục 8e): weight, bias, input, `mant`/`shift`, `act_min` của N layer đầu thay dữ liệu test; kiểm tra tham chiếu mọi layer = model int8 | tắt |
 | `OPENEYE_KEEP_GOING=1` | Kiểm tra bộ đệm iact giữa các layer sai thì ghi log và chạy tiếp (test vẫn FAIL ở cuối); dùng để đo mọi layer | tắt (case Bảng 3 tự bật) |
 | `OPENEYE_FAIL_ON_STALL=<N>` | Dừng khi FSM không tiến triển N chu kỳ | 100000 (case model: 400000) |
 | `OPENEYE_EXPECT_LAYERS=<N>` | Model phải có đúng N layer | tuỳ test |
@@ -301,11 +296,10 @@ OpenEye_orig/
 │   ├── conv_wght_encoding.py  ★  Mã hóa weight Conv có số 0 theo đúng cách RTL giải mã (sửa lỗi #22, mục 9)
 │   ├── wght_pipeline_model.py ★  Mô hình chu kỳ của data_pipeline_wght.v (khớp RTL), dùng trong unit test
 │   ├── writeback_model.py     ★  Mô hình chu kỳ của pha ghi ngược psum → iact (vòng đọc + bộ đóng gói), dùng trong unit test (#25, #26)
-│   ├── ptq.py                 ★  Lượng tử hoá model TFLite int8 đã huấn luyện cho phần cứng (PTQ) + mô hình int8 chạy đúng như phần cứng (mục 8e)
 │   └── profile_report.py      ★  Báo cáo và so sánh profile (mục 6.5)
 ├── test/
 │   ├── cocotb_fpga/              Testbench top-level FPGA và các bộ test (cách chạy: mục 3c)
-│   │   ├── OpenEye_FPGA_tb.py ★  Testbench (★ seed, đệm channel, weight TFLite, PTQ, KEEP_GOING, profiler, các hook dữ liệu)
+│   │   ├── OpenEye_FPGA_tb.py ★  Testbench (★ seed, đệm channel, weight TFLite, KEEP_GOING, profiler, các hook dữ liệu)
 │   │   ├── test_profile.py    ★  Case đo: 9 một layer + 3 cả model (mốc, mục 6.7) + 16 cấu hình Bảng 3 của paper (mục 6.14)
 │   │   ├── test_conv_const.py ★  Test Conv (34 test dùng làm hồi quy; ★ thêm random_data)
 │   │   ├── test_gemm_layer.py    Test GEMM/Dense (63 test dùng làm hồi quy)
@@ -315,7 +309,6 @@ OpenEye_orig/
 │   │   ├── test_dense_chain.py ★ 11 chuỗi Dense → Dense trên chip (ghi ngược FC, lỗi #26), MLP, nhiều cấu hình
 │   │   ├── test_glb_psum2.py  ★  7 mô hình nối layer với NUM_GLB_PSUM=2 (ghi ngược Conv, lỗi #25)
 │   │   ├── test_int8_clamp.py ★  9 mô hình kiểm kẹp int8 và ReLU gộp (#30)
-│   │   ├── test_ptq_mnist.py  ★  Model MNIST int8 đã huấn luyện trên ảnh test thật qua PTQ (Conv1–3 + 10 output đầu của fc1), mục 8e
 │   │   └── regmap.yaml           Định nghĩa các thanh ghi cấu hình gửi qua DMA (nguồn của dma_storage.v)
 │   ├── cocotb_parallel/          Test của OpenEye_Parallel (SERIAL=0), đã cũ (mục 5.7)
 │   ├── test_memory_model.py   ★  16 unit test của mô hình bộ nhớ
@@ -327,7 +320,6 @@ OpenEye_orig/
 │   ├── test_fc_writeback.py   ★  Mô hình chu kỳ của pha ghi ngược FC (lỗi #26): 110 test
 │   ├── test_conv_writeback.py ★  Mô hình chu kỳ của pha ghi ngược Conv với 2/4 lane (lỗi #25): 12 test
 │   ├── test_int8_clamp.py     ★  Unit test kẹp int8 / ReLU phía Python (#30): 11 test
-│   ├── test_ptq.py            ★  Unit test PTQ: tham số, độ chính xác, đường tham chiếu của testbench = model int8 (mục 8e): 16 test
 │   ├── cocotb_quantization/   ★  Testbench riêng của quantization_unit (kẹp int8, #30)
 │   └── .temp/                 ☆  Thư mục chạy của từng test (log, header sinh ra, profile.json)
 ├── tools/                     ★  Công cụ của dự án riêng
@@ -1243,7 +1235,7 @@ dài 96 thay vì 192 chu kỳ.
 | Giai đoạn | Nội dung | Trạng thái |
 |---|---|---|
 | 0. Đo lường | Profiler, báo cáo, so sánh, baseline 12 case, mô hình bộ nhớ, mốc phần cứng Vivado, kiểm tra độc lập từng word, đo theo từng layer, Bảng 3 của paper | **Xong** (2026-10-24); còn: hiệu chỉnh mô hình bộ nhớ theo board |
-| 0b. Sửa lỗi tính đúng (phát sinh) | Lỗi làm phần cứng/mô phỏng tính sai | **Đã sửa:** #3, #13, #6, #7 (`NUM_GLB_IACT=3`), #14, #18, #19, #22, #25, #26, #30 (kẹp int8, ReLU gộp); #17 có workaround Python; #5 là báo động giả của testbench. **Còn mở:** #9, #12, #18b, #19b, #21, #23, #27, #28, #29, #31, #32, #33 (lộ ra khi chạy model thật qua PTQ, mục 8e), 3 channel (#7), không có hàm kích hoạt (#24) |
+| 0b. Sửa lỗi tính đúng (phát sinh) | Lỗi làm phần cứng/mô phỏng tính sai | **Đã sửa:** #3, #13, #6, #7 (`NUM_GLB_IACT=3`), #14, #18, #19, #22, #25, #26, #30 (kẹp int8, ReLU gộp); #17 có workaround Python; #5 là báo động giả của testbench. **Còn mở:** #9, #12, #18b, #19b, #21, #23, #27, #28, #29, #31, #32, #33 (lộ ra với dữ liệu MNIST thật, 2026-10-30), 3 channel (#7), không có hàm kích hoạt (#24) |
 | 1. Giảm lưu lượng DMA | Bias theo filter, đóng gói weight, bảng quant theo F hoặc lưu BRAM, readout INT8 | Chưa làm. Đề xuất bắt đầu với bias |
 | 2. Che độ trễ | Double-buffering (`BRANCHES=2`): nạp lượt sau trong lúc lượt hiện tại tính toán | Chưa làm (cần sửa lỗi chọn nửa buffer iact trước) |
 | 3. Mô hình và DSE | Mô hình Python dự đoán chu kỳ và byte, roofline, quét cấu hình | Chưa làm |
@@ -1301,9 +1293,9 @@ dài 96 thay vì 192 chu kỳ.
 | 28 | Conv ở `CLUSTER_ROWS=1` với `NUM_GLB_PSUM=2` tính sai một số output (đường đọc thẳng ra, không có ghi ngược): Conv 14×14 32 → 32 channel sai, 16 → 32 đúng; conv2 của mạng paper (sau pooling) sai ở vài pixel. CR 1 X 4 và CR 2 X 2 đều đúng. Là nguyên nhân của 2 hàng CR 1 X 2 còn FAIL trong Bảng 3 | ? (phép tính, tổ hợp CR = 1 + 2 lane) | **Chưa điều tra** (phát hiện 2026-10-26 khi kiểm chứng bản sửa #25) |
 | 29 | Dense K = 3136 với ≥ 32 output tính sai trên RTL (chuỗi 3136 → 64 → 10, 3136 → 32 → 10 sai từ kiểm tra bộ đệm sau Dense đầu); 2560 → 32, 2048 → 32, 1024/512/256 → 64, 3136 → 16, 3136 → 10 đúng. Chặn Dense 3136 → 64 của model MNIST int8 đã huấn luyện | ? (có thể cùng họ #19b) | **Chưa điều tra** (phát hiện 2026-10-28) |
 | 30 | Bộ lượng tử **không kẹp int8**: lấy 8 bit thấp, giá trị tràn bị quấn vòng (130 → −126, −129 → 127); tham chiếu Python cũng không kẹp nên mọi test PASS (dữ liệu test chưa từng tràn). Đưa model MNIST int8 thật vào phần cứng: **9,3 %** thay vì 99,2 % (giả lập) | `quantization_unit.v` | **Đã sửa** (2026-10-28, được bạn đồng ý): kẹp về `[act_min, 127]`, `act_min` theo layer (thanh ghi `quant_clamp_low`). Test mới 9/9 RTL + 2/2 bộ lượng tử, đối chứng âm 9/9 FAIL trên RTL cũ, hồi quy 157 test 0 FAIL, 12 case mốc 0 chu kỳ lệch, lint 462. Mục 9 |
-| 31 | Conv với **input thật, thưa** (ảnh MNIST 85 % pixel bằng 0; activation sau ReLU 68 % bằng 0) đưa vào qua DMA **mất các tích**: phần cứng trả về đúng bias. Conv1 28×28 (2 channel do đệm #17): bias ở cả 25.088/25.088 output (6.591 sai); Conv2 14×14×32 → 64: bias ở 12.320/12.544 (cả 12.544 sai). Cùng cấu hình với dữ liệu ngẫu nhiên (số 0 bị `DRAMContents` thay bằng ±1) thì đúng, nên trước đây không lộ. Chạy cả model: bộ đệm sau max pooling đầu chứa giá trị nền (output của ảnh trắng) ở mọi vị trí | ? (đường iact thưa: mapper Python hoặc `iact_stream_constructor`/PE; Conv3 7×7 với 73 % số 0 thì không mất tích) | **Chưa điều tra** (phát hiện 2026-10-30, mục 8e) |
-| 32 | Conv3 7×7×64 → 64: **bias của cặp filter (2k, 2k+1) bị đổi chỗ** (output = đúng + b[2k+1] − b[2k] ở filter 2k và ngược lại, ở mọi vị trí; các tích đúng). Mọi test trước đây dùng bias 1 cho mọi filter nên không thấy; Conv1/Conv2 không đổi chỗ | ? (thứ tự bias: `psum_stream_mapper` hoặc RTL, cấu hình 7 pixel / 4 cột cluster) | **Chưa điều tra** (phát hiện 2026-10-30; tái hiện rẻ: Conv 7×7×64 → 64 với `OPENEYE_BIAS_STEP`) |
-| 33 | Dense 3136 → 10 (10 output đầu của fc1) với input thật (output Conv3, 78 % số 0): ảnh test 0 sai cả 10 output (lệch −6.372 … +5.276), ảnh 1 đúng cả 10. Không phải dịch vị trí, đổi cặp hay mất một khối input | ? | **Chưa điều tra** (phát hiện 2026-10-30) |
+| 31 | Conv với **input thật, thưa** (ảnh MNIST, 85 % pixel bằng 0; activation sau ReLU, 68 % bằng 0) nạp qua DMA **mất các tích**: phần cứng trả về đúng bias. Conv1 28×28 (2 channel do đệm #17): bias ở cả 25.088/25.088 output (6.591 sai so với numpy); Conv2 14×14×32 → 64: bias ở 12.320/12.544 (cả 12.544 sai). Cùng cấu hình với dữ liệu ngẫu nhiên thì đúng, vì `DRAMContents` thay mọi số 0 bằng ±1. Chạy cả model: bộ đệm sau max pooling đầu chứa giá trị nền (output của ảnh trắng) ở mọi vị trí. Conv3 7×7 với 73 % số 0 không mất tích | ? (đường iact thưa: mapper Python hoặc `iact_stream_constructor`/PE) | **Chưa điều tra** (phát hiện 2026-10-30 khi chạy model MNIST đã huấn luyện với ảnh test thật; tái hiện: commit `440f36d` qua `git worktree` (mục 3c)) |
+| 32 | Conv3 7×7×64 → 64: **bias của cặp filter (2k, 2k+1) bị đổi chỗ** (output = đúng + b[2k+1] − b[2k] ở filter 2k và ngược lại, ở mọi vị trí; các tích đúng). Mọi test trước đây cho mọi filter bias 1 nên không thấy; Conv1/Conv2 không đổi chỗ | ? (thứ tự bias: `psum_stream_mapper` hoặc RTL; cấu hình 7 pixel / 4 cột cluster) | **Chưa điều tra** (phát hiện 2026-10-30; tái hiện rẻ không cần model thật: Conv 7×7×64 → 64, dữ liệu ngẫu nhiên, `OPENEYE_BIAS_STEP`; hoặc tái hiện: commit `440f36d` qua `git worktree` (mục 3c)) |
+| 33 | Dense 3136 → 10 (10 output đầu của fc1 đã huấn luyện) với input thật (output Conv3, 78 % số 0): ảnh test 0 sai cả 10 output (lệch −6.372 … +5.276), ảnh 1 đúng cả 10. Không phải dịch vị trí, đổi cặp hay mất một khối input | ? | **Chưa điều tra** (phát hiện 2026-10-30; tái hiện: commit `440f36d` qua `git worktree` (mục 3c)) |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-24)
 
@@ -1326,7 +1318,6 @@ luyện: kẹp int8, ReLU (#24) (mục 8d) |
 | I | Lỗi #26 (Dense nối tiếp Dense) và #25 (`NUM_GLB_PSUM=2`) | Điều tra (Python trước) | Chặn mạng của paper và mọi model có 2 Dense; Bảng 3 chưa có cấu hình nào tính đúng hết | #26 **đã sửa** (2026-10-24, 1 dòng RTL + Python, mục 9); #25 **đã sửa** (2026-10-26, mục 9) |
 | J | Bảng 3 với activation thưa (giả lập ReLU) | Chỉ Python | Phần xử lý của fork chậm hơn paper 4–5,6 lần; xem bao nhiêu là do activation không thưa | Đề xuất |
 | K | Hàm kích hoạt (#24) + kẹp int8 trong `quantization_unit` | Sửa RTL | Cần cho model thật (mục 8d) | **Xong** (2026-10-28, #30): kẹp với cận dưới theo layer, ReLU gộp vào kẹp (mục 9) |
-| L | Luồng Python PTQ: model int8 đã huấn luyện → tham số cho phần cứng, tham chiếu int8 | Chỉ Python | Python chỉ sinh dữ liệu test; chạy model thật cần weight, bias, `mant`/`shift`, ảnh thật (mục 8d) | **Bước 1–2 xong** (2026-10-30, mục 8e): PTQ và tham chiếu đúng, nhưng RTL chưa tính đúng dữ liệu thật: lỗi mới #31, #32, #33 (+ #29) chặn chạy cả model |
 
 Thứ tự đề xuất: A, B, B2, C2 (kiến trúc MNIST chạy đủ) **đã xong**; tiếp theo là C (bias theo filter: Bảng 3 cho thấy bias chiếm khoảng 54.000–58.000 ns ở mọi
 cấu hình), rồi D (I: #25, #26 đã sửa).
@@ -1389,9 +1380,9 @@ toàn 0, +472 chu kỳ = +1,5 % Conv1, mục 9; sửa RTL vẫn là lựa chọn
 
 **Còn thiếu để chạy model int8 đã huấn luyện với kết quả đúng** (điều tra bằng bộ giả lập 2026-10-28, `doc/experiments/2026-10-28_int8_clamp.md`;
 TFLite int8 đạt 99,23 % trên 10.000 ảnh): (A) ~~kẹp int8~~ và (B) ~~ReLU~~ **đã làm 2026-10-28** (#30: kẹp với cận dưới theo layer, ReLU = cận dưới 0; giả lập: từ 9,3 %
-lên 99,21–99,25 % với activation lượng tử đối xứng, zero point 0). (C) **luồng Python lượng tử int8 (PTQ)** và (D) tham chiếu int8 **đã làm bước 1–2 ngày 2026-10-30**
-(mục 8e: `open_eye.ptq`, weight theo tensor nên không cần sửa #12, 99,23 % trên 10.000 ảnh; tham chiếu của testbench được kiểm so với mô hình int8 ở mọi layer). Còn lại:
-(E) lỗi #12 `current_filter` và (F) mantissa bị cắt 8 bit (`OpenEye_FPGA.v:1350`):
+lên 99,21–99,25 % với activation lượng tử đối xứng, zero point 0). Còn lại: (C) **luồng Python lượng tử int8 (PTQ)** cho model thật: hiệu chỉnh, weight theo channel,
+bias int32, `mant`/`shift` theo filter, `act_min`, lượng tử ảnh input, hoán vị weight Dense đầu tiên theo thứ tự làm phẳng khối 4 channel của phần cứng; (D) tham chiếu
+int8 thật (bộ giả lập bit-exact, đã khớp TFLite) thay cho `floor(mant·x/2^shift)`; (E) lỗi #12 `current_filter` và (F) mantissa bị cắt 8 bit (`OpenEye_FPGA.v:1350`):
 không ảnh hưởng độ chính xác model MNIST (−0,04 điểm) nhưng cần để khớp từng bit; (G) lỗi #29 (Dense 3136 → 64). Với lượng tử đối xứng: psum 20 bit đủ (lớn nhất
 365.571), đệm 0 đúng, không cần cộng zero point, giữ được bỏ-qua-số-0 (63–83 % activation là 0 sau ReLU). Lượng tử bất đối xứng kiểu TFLite (zp −128) thì cần thêm
 psum 32 bit, đệm viền bằng zero point (RTL) và mất bỏ-qua-số-0.
@@ -1401,75 +1392,6 @@ psum 32 bit, đệm viền bằng zero point (RTL) và mất bỏ-qua-số-0.
 Model MNIST thật (2 channel, bộ nhớ lý tưởng): **244.052 chu kỳ = 976 µs ở 250 MHz**; tính toán 62 %, nạp weight 16 %, nạp bias 10 % (40 % của Conv1), ghi ngược
 5 %, chuyển đổi 4 %, pooling 3 %; Conv2 là layer nặng nhất (121.162 chu kỳ). **Đã đưa vào profiler của repo** (2026-10-22, chỉ Python): mỗi layer có bảng
 pha riêng, case `model_*` trong `run_profile.py`, bảng theo layer trong `profile_report`. Cách dùng và số liệu: mục 6.13.
-
-### 8e. Lượng tử hoá model đã huấn luyện cho phần cứng (PTQ, bước 1–2, 2026-10-30, được bạn đồng ý, chỉ Python)
-
-Chi tiết: `doc/experiments/2026-10-30_ptq.md`. Không sửa RTL.
-
-**Trước đây:** Python đóng gói DMA **đúng định dạng** (weight 8 bit + overhead 4 bit, bias 20 bit, mục lượng tử offset 8 | shift 7 | mantissa 25, thanh ghi trạng
-thái) nhưng giá trị là **dữ liệu test**, không phải model đã lượng tử: weight Conv `floor(127·w)` không giữ scale (model MNIST có \|w\| ≤ 0,42 nên chỉ dùng ±53
-trong ±127), weight Dense ngẫu nhiên, bias 1 / c+1, input ngẫu nhiên, `mant`/`shift` hằng [1, 7] / [1, 9]. Dữ liệu không quá lớn (đều nằm trong int8); vấn đề
-là không có số nào lấy từ model. `tflite2model.quantize_scale` sinh hệ số Q31 của TFLite (31 bit): qua trường 25 bit và 8 bit RTL đọc, M của conv1 thành
-1,5·10⁻¹⁰ thay vì 0,00335, mọi output bằng 0. Upstream không có giải pháp (mục 2, kiểm tra 2026-10-30).
-
-**Phương án (từ model TFLite int8 đã huấn luyện, `doc/demo_notebooks/mnist_quantized_model.tflite`):**
-
-| | Công thức | Lý do |
-|---|---|---|
-| Ảnh vào | `x = round(p·127/255)`, scale 1/127 | zero point 0: nền là số 0 thô (bỏ qua số 0, đệm viền 0 đúng) |
-| Scale activation | `s·max(\|−128−zp\|, \|127−zp\|)/127` (output ReLU: `s·255/127`) | cùng khoảng thực, zero point 0 |
-| Weight | một scale cho cả layer: `s_w = max\|w_thực\|/127`, `w = round(w_thực/s_w)` | mọi filter cùng M: đúng từng bit dù lỗi #12 |
-| Bias | `round(b_thực/(s_in·s_w))` | đơn vị psum, vừa 20 bit (−5.862 … 3.325) |
-| Bộ lượng tử | `M = s_in·s_w/s_out`; `shift` lớn nhất với `round(M·2^shift) < 256`; offset 0; `act_min` 0 sau ReLU | mantissa 8 bit (RTL cắt), ReLU gộp (#30) |
-| Layer cuối | psum thô ra host; lớp = argmax(psum·s_w) | `PSUM_SEND_RESULTS` |
-
-Tham số của model MNIST: conv1 `mant`/`shift` 151/15, conv2 252/18, conv3 250/18, fc1 202/17, fc2 154/16; `act_min` 0, 0, 0, 0, −128.
-
-**Chọn cách lượng tử weight (10.000 ảnh test, TFLite 99,23 %):**
-
-| Cách | Độ chính xác | psum lớn nhất | Khớp từng bit với RTL hiện tại |
-|---|---:|---:|---|
-| **Theo tensor (đã chọn)** | **99,23 %** | 216.908 | có |
-| Theo channel, M riêng từng filter | 99,25 % | 352.566 | cần sửa #12 (RTL) |
-| Theo channel, mọi filter dùng M của filter 0 (phần cứng hôm nay) | 99,21 % | 454.398 | có, nhưng các filter khác sai thang đo |
-| Theo tensor + số hạng làm tròn trong bias | 99,22 % (giả lập) | | không lợi, không dùng |
-
-**Đã làm:**
-
-| File | Thay đổi |
-|---|---|
-| `src/open_eye/ptq.py` (mới) | Đọc model TFLite int8, lượng tử cho phần cứng (`quantize_tflite`, `per_channel` tuỳ chọn), kiểm tra giới hạn trường, lượng tử ảnh, `forward` (mô hình int8 tính đúng như phần cứng: conv 3×3 đệm 0, max pooling 2×2, Dense, `kẹp(floor(mant·psum/2^shift), act_min, 127)`, psum thô ở layer cuối), `predict`, `dense_input_order` (thứ tự làm phẳng khối 4 channel lấy từ chính `fill_dram_with_ref`), `TestbenchModel` (nạp DRAM và tham số layer của testbench, so tham chiếu từng layer) |
-| `test/cocotb_fpga/OpenEye_FPGA_tb.py` | Hook `OPENEYE_PTQ=<file>:<ảnh>[:<layer đầu>]`: thay weight, bias, input, `quantize`, `act_min` của các layer bằng model đã lượng tử; sau `collect_results` khẳng định tham chiếu từng layer = `ptq.forward` |
-| `test/test_ptq.py` (mới) | 17 unit test |
-| `test/cocotb_fpga/test_ptq_mnist.py` (mới) | 8 test từng layer + 2 test cả model trên RTL (ảnh test 0 và 1) |
-
-**Kiểm chứng phía Python:** `test/test_ptq.py` 17/17: tham số vừa trường; độ chính xác bằng TFLite trên cùng ảnh; psum < 2^19; đường tham chiếu của testbench
-(LayerParameters thật của model 6 layer, đệm channel, `collect_results` / `fill_dram_with_ref` / `batchnorm_output`) **bằng `forward` ở cả 6 layer**; đối chứng
-âm: weight Dense theo thứ tự NHWC thì Dense sai. Công cụ độc lập `tools/verify_conv_output.py` (numpy tính lại từ chính số nguyên phần cứng nhận) cũng cho
-tham chiếu = numpy ở Conv1/2/3. Hồi quy một phần các test RTL có sẵn sau khi sửa testbench (`test_int8_clamp.py` 9, `test_glb_psum2.py` 7, Conv1/Conv2 weight đã
-huấn luyện của `test_mnist_layers.py`): 18/18 PASS (hook không làm gì khi không đặt `OPENEYE_PTQ`).
-
-**Kết quả trên RTL (bước 2):** phần Python đúng, nhưng **phần cứng chưa tính đúng dữ liệu thật**:
-
-| Test | Kết quả | Lỗi |
-|---|---|---|
-| Conv1 trên ảnh (ảnh 0 và 1) | FAIL: phần cứng ra đúng **bias** ở cả 25.088 output (6.591 sai so với numpy) | **#31** |
-| Conv2 trên output pool1 | FAIL: bias ở 12.320/12.544 output, cả 12.544 sai | **#31** |
-| Conv3 trên output pool2 | FAIL: tích đúng, **bias cặp filter (2k, 2k+1) đổi chỗ** ở mọi output | **#32** |
-| 10 output đầu của fc1 trên output Conv3 | Ảnh 1 **PASS** (10/10 khớp từng bit); ảnh 0 FAIL cả 10 | **#33** |
-| Cả model trên chip (Conv, Pool, Conv, Pool, Conv, fc1 10 output) | FAIL ở bộ đệm sau pooling đầu: giá trị nền ở mọi vị trí (hệ quả của #31) | #31 |
-
-Các test RTL đánh `xfail(strict)` theo đúng lỗi (lần chạy cuối: 1 PASS + 9 xfail). Ba lỗi này bị che từ trước vì dữ liệu test thay mọi số 0 bằng ±1 (không có chuỗi số 0) và
-đặt bias = 1 cho mọi filter. Kiểm tra bộ đệm sau một Conv có Pooling theo sau bị testbench bỏ qua (không có bố cục cho Pooling), nên lỗi chỉ lộ ở layer sau.
-Không đo chu kỳ với dữ liệu thật, vì kết quả còn sai.
-
-**Ưu điểm của cách làm:** chỉ sửa Python, không đổi DMA hay chu kỳ; giữ được bỏ-qua-số-0 (zero point 0); psum 20 bit đủ; khớp từng bit với phần cứng
-hiện tại dù có #12 và mantissa 8 bit; tham chiếu của testbench được kiểm so với mô hình int8 ở từng layer. **Nhược điểm:** activation sau ReLU chỉ dùng 0…127
-(7 bit hiệu dụng; với MNIST không mất gì); weight theo tensor kém theo channel 0,02 điểm (cần #12 để dùng theo channel); chỉ đọc model TFLite (chưa có đường
-model Keras float + tự hiệu chỉnh); ReLU nhận qua tên tensor `Relu`; `forward` chỉ có conv 3×3 'same' bước 1, max pooling 2×2 và Dense.
-
-**Việc tiếp theo (cần bạn đồng ý):** điều tra #31 (chặn mọi model thật, ưu tiên cao nhất), #32 (tái hiện rẻ bằng `OPENEYE_BIAS_STEP`), #33, #29; sau đó chạy
-cả model trên RTL và đo chu kỳ với activation thật.
 
 ## 9. Các lỗi đã biết và các bản sửa RTL
 
@@ -2666,14 +2588,15 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
 
 ### 2026-10-30
 
-- **Kiểm tra upstream** (`git fetch upstream`, `upstream/main` = `93f0e82`): 15 commit mới (23–29/10: DAG, nới độ rộng thanh ghi cho mạng lớn, Verilator,
-  `iact_stream_constructor.v` về trước `23be043`, sửa xếp weight conv), **không commit nào về lượng tử hoá**, không có giải pháp PTQ; chưa lấy (mục 2).
-- **PTQ bước 1–2** (được bạn đồng ý, chỉ Python, mục 8e): `src/open_eye/ptq.py` lượng tử model TFLite int8 đã huấn luyện cho phần cứng (activation zero point 0,
-  weight theo tensor nên đúng từng bit dù #12, `mant` 8 bit, `act_min` 0 sau ReLU, bias đơn vị psum) và tính model int8 đúng như phần cứng: **99,23 %** trên
-  10.000 ảnh (TFLite 99,23 %). Hook testbench `OPENEYE_PTQ=<file>:<ảnh>[:<layer đầu>]` nạp model vào DRAM/tham số layer và khẳng định tham chiếu từng layer = model
-  int8. Test: `test/test_ptq.py` 17/17 (gồm đường tham chiếu của testbench trên model 6 layer và đối chứng âm thứ tự làm phẳng); unit test tổng 279 pass, 11 fail
-  có từ trước. RTL (`test/cocotb_fpga/test_ptq_mnist.py`, ảnh test 0 và 1): **phần cứng chưa tính đúng dữ liệu thật**, ba lỗi mới: **#31** Conv1/Conv2 với input thật
-  thưa mất các tích (ra đúng bias: Conv1 ở 25.088/25.088 output), **#32** Conv3 7×7×64 → 64 đổi chỗ bias của cặp filter (2k, 2k+1), **#33** Dense 3136 → 10 sai với
-  ảnh 0 (ảnh 1 đúng). Đã xác nhận bằng `tools/verify_conv_output.py` (tham chiếu = numpy, phần cứng khác). Các lỗi bị che vì dữ liệu test thay số 0 bằng ±1 và
-  bias = 1. Test RTL đánh `xfail(strict)` theo lỗi: 1 PASS + 9 xfail; hồi quy một phần test RTL có sẵn 18/18 PASS. Chưa điều tra nguyên nhân (cần bạn đồng ý).
-  `doc/experiments/2026-10-30_ptq.md`.
+- **Kiểm tra upstream** (`upstream/main` = `93f0e82`): 15 commit mới (DAG, nới độ rộng thanh ghi, Verilator, sửa xếp weight conv), không commit nào về
+  lượng tử hoá; chưa lấy (mục 2).
+- **PTQ bước 1–2 rồi gỡ bỏ.** Đã làm theo đề xuất (commit `440f36d`: `src/open_eye/ptq.py` lượng tử model TFLite đã huấn luyện cho phần cứng, hook testbench
+  `OPENEYE_PTQ`, test `test_ptq.py` và `test_ptq_mnist.py`), sau đó **revert theo yêu cầu của bạn**: model MNIST đã huấn luyện chỉ để hiểu luồng làm việc của
+  project, và hướng mong muốn là giữ thiết kế Python cũ, không dựng một đường riêng song song. `dev` trở lại đúng nội dung trước `440f36d` (trừ ghi chép dưới đây).
+  Kiểm tra lúc làm rõ: tool của OpenEye (`open_eye.model_loader.load_model`, như notebook gọi) đọc được model int8 (5 layer: conv ×3, dense ×2, **bỏ mất 2 layer
+  MaxPool**, weight int8, bias int32, zero point, hệ số Q31), nhưng Python cũ chưa nhận được đối tượng này (`LayerParameters`: `'TFLite_dense' object has no attribute
+  'kernel'`), và testcase `model_test` bị upstream tắt; luồng gốc chưa có đường từ model đã lượng tử tới RTL (chỉ đọc model để xem).
+- **Giữ ghi chép 3 lỗi phần cứng mới** tìm được khi chạy model thật trên RTL (ảnh test 0 và 1; tham chiếu đã được kiểm độc lập bằng `tools/verify_conv_output.py`):
+  **#31** Conv1/Conv2 với input thật thưa mất các tích (phần cứng ra đúng bias: Conv1 ở 25.088/25.088 output), **#32** Conv3 7×7×64 → 64 đổi chỗ bias của cặp filter
+  (2k, 2k+1), **#33** Dense 3136 → 10 sai với ảnh 0 (ảnh 1 đúng). Bị che vì dữ liệu test thay số 0 bằng ±1 và cho mọi filter bias 1. Chưa điều tra. Mục 8b,
+  cách tái hiện ở mục 3c, chi tiết `doc/experiments/2026-10-30_real_data_bugs.md`.
