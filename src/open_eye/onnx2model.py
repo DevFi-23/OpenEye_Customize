@@ -4,7 +4,12 @@ import onnx
 from onnx import numpy_helper
 import onnxruntime as ort
 import numpy as np
-from onnxruntime.quantization import quant_pre_process, quantize_dynamic, QuantType
+from onnxruntime.quantization import (quant_pre_process, quantize_dynamic, quantize_static, QuantType, QuantFormat,
+                                      CalibrationDataReader)
+
+MANT_BITS = 8       # the RTL multiplies by 8 bits of the 25-bit mantissa field (OpenEye_FPGA.v:1350)
+SHIFT_MAX = 127     # 7-bit shift field
+COMPUTE_OPS = {'ConvInteger', 'QLinearConv', 'MatMulInteger', 'QLinearMatMul', 'QGemm', 'MaxPool'}
 
 class TensorShape:
     """Helper class to allow reading shapes via .shape property, similar to TensorFlow."""
@@ -85,6 +90,48 @@ def quantize_to_int8(src_path, dest_path="simple_mnist_convnet_int8.onnx"):
     print(f"Model successfully saved as SIGNED INT8: {dest_path}")
     return dest_path
 
+def quantize_to_int8_static(src_path, calibration_data, dest_path="simple_mnist_convnet_int8.onnx"):
+    """Static quantization for the hardware, calibrated on calibration_data (float32 [N, C, H, W], preprocessed as in
+    training). Dynamic quantization keeps the activations in float, so it gives no activation scale and no
+    requantization multiplier; the hardware needs both. Activations and weights are symmetric int8 (zero point 0: the
+    hardware pads with a raw 0 and skips raw zeros), one weight scale per layer (the quantizer uses filter 0's
+    multiplier for every filter, bug #12), QOperator format (QLinearConv / QGemm carry their scales as inputs)."""
+    prep_path = "simple_mnist_processed.onnx"
+    quant_pre_process(input_model_path=src_path, output_model_path=prep_path)
+
+    class _Calibration(CalibrationDataReader):
+        def __init__(self, data):
+            self._items = iter({'input': data[i:i + 1].astype(np.float32)} for i in range(len(data)))
+
+        def get_next(self):
+            return next(self._items, None)
+
+    quantize_static(prep_path, dest_path, _Calibration(calibration_data), quant_format=QuantFormat.QOperator,
+                    activation_type=QuantType.QInt8, weight_type=QuantType.QInt8, per_channel=False,
+                    extra_options={'ActivationSymmetric': True, 'WeightSymmetric': True})
+    if os.path.exists(prep_path):
+        os.remove(prep_path)
+    print(f"Model statically quantized to SIGNED INT8 (zero point 0, per tensor): {dest_path}")
+    return dest_path
+
+def hardware_multiplier(m, mant_bits=MANT_BITS, shift_max=SHIFT_MAX):
+    """Requantization multiplier m as the quantizer's mant / 2^shift: the largest shift for which mant fits mant_bits."""
+    if not m > 0:
+        raise ValueError(f"multiplier {m} is not positive")
+    shift = 0
+    while shift < shift_max and round(m * 2 ** (shift + 1)) < (1 << mant_bits):
+        shift += 1
+    mant = int(round(m * 2 ** shift))
+    if not 0 < mant < (1 << mant_bits):
+        raise ValueError(f"multiplier {m} does not fit {mant_bits} mantissa bits and shift <= {shift_max}")
+    return mant, shift
+
+def quantize_input(pipeline, x):
+    """Float input x (preprocessed as in training) as the int8 activations of the first layer (its input scale, zero
+    point 0). Needs a statically quantized pipeline."""
+    scale = pipeline[0].input_scale
+    return np.clip(np.rint(np.asarray(x, dtype=np.float64) / scale), -128, 127).astype(np.int64)
+
 def build_graph_helpers(onnx_model):
     """Generates maps for look-ahead (ReLU fusion) and quick initializer lookups."""
     onnx_model = onnx.shape_inference.infer_shapes(onnx_model)
@@ -110,13 +157,18 @@ def get_tensor_shapes(onnx_model):
     return shapes
 
 def check_fused_relu(node, next_node_map):
-    """Looks ahead in the dataflow to check if the next layer is a ReLU."""
+    """Looks ahead in the dataflow to check if the next layer is a ReLU.
+
+    Stops at the next layer's compute node: a static graph puts DequantizeLinear between a QLinearConv and its Relu, and
+    without the stop the Relu of a following layer would be taken for this one's (e.g. a MaxPool before a conv)."""
     current_tensor = node.output[0]
     for _ in range(5):
         if current_tensor in next_node_map:
             next_node = next_node_map[current_tensor]
             if next_node.op_type == 'Relu':
                 return True
+            if next_node.op_type in COMPUTE_OPS:
+                break
             current_tensor = next_node.output[0]
         else:
             break
@@ -179,11 +231,46 @@ def process_weights_and_biases(layer_obj, node, inits, input_scale, next_node_ma
         
     return layer_obj
 
+def process_qlinear(layer_obj, node, inits):
+    """QLinearConv / QGemm of a statically quantized graph: the int8 weights, the int32 bias (scale input * weight)
+    and the input, weight and output scales are inputs of the node. Sets weights[0] (conv [kernel row][kernel column]
+    [channel][filter], the order DRAMContents reads for a Keras kernel; dense [out][in]), weights[1] (bias), the
+    scales and quantization_factor ([mant, shift] per filter of the quantizer, mant / 2^shift ~ s_in * s_w / s_out)."""
+    if node.op_type == 'QLinearConv':     # x, x_scale, x_zp, w, w_scale, w_zp, y_scale, y_zp, [B]
+        x_s, x_zp, w, w_s, w_zp, y_s, y_zp = node.input[1:8]
+        b = node.input[8] if len(node.input) > 8 else None
+    else:                                 # QGemm: A, a_scale, a_zp, B, b_scale, b_zp, C, y_scale, y_zp (transB = 1)
+        x_s, x_zp, w, w_s, w_zp, b, y_s, y_zp = node.input[1:9]
+    zero_points = [int(np.asarray(inits[z]).ravel()[0]) for z in (x_zp, w_zp, y_zp) if z in inits]
+    if any(zero_points):
+        raise ValueError(f"{node.name}: zero points {zero_points}; the hardware needs zero point 0 (symmetric)")
+    w_scale = np.asarray(inits[w_s]).ravel()
+    if w_scale.size != 1:
+        raise ValueError(f"{node.name}: one weight scale per channel; the hardware needs one per layer (bug #12)")
+    raw = inits[w].astype(np.int64)
+    layer_obj.input_scale = float(np.asarray(inits[x_s]).ravel()[0])
+    layer_obj.scale = float(w_scale[0])
+    layer_obj.output_scale = float(np.asarray(inits[y_s]).ravel()[0])
+    layer_obj.zero_point = 0
+    filters = raw.shape[0]
+    layer_obj.bias_int32 = inits[b].astype(np.int64) if b else np.zeros(filters, dtype=np.int64)
+    if layer_obj.type == 'conv2d':
+        # ONNX [filter][channel][kernel row][kernel column] -> [row][column][channel][filter]
+        layer_obj.weights[0] = np.transpose(raw, (2, 3, 1, 0))
+    else:
+        layer_obj.weights[0] = raw                      # [out][in], the input in ONNX's flatten order (NCHW)
+        layer_obj.flatten_order = 'NCHW'
+    layer_obj.weights[1] = layer_obj.bias_int32
+    mant, shift = hardware_multiplier(layer_obj.input_scale * layer_obj.scale / layer_obj.output_scale)
+    layer_obj.quantization_factor = [[mant, shift] for _ in range(filters)]
+    layer_obj.quantized = True
+    return layer_obj
+
 def build_layer_dict(idx, node, shapes, next_node_map):
     """Instantiates a new HardwareLayer object instead of a raw dictionary."""
     op_mapping = {
         'ConvInteger': 'conv2d', 'QLinearConv': 'conv2d',
-        'MatMulInteger': 'dense', 'QLinearMatMul': 'dense',
+        'MatMulInteger': 'dense', 'QLinearMatMul': 'dense', 'QGemm': 'dense',
         'MaxPool': 'pooling2d'
     }
     l_type = op_mapping[node.op_type]
@@ -204,16 +291,21 @@ def parse_pipeline(onnx_model, inits, next_node_map, shapes):
     input_scale = inits.get('input_scale', 1.0)
     
     for node in onnx_model.graph.node:
-        if node.op_type not in ['ConvInteger', 'QLinearConv', 'MatMulInteger', 'QLinearMatMul', 'MaxPool']:
+        if node.op_type not in COMPUTE_OPS:
             continue
             
         layer = build_layer_dict(len(pipeline), node, shapes, next_node_map)
         attrs = {a.name: (list(a.ints) if a.type == onnx.AttributeProto.INTS else a.i) for a in node.attribute}
         
         if layer.type in ['conv2d', 'dense']:
-            layer = process_weights_and_biases(layer, node, inits, input_scale, next_node_map)
+            if node.op_type in ('QLinearConv', 'QGemm'):        # statically quantized graph (quantize_to_int8_static)
+                layer = process_qlinear(layer, node, inits)
+                w_input = 3
+            else:
+                layer = process_weights_and_biases(layer, node, inits, input_scale, next_node_map)
+                w_input = 1
             if layer.type == 'conv2d' and layer.weights[0] is not None:
-                params = extract_conv_params(node, inits[node.input[1]], attrs)
+                params = extract_conv_params(node, inits[node.input[w_input]], attrs)
                 layer.kernel = TensorShape(params["kernel_shape"])
                 layer.kernel_size = params["kernel_shape"]
                 layer.strides = params["strides"]
@@ -225,6 +317,9 @@ def parse_pipeline(onnx_model, inits, next_node_map, shapes):
                 layer.out_features = layer.weights[0].shape[0]
                 layer.in_features = layer.weights[0].shape[1]
                 layer.filters = layer.weights[0].shape[0]
+                if not isinstance(layer.output.shape, list):
+                    # ONNX shape inference does not know com.microsoft QGemm: [batch, outputs] from the weights
+                    layer.output = TensorShape([layer.input.shape[0], layer.filters])
         elif layer.type == 'pooling2d':
             pool_kernel = attrs.get("kernel_shape", [2, 2])
             layer.kernel = TensorShape(pool_kernel)
@@ -241,10 +336,16 @@ def print_summary(pipeline):
     for l in pipeline:
         print(f"[{l.index}] Type: {l.type:<15} | In: {str(l.input.shape):<22} | Out: {str(l.output.shape):<22} | Fused ReLU: {str(l.has_relu)}")
 
-def get_model(torch_model):
-    """Main Orchestrator: Controls export, quantization, parsing, and verification."""
+def get_model(torch_model, calibration_data=None):
+    """Main Orchestrator: Controls export, quantization, parsing, and verification.
+
+    calibration_data (float32 [N, C, H, W], preprocessed as in training): quantize statically for the hardware
+    (quantize_to_int8_static); without it the weights only are quantized (dynamic), as before."""
     fp32_path = export_to_onnx(torch_model)
-    int8_path = quantize_to_int8(fp32_path)
+    if calibration_data is None:
+        int8_path = quantize_to_int8(fp32_path)
+    else:
+        int8_path = quantize_to_int8_static(fp32_path, calibration_data)
     
     loaded_model = onnx.load(int8_path)
     onnx_model, inits, next_node_map = build_graph_helpers(loaded_model)
@@ -254,7 +355,9 @@ def get_model(torch_model):
     print_summary(pipeline)
     
     for layer_number in range(len(pipeline)):
-        pipeline[layer_number].name = pipeline[layer_number].type
+        # LayerParameters picks the layer type, and max or average pooling ("max" in the name), from the name
+        pipeline[layer_number].name = {'MaxPool': 'max_pooling2d', 'AveragePool': 'average_pooling2d'}.get(
+            pipeline[layer_number].onnx_op, pipeline[layer_number].type)
     
     # =========================================================================
     # STABLE HARDWARE REFERENCE GENERATOR (Via Graph Modification)

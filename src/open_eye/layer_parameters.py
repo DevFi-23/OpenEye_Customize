@@ -35,9 +35,10 @@ def activation_min(layer):
 
     A ReLU right after a Conv/Dense needs no activation hardware: the quantizer clamps its output to
     [act_min, 127] anyway, and with zero point 0 the quantized ReLU is max(q, 0). Recognised: a Keras layer
-    with activation='relu' and an imported layer (tflite2model / onnx2model / pytorch2model) with relu=True.
+    with activation='relu', an imported layer of tflite2model / pytorch2model with relu=True and one of onnx2model
+    with has_relu=True.
     """
-    if getattr(layer, "relu", False) is True:
+    if getattr(layer, "relu", False) is True or getattr(layer, "has_relu", False) is True:
         return 0
     activation = getattr(layer, "activation", None)
     return 0 if getattr(activation, "__name__", "") == "relu" else -128

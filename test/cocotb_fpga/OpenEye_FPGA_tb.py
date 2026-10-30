@@ -214,7 +214,16 @@ async def single_layer_test(dut):
         sys.path.append(str(target_dir))
         from mnist_conv_net import SimpleMNISTConvNet, load_simple_mnist_model
         model = SimpleMNISTConvNet()
-        model = o2m.get_model(model)
+        calibration = None
+        if os.environ.get("OPENEYE_MODEL_WEIGHTS"):
+            # A trained checkpoint (e.g. doc/demo_notebooks/mnist_unquantized_model.pth): onnx2model quantizes it
+            # statically for the hardware, calibrated on MNIST training images preprocessed as in training.
+            load_simple_mnist_model(os.environ["OPENEYE_MODEL_WEIGHTS"], model)
+            calibration, _ = data_create.mnist_images(
+                "train", range(int(os.environ.get("OPENEYE_CALIBRATION_IMAGES", "200"))))
+            logger.info("OPENEYE_MODEL_WEIGHTS: %s, static quantization calibrated on %d training images",
+                        os.environ["OPENEYE_MODEL_WEIGHTS"], len(calibration))
+        model = o2m.get_model(model, calibration)
         trunc_model = truncate_model(model)
     if os.environ.get("OPENEYE_EXPECT_LAYERS"):
         expected_layers = int(os.environ["OPENEYE_EXPECT_LAYERS"])
@@ -453,6 +462,13 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
         tflite_path, tensor_name = os.environ["OPENEYE_TFLITE_CONV"].split(":", 1)
         zeros = dram.load_conv_weights_tflite(0, tflite_path, tensor_name)
         logger.info("OPENEYE_TFLITE_CONV: layer-0 weights from %s (%d zero weights)", tensor_name, zeros)
+    if os.environ.get("OPENEYE_INPUT_IMAGE"):
+        # MNIST test image <index> as the model's input: preprocessed as in training and quantized with the model's
+        # input scale (onnx2model static quantization, zero point 0), fmap[0][0][row][column]
+        image, label = data_create.mnist_images("test", [int(os.environ["OPENEYE_INPUT_IMAGE"])])
+        dram.fmap[0][0] = o2m.quantize_input(model, image[0, 0]).tolist()
+        logger.info("OPENEYE_INPUT_IMAGE: MNIST test image %s (label %d), input scale %g",
+                    os.environ["OPENEYE_INPUT_IMAGE"], int(label[0]), model[0].input_scale)
     # After the debug hooks above, which fill every channel
     channel_pad.fill_padding_channels(model, dram)
     # OPENEYE_KEEP_GOING: a failed iact buffer check between chained layers is
@@ -519,6 +535,10 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
                                                 dram.fmap[1 + layer_number][f])
                             # Check both decoded values and the complete DMA stream.
                             dram_ok = tum.compare_dram_with_ref(layer_parameters[layer_number], calculated_results, dram.fmap[1 + layer_number])
+                            if os.environ.get("OPENEYE_INPUT_IMAGE") and "Dense" in str(layer_parameters[layer_number].layer_name):
+                                outputs = [int(dram.fmap[1 + layer_number][f]) for f in range(layer_parameters[layer_number].filters)]
+                                logger.info("OPENEYE_INPUT_IMAGE: DUT class %d (raw outputs %s)",
+                                            max(range(len(outputs)), key=outputs.__getitem__), outputs)
                             file_ok = True
                             if(logging.DEBUG >= log_level):
                                 file_ok = gtu.check_results(openeye_parameter, 'demo/layer_' + str(layer_number) + '_' + str(layer_repetition) + '/dma_stream_ref.txt',\

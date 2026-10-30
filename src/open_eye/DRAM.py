@@ -211,13 +211,24 @@ class DRAMContents(object):
                     for f in range(layer_parameters[l].filters):
                         for y in range(layer_parameters[l].kernel_size[1]):
                             for x in range(layer_parameters[l].kernel_size[0]):
-                                # Quantize weight to INT8
-                                self.weights[l][c][f][y][x] = int(math.floor(float(127*model[l].weights[0][x][y][c][f])))
+                                if getattr(model[l], "quantized", False):
+                                    # Already int8 (onnx2model, static quantization): taken as it is
+                                    self.weights[l][c][f][y][x] = int(model[l].weights[0][x][y][c][f])
+                                else:
+                                    # Quantize weight to INT8
+                                    self.weights[l][c][f][y][x] = int(math.floor(float(127*model[l].weights[0][x][y][c][f])))
                                 # Apply sparsity pattern if requested: zero out elements where sum of indices is even
                                 if (sparse_wghts & (((c+f+x+y) % 2) == 0)):
                                     self.weights[l][c][f][y][x] = 0
                                 # Zero weights stay zero: the conv weight encoding handles them
                                 # (bug #22); replacing them by +-1 hid the bug in every test.
+            elif "Dense" in str(layer_parameters[l].layer_name) and getattr(model[l], "quantized", False):
+                # Already int8 [out][in] (onnx2model, static quantization), the input in the model's flatten order;
+                # the hardware holds the input of a Dense layer after a Conv/Pooling layer in its own order
+                order = self.dense_input_order(layer_parameters, l, model[l])
+                w = np.asarray(model[l].weights[0])
+                self.weights[l] = [[int(w[x][order[c]]) for c in range(layer_parameters[l].iact_size_x)]
+                                   for x in range(layer_parameters[l].filters)]
             elif "Dense" in str(layer_parameters[l].layer_name):
                 # Load Dense (fully connected) layer weights
                 # Note: Uses random weights instead of model weights
@@ -250,12 +261,16 @@ class DRAMContents(object):
                 # Load Conv2D biases: one bias per output filter
                 for x in range(layer_parameters[l].filters):
                     self.bias[l][x] = int(math.floor(float(model[l].weights[1][x])))
-                    self.bias[l][x] = 1
+                    if not getattr(model[l], "quantized", False):
+                        self.bias[l][x] = 1     # test pattern; a quantized model keeps its int32 bias
                     # Alternative: self.bias[l][x] = x * (-1)  # Uncomment for test pattern
             elif "Dense" in str(layer_parameters[l].layer_name):
                 # Load Dense layer biases: one bias per output feature
                 # Note: Uses sequential test values (c+1) instead of model biases
                 for c in range(layer_parameters[l].filters):
+                    if getattr(model[l], "quantized", False):
+                        self.bias[l][c] = int(model[l].weights[1][c])     # the model's int32 bias
+                        continue
                     # Alternative: self.bias[l][c] = int(math.floor(float(model[l].weights[1][c])))
                     self.bias[l][c] = int(c + 1)  # Test pattern: 1, 2, 3, ...
 
@@ -287,6 +302,28 @@ class DRAMContents(object):
                 self.fmap[0][c] = np.random.randint(-16, 15)
                 if (self.fmap[0][c] == 0):
                     self.fmap[0][c] = int(np.random.choice([-1, 1]))
+
+    @staticmethod
+    def dense_input_order(layer_parameters, l, layer):
+        """For every position of Dense layer l's input in the hardware, the index into the model's flattened input.
+
+        After a Conv or Pooling layer the hardware holds the Dense input in blocks of 4 channels (the order of
+        test_utils_main.fill_dram_with_ref, which the reference uses and the RTL write-back produces); the model
+        flattens in its own order (onnx2model: NCHW, channel * H * W + row * W + column). A Dense layer fed by the
+        DMA or by a Dense layer takes its input in the model's order.
+        """
+        size = layer_parameters[l].iact_size_x
+        if l == 0 or "Dense" in str(layer_parameters[l - 1].layer_name):
+            return list(range(size))
+        if getattr(layer, "flatten_order", None) != "NCHW":
+            raise ValueError("Dense layer %d: unknown flatten order of the model's input" % l)
+        from open_eye import test_utils_main as tum
+        _, rows, cols, channels = layer_parameters[l - 1].output_shape
+        index = [[[(f * rows + r) * cols + c for c in range(cols)] for r in range(rows)] for f in range(channels)]
+        order = tum.fill_dram_with_ref(index, [None] * size, layer_parameters[l - 1], layer_parameters[l])
+        if sorted(order) != list(range(size)):
+            raise ValueError("Dense layer %d: the hardware input order is not a permutation" % l)
+        return order
 
     def load_conv_weights_tflite(self, layer, path, tensor_name):
         """Replace the weights of conv layer `layer` by an int8 tensor of a TFLite model.

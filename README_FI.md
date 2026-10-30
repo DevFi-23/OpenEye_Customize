@@ -172,9 +172,9 @@ Một test cocotb là một tiến trình; máy 12 nhân / 7 GB RAM chạy song 
 venv/bin/python -m pytest -q test/test_*.py
 ```
 
-Hiện tại: **262 pass, 11 fail** (129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
+Hiện tại: **268 pass, 11 fail** (129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8 + 6 test đường model thật so với ONNX Runtime). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
 thay đổi của fork. Các file của fork: `test_profile_report.py`, `test_profile_phases.py`, `test_channel_pad.py`, `test_conv_wght_encoding.py`, `test_paper_table3.py`,
-`test_memory_model.py`, `test_fc_writeback.py`, `test_conv_writeback.py`, `test_int8_clamp.py`.
+`test_memory_model.py`, `test_fc_writeback.py`, `test_conv_writeback.py`, `test_int8_clamp.py`, `test_onnx_model_flow.py` (cần `torch`, `onnxruntime`, file `.pth` đã huấn luyện).
 
 ### Test mô phỏng RTL (cocotb qua pytest)
 
@@ -194,6 +194,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ../../venv/bin/python -m pytest -q -p no:cachep
 | `test_dense_chain.py` | (cả file) | 11 chuỗi Dense → Dense trên chip (lỗi #26): K 16–1568, N 8–64, MLP, `CLUSTER_ROWS` 1/2/4, `NUM_GLB_IACT` 3, `NUM_GLB_PSUM` 2 | 20 s – 1,5 phút | 11 PASS |
 | `test_glb_psum2.py` | (cả file) | 7 mô hình nối layer với `NUM_GLB_PSUM=2` (lỗi #25): Conv đơn, Conv → Conv (4/16 channel, hàng 14 pixel), Conv → Pool → Conv (rộng 8, 6), Conv → Pool → Conv → Pool → Conv | 15–50 s | 7 PASS |
 | `test_int8_clamp.py` | (cả file) | 9 mô hình kiểm kẹp int8 và ReLU gộp (#30): tràn (`OPENEYE_QUANT_SHIFT`), ReLU (hậu tố `_RELU`), cả hai; Conv → Conv, Conv → Pool → Conv, chuỗi Dense, MLP, `NUM_GLB_PSUM=2`, mạng paper có ReLU | 15 s – 3 phút | 9 PASS |
+| `test_real_model.py` | (cả file) | Model PyTorch MNIST đã huấn luyện đi trọn đường toolchain (`onnx2model` lượng tử tĩnh → `LayerParameters` → `DRAMContents` → RTL), ảnh test 0 và 1 (mục 8d) | ~11 phút | 2 xfail (#32, #35: Conv1/Pool1, Conv2/Pool2 khớp từng bit, Conv3 sai) |
 | `test/cocotb_quantization/test_quantization_unit.py` | (cả file) | Testbench riêng của `quantization_unit` (12.188 output mỗi test so với mô hình Python, psum 20 và 32 bit) | ~2 s | 2 PASS |
 | `test_gemm_layer.py` | (cả file) | 63 test GEMM/Dense | vài phút | 40 PASS, 23 FAIL do bộ kiểm tra ghi FC "live" (#5, báo động giả); với `OPENEYE_SKIP_FC_WRITE_CHECK=1`: 63 PASS (đo 2026-10-19) |
 
@@ -244,6 +245,9 @@ Chi tiết: mục 6 (profiler), 6.13 (model nhiều layer), 6.14 (Bảng 3).
 | `OPENEYE_DUMP_VERIFY=1` | Ghi `verify_layer0.pkl` cho `tools/verify_conv_output.py` | tắt |
 | `OPENEYE_PAD_CHANNELS=0` | Tắt đệm channel của lỗi #17 | bật |
 | `OPENEYE_TFLITE_CONV=<file>:<tensor>` | Weight Conv layer 0 lấy từ model TFLite int8 | tắt |
+| `USE_RANDOM_VALUES=0` | Đường model thật của toolchain: `models/mnist_conv_net.SimpleMNISTConvNet` (PyTorch) → `onnx2model` → `LayerParameters` → `DRAMContents` | 1 (model Keras ngẫu nhiên của `data_create`) |
+| `OPENEYE_MODEL_WEIGHTS=<file .pth>` | Với `USE_RANDOM_VALUES=0`: nạp trọng số đã huấn luyện và lượng tử tĩnh cho phần cứng (zero point 0, một scale weight mỗi layer); `OPENEYE_CALIBRATION_IMAGES=<n>` ảnh train để hiệu chỉnh | tắt (model chưa huấn luyện, lượng tử động); 200 |
+| `OPENEYE_INPUT_IMAGE=<i>` | Input layer 0 = ảnh test MNIST i, chuẩn hoá như lúc huấn luyện, lượng tử bằng scale input của model; log lớp mà DUT dự đoán | tắt (input ngẫu nhiên) |
 | `OPENEYE_KEEP_GOING=1` | Kiểm tra bộ đệm iact giữa các layer sai thì ghi log và chạy tiếp (test vẫn FAIL ở cuối); dùng để đo mọi layer | tắt (case Bảng 3 tự bật) |
 | `OPENEYE_FAIL_ON_STALL=<N>` | Dừng khi FSM không tiến triển N chu kỳ | 100000 (case model: 400000) |
 | `OPENEYE_EXPECT_LAYERS=<N>` | Model phải có đúng N layer | tuỳ test |
@@ -310,6 +314,7 @@ OpenEye_orig/
 │   │   ├── test_dense_chain.py ★ 11 chuỗi Dense → Dense trên chip (ghi ngược FC, lỗi #26), MLP, nhiều cấu hình
 │   │   ├── test_glb_psum2.py  ★  7 mô hình nối layer với NUM_GLB_PSUM=2 (ghi ngược Conv, lỗi #25)
 │   │   ├── test_int8_clamp.py ★  9 mô hình kiểm kẹp int8 và ReLU gộp (#30)
+│   │   ├── test_real_model.py ★  Model PyTorch MNIST đã huấn luyện qua đường toolchain trên RTL (2 xfail: #32, #35)
 │   │   └── regmap.yaml           Định nghĩa các thanh ghi cấu hình gửi qua DMA (nguồn của dma_storage.v)
 │   ├── cocotb_parallel/          Test của OpenEye_Parallel (SERIAL=0), đã cũ (mục 5.7)
 │   ├── test_memory_model.py   ★  16 unit test của mô hình bộ nhớ
@@ -321,6 +326,7 @@ OpenEye_orig/
 │   ├── test_fc_writeback.py   ★  Mô hình chu kỳ của pha ghi ngược FC (lỗi #26): 110 test
 │   ├── test_conv_writeback.py ★  Mô hình chu kỳ của pha ghi ngược Conv với 2/4 lane (lỗi #25): 12 test
 │   ├── test_int8_clamp.py     ★  Unit test kẹp int8 / ReLU phía Python (#30): 11 test
+│   ├── test_onnx_model_flow.py ★ Đường model thật của toolchain so với ONNX Runtime từng layer, không RTL: 6 test
 │   ├── cocotb_quantization/   ★  Testbench riêng của quantization_unit (kẹp int8, #30)
 │   └── .temp/                 ☆  Thư mục chạy của từng test (log, header sinh ra, profile.json)
 ├── tools/                     ★  Công cụ của dự án riêng
@@ -1236,7 +1242,7 @@ dài 96 thay vì 192 chu kỳ.
 | Giai đoạn | Nội dung | Trạng thái |
 |---|---|---|
 | 0. Đo lường | Profiler, báo cáo, so sánh, baseline 12 case, mô hình bộ nhớ, mốc phần cứng Vivado, kiểm tra độc lập từng word, đo theo từng layer, Bảng 3 của paper | **Xong** (2026-10-24); còn: hiệu chỉnh mô hình bộ nhớ theo board |
-| 0b. Sửa lỗi tính đúng (phát sinh) | Lỗi làm phần cứng/mô phỏng tính sai | **Đã sửa:** #3, #13, #6, #7 (`NUM_GLB_IACT=3`), #14, #18, #19, #22, #25, #26, #30 (kẹp int8, ReLU gộp); #17 có workaround Python; #5 là báo động giả của testbench. **Còn mở:** #9, #12, #18b, #19b, #21, #23, #27, #28, #29, #31 (đã điều tra, gồm cả #33: lượt rỗng làm mất các lượt sau), #32 (lộ ra với dữ liệu MNIST thật, 2026-10-30), 3 channel (#7), không có hàm kích hoạt (#24) |
+| 0b. Sửa lỗi tính đúng (phát sinh) | Lỗi làm phần cứng/mô phỏng tính sai | **Đã sửa:** #3, #13, #6, #7 (`NUM_GLB_IACT=3`), #14, #18, #19, #22, #25, #26, #30 (kẹp int8, ReLU gộp), #34 (MaxPool của `onnx2model` thành average, Python); #17 có workaround Python; #5 là báo động giả của testbench. **Còn mở:** #9, #12, #18b, #19b, #21, #23, #27, #28, #29, #31 (đã điều tra, gồm cả #33: lượt rỗng làm mất các lượt sau), #32 (lộ ra với dữ liệu MNIST thật, 2026-10-30; xác nhận lại với model PyTorch thật), #35 (Conv3 cột cuối khi ghi ngược), 3 channel (#7), không có hàm kích hoạt (#24) |
 | 1. Giảm lưu lượng DMA | Bias theo filter, đóng gói weight, bảng quant theo F hoặc lưu BRAM, readout INT8 | Chưa làm. Đề xuất bắt đầu với bias |
 | 2. Che độ trễ | Double-buffering (`BRANCHES=2`): nạp lượt sau trong lúc lượt hiện tại tính toán | Chưa làm (cần sửa lỗi chọn nửa buffer iact trước) |
 | 3. Mô hình và DSE | Mô hình Python dự đoán chu kỳ và byte, roofline, quét cấu hình | Chưa làm |
@@ -1297,6 +1303,8 @@ dài 96 thay vì 192 chu kỳ.
 | 31 | Conv/Dense **mất mọi lượt tính từ một lượt rỗng trở đi**: lượt mà không PE nào có activation khác 0 (Conv 3×3: cửa sổ 3 hàng input toàn 0 trên phần hàng một lượt phủ; Dense: một khối K input của lượt toàn 0) và mọi lượt sau không được tính, output giữ bias (+ các lượt trước); layer vẫn chạy hết, không treo. Ảnh MNIST thật: Conv1 ra bias ở cả 25.088 output (hàng trên của ảnh trống), Conv2 ở 12.320/12.544. Dữ liệu test ngẫu nhiên không có số 0 (`DRAMContents` thay 0 bằng ±1) nên không lộ | RTL điều khiển: PE chỉ bắt đầu lượt khi có activation khác 0 (`PE.v:1135`); `OpenEye_FPGA.v` đếm lượt (Process 2) và khởi động lượt converter/weight kế tiếp (Process 5) khi bus iact ready của mảng PE rời trạng thái toàn 1, việc chỉ xảy ra khi có PE bắt đầu tính | **Đã điều tra** (2026-10-30, không sửa RTL; mục 9; **upstream `93f0e82` cũng bị**, đã chạy thử): hướng sửa A (PE rỗng vẫn đi trọn giao thức một lượt) hoặc B (đếm lượt theo sự kiện tường minh), cần bạn đồng ý; giả lập chỉ một xung ready là chưa đủ |
 | 32 | Conv3 7×7×64 → 64: **bias của cặp filter (2k, 2k+1) bị đổi chỗ** (output = đúng + b[2k+1] − b[2k] ở filter 2k và ngược lại, ở mọi vị trí; các tích đúng). Mọi test trước đây cho mọi filter bias 1 nên không thấy; Conv1/Conv2 không đổi chỗ | ? (thứ tự bias: `psum_stream_mapper` hoặc RTL; cấu hình 7 pixel / 4 cột cluster) | **Chưa điều tra** (phát hiện 2026-10-30; tái hiện rẻ không cần model thật: Conv 7×7×64 → 64, dữ liệu ngẫu nhiên, `OPENEYE_BIAS_STEP`; hoặc tái hiện: commit `440f36d` qua `git worktree` (mục 3c)) |
 | 33 | Dense 3136 → 10 (10 output đầu của fc1 đã huấn luyện) với input thật: ảnh test 0 sai cả 10 output, ảnh 1 đúng | **Cùng nguyên nhân #31**: kết quả của ảnh 0 bằng đúng bias + tích của input 0…2653; input 2654 mở đầu chuỗi 109 số 0 (một lượt rỗng); chuỗi 0 dài nhất của ảnh 1 là 75 | **Đã điều tra** (2026-10-30): gộp vào #31 |
+| 34 | Đường model thật (`USE_RANDOM_VALUES=0`): layer MaxPool của `onnx2model` bị cấu hình thành **average pooling** (`pooling_mode` 1, giới hạn vòng lặp 8/16 thay vì 112): `onnx2model.get_model` đặt tên mọi layer bằng loại (`pooling2d`), còn `LayerParameters.write_pooling_layer` chọn max khi tên chứa `max`. RTL sai từ bộ đệm sau pooling đầu (784/784 word). Upstream có cùng code | Python (`onnx2model`) | **Đã sửa** (2026-10-30, chỉ Python): layer MaxPool tên `max_pooling2d`; xác nhận trên RTL (đổi tên bằng probe → qua kiểm tra sau pool1, pool2). Mục 8d |
+| 35 | Conv3 7×7×64 → 64 của model thật khi **ghi ngược** cho Dense: cột cuối (x = 6) của hàng 7 pixel sai (nhỏ hơn) ở 3/16 word sai đã ghi; 13/16 còn lại do #32. Conv3 chạy đơn (đọc thẳng ra) với dữ liệu ngẫu nhiên thì mọi giá trị đúng | ? (có thể họ #9, hàng 7 pixel) | **Chưa điều tra** (phát hiện 2026-10-30) |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-24)
 
@@ -1397,6 +1405,21 @@ pooling để cấu hình pooling trên RTL, cờ ReLU, weight int8, bias int32)
 (253), bias Dense = c+1 (260), weight Dense ngẫu nhiên (228), input ngẫu nhiên (273); `quantize` lấy mặc định [1, 7]/[1, 9]; `act_min` bỏ qua `has_relu`
 (`activation_min` chỉ đọc `relu`/`activation`); `quantize_dynamic` không cho scale activation nên không suy ra được `mant`/`shift`. Chạy RTL theo đường này (MNIST_REAL,
 QUANT_AMOUNT 64): FAIL ở bộ đệm sau pooling đầu, 784/784 word sai (DUT 0/−128, tham chiếu giá trị nhỏ); chưa điều tra (đường này không có test nào).
+
+**Đường model thật chở được model đã huấn luyện (2026-10-30, được bạn đồng ý, chỉ Python; `doc/experiments/2026-10-30_onnx_model_flow.md`):**
+
+| File | Sửa |
+|---|---|
+| `onnx2model.py` | `get_model(model, calibration_data)`: có dữ liệu hiệu chỉnh thì **lượng tử tĩnh** (ONNX Runtime `quantize_static`, int8 zero point 0 cho cả activation lẫn weight, một scale weight mỗi layer); không có thì vẫn lượng tử động như cũ. Đọc `QLinearConv`/`QGemm` (Linear thành `QGemm`): weight int8, bias int32, scale input/weight/output, `quantization_factor` = `[mant, shift]` từ `M = s_in·s_w/s_out` (mantissa 8 bit), cờ `quantized`. Layer MaxPool tên `max_pooling2d` (sửa #34). Dò ReLU dừng ở node tính kế tiếp. Kích thước output của `QGemm` lấy từ weight |
+| `layer_parameters.py` | `activation_min` đọc thêm `has_relu` (tên cờ ReLU của `onnx2model`; upstream không đọc cờ này ở đâu, và upstream không có kẹp ReLU) |
+| `DRAM.py` | Layer `quantized`: weight và bias của model giữ nguyên (không ×127, không bias 1); weight Dense hoán vị theo thứ tự input Dense của phần cứng (`dense_input_order`, lấy từ `fill_dram_with_ref`) so với thứ tự làm phẳng NCHW của model. Đường ngẫu nhiên giữ nguyên |
+| `data_create.py` | `mnist_images`: ảnh MNIST chuẩn hoá như lúc huấn luyện (`(pixel/255 − 0,1307)/0,3081`) |
+| Testbench | `OPENEYE_MODEL_WEIGHTS` (nạp `.pth`, lượng tử tĩnh), `OPENEYE_INPUT_IMAGE` (ảnh test thật), log lớp DUT dự đoán |
+
+Kiểm chứng toolchain không cần RTL (`test/test_onnx_model_flow.py`, 6/6): tham chiếu của testbench so với ONNX Runtime chạy cùng model int8, từng layer: chỉ khác
+do làm tròn (Conv1/Pool1 lệch ≤ 1; Conv2…Conv3 lệch ≤ 3, ≥ 98 % lệch ≤ 1), lớp dự đoán trùng ORT và nhãn; trên 100 ảnh test đầu, tham chiếu đúng 100 % và trùng lớp với ORT int8 100 %. Trên RTL (`test_real_model.py`, ảnh 0 và 1):
+Conv1 + ReLU + Pool1 và Conv2 + ReLU + Pool2 **khớp từng bit**; Conv3 sai (112/392 và 138/392 word đúng): 13/16 word sai đã ghi giải thích được bằng #32 (bias cặp
+filter đổi chỗ), 3/16 ở cột cuối của hàng 7 pixel (lỗi mới #35); test đánh `xfail(strict)`. Dense của model này là 3136 → 10 nên không vướng #29.
 
 **Đo pha khi chạy nhiều layer (phân tích ngày 2026-10-22, đã làm xong cùng ngày):** khi đó profiler cộng dồn mọi layer, và với layer trung gian thì tính toán diễn ra trong trạng thái 11 nên bị ghi là `writeback`
 (`compute = 0`). Bản thử `probe_model.py` tách theo từng lần vào `GET_PARAMETERS` và tách trạng thái 10/11 theo FSM psum (1–3 = tính toán, 4/6 = ghi ngược).
@@ -2670,3 +2693,11 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   hỏi của bạn, không sửa gì: Makefile không ghi đè bias/weight; cấu trúc model thật đi qua toolchain được (6 layer, pooling cấu hình cho RTL) nhưng dữ liệu bị thay ở
   Python (weight ×127, bias 1 / c+1, Dense và input ngẫu nhiên, `quantize` mặc định, ReLU bị bỏ qua) và model không được nạp trọng số đã huấn luyện; RTL theo đường
   này FAIL sau pooling đầu (chưa điều tra). Lỗi `LayerParameters` với `tflite2model` là thiếu thuộc tính `kernel` (đường TFLite không nối với toolchain). Mục 8d.
+- **Đường model thật của toolchain chở được model đã huấn luyện** (được bạn đồng ý, chỉ Python, mục 8d, `doc/experiments/2026-10-30_onnx_model_flow.md`):
+  `has_relu` không được đọc vì `activation_min` (#30) chỉ biết tên `relu`/`activation`; upstream không đọc cờ này ở đâu và cũng không có kẹp ReLU. Điều tra lỗi RTL sau
+  pooling của đường này: **lỗi mới #34** (Python, đã sửa): `onnx2model` đặt tên layer MaxPool là `pooling2d` nên `LayerParameters` cấu hình thành average pooling;
+  xác nhận trên RTL. Sửa trong file của toolchain: `onnx2model` lượng tử tĩnh (zero point 0, một scale mỗi layer, `QLinearConv`/`QGemm`, `mant`/`shift` 8 bit), tên
+  MaxPool; `activation_min` đọc `has_relu`; `DRAMContents` giữ nguyên weight/bias int8 của model và hoán vị weight Dense; testbench nạp `.pth` đã huấn luyện và ảnh
+  test thật (`OPENEYE_MODEL_WEIGHTS`, `OPENEYE_INPUT_IMAGE`). Kiểm chứng: `test/test_onnx_model_flow.py` 6/6 (tham chiếu = ONNX Runtime trừ làm tròn, lớp đúng);
+  unit test 268 pass, 11 fail có từ trước. RTL với model thật: Conv1/Pool1/Conv2/Pool2 khớp từng bit, Conv3 sai do #32 (13/16 word) và **lỗi mới #35** (cột cuối hàng
+  7 pixel khi ghi ngược, 3/16 word); `test/cocotb_fpga/test_real_model.py` 2 xfail.

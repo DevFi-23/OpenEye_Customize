@@ -13,6 +13,20 @@ import tensorflow as tf
 
 logger = logging.getLogger("cocotb")
 
+# Input transform the PyTorch MNIST model was trained with (doc/demo_notebooks/mnist_pytorch.ipynb:
+# transforms.Normalize((0.1307,), (0.3081,)) after ToTensor, i.e. pixel / 255)
+MNIST_MEAN, MNIST_STD = 0.1307, 0.3081
+
+
+def mnist_images(split, indices):
+    """MNIST images preprocessed as the PyTorch model of models/mnist_conv_net.py was trained: (pixel / 255 - mean) / std,
+    float32 [N, 1, 28, 28] (NCHW), and their labels. split: "train" or "test" (tf.keras.datasets cache)."""
+    import numpy as np
+    (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
+    x, y = (x_train, y_train) if split == "train" else (x_test, y_test)
+    idx = list(indices)
+    return ((x[idx].astype(np.float32) / 255.0 - MNIST_MEAN) / MNIST_STD)[:, None], y[idx]
+
 def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, inputsize_y, strides, channels, outputsize):
     """Create a TensorFlow/Keras neural network layer based on the specified configuration.
 
