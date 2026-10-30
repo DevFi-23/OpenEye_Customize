@@ -749,6 +749,8 @@ module PE #(
   // CALCULATING:       Active computation using MAC operations
   // WAIT_TO_SEND_PSUM: Waiting for external ready signal to send partial sums out
   // SEND_PSUM:         Streaming partial sum results to next stage
+  // EMPTY_PASS:        A pass without a non-zero activation (or weight word):
+  //                    no product, but the pass handshake of a computing PE
   localparam [$clog2(16)-1:0] IDLE              = 0;
   localparam [$clog2(16)-1:0] LOADING_1         = 1;
   localparam [$clog2(16)-1:0] LOADING_2         = 2;
@@ -758,6 +760,29 @@ module PE #(
   localparam [$clog2(16)-1:0] CALCULATING       = 6;
   localparam [$clog2(16)-1:0] WAIT_TO_SEND_PSUM = 7;
   localparam [$clog2(16)-1:0] SEND_PSUM         = 8;
+  localparam [$clog2(16)-1:0] EMPTY_PASS        = 9;
+  localparam [4:0]            EMPTY_PASS_HOLD   = 5'd16;
+
+  // An empty pass must look like a computing one to everything outside the PE
+  // (bug #31). OpenEye_FPGA counts a pass and starts the converter and weight
+  // send of the next pass when the PE array's iact ready bus leaves all-ones,
+  // i.e. when PEs leave IDLE. A PE without a non-zero activation used to stay
+  // in IDLE; when no PE of a pass had one, nothing left IDLE, the next pass
+  // was never loaded and every later pass of the layer kept only the bias.
+  // An empty PE now leaves IDLE on the same compute trigger (iact/wght ready
+  // low, the pass is counted) and keeps its iact/wght ready low for
+  // EMPTY_PASS_HOLD clocks or until the psum FSM reads the pass out
+  // (psum_enable_i), whichever comes first. The next pass's data must not
+  // arrive while the psum FSM is still in WAIT_TO_SEND_READY_SIGNAL
+  // (psum_transmitted high; it leaves after 16 clocks without transfer,
+  // psum_pipeline.v): when that transfer ended, OpenEye_Parallel sent a second
+  // compute pulse one pass early (Dense with a zero block: a PE started on 4 of
+  // its 12 words and hung). A computing PE holds the ready that long anyway;
+  // holding it until the read-out instead delayed every pass in which PEs
+  // beyond the line end were empty (+4 % cycles on the MNIST model). The
+  // empty PE is ready for psums at once (psum_select = 1) and reads out like
+  // an IDLE PE: SEND_PSUM with no product stored passes the incoming psum on.
+  // doc/experiments/2026-10-30_bug31_fix.md.
 
   // ============================================================================
   // Combinational Logic Assignments
@@ -996,6 +1021,7 @@ module PE #(
     reg  [   WGHT_DATA_ADDR_BITWIDTH-1:0] wght_data_start_pre;   // Pre-computed start for next range
     reg                                   wght_start_set;        // Flag: start address has been set
     reg                                   wght_end_set;          // Flag: end address has been set
+    reg  [                         4 : 0] empty_pass_hold;       // EMPTY_PASS: clocks left with ready low
 
     // ============================================================================
     // SPARSE FSM (SPARSITY_EN=1)
@@ -1007,6 +1033,7 @@ module PE #(
     always @(posedge clk_i, negedge rst_ni) begin
       if (!rst_ni) begin
         current_state_computing <= IDLE;
+        empty_pass_hold         <= 0;
         iact_addr_SPad_addr     <= 0;
         iact_addr_SPad_en_r     <= 0;
         iact_addr_current       <= 0;
@@ -1145,6 +1172,41 @@ module PE #(
                 psum_data_SPad_en_r[mac_i]   <= 0;
                 use_psum[mac_i]              <= 0;
                 used_psum_memory[mac_i]      <= 0;
+              end
+            end else if (data_set & compute_pe) begin
+              // Empty pass (bug #31): no SPad read, no product. Leave IDLE
+              // like a computing PE so the pass is counted and the next one
+              // loaded; psums can be read at once.
+              current_state_computing <= EMPTY_PASS;
+              empty_pass_hold         <= EMPTY_PASS_HOLD;
+              mux_iact_ready          <= 0;
+              wght_ready_o            <= 0;
+              psum_select             <= 1;
+            end
+          end
+
+          // ====================================================================
+          // EMPTY_PASS: a pass without a non-zero activation or weight word
+          // ====================================================================
+          // iact/wght ready low for EMPTY_PASS_HOLD clocks or until the psum
+          // FSM reads the pass out; the read-out is SEND_PSUM as from IDLE: no
+          // product stored (used_psum_memory was cleared in IDLE), the
+          // incoming psum is passed on.
+          EMPTY_PASS: begin
+            if (empty_pass_hold != 5'd0) begin
+              empty_pass_hold <= empty_pass_hold - 5'd1;
+            end else begin
+              mux_iact_ready  <= 1;
+              wght_ready_o    <= 1;
+            end
+            if (psum_enable_i) begin
+              current_state_computing <= SEND_PSUM;
+              mux_iact_ready          <= 1;
+              wght_ready_o            <= 1;
+              for (mac_i = 0; mac_i < PARALLEL_MACS; mac_i=mac_i+1) begin
+                adder_en[mac_i]         <= 1;
+                use_psum[mac_i]         <= 0;
+                used_psum_memory[mac_i] <= 0;
               end
             end
           end
@@ -1695,9 +1757,11 @@ module PE #(
     reg  [          IACT_ADDR_DATA   : 0] wght_filter;     // Current iact address being processed
     reg                                   computing_1;              // Flag indicating active computation
     reg                                   computing_2;              // Flag indicating active computation
+    reg  [                         4 : 0] empty_pass_hold;          // EMPTY_PASS: clocks left with ready low
     always @(posedge clk_i, negedge rst_ni) begin
       if (!rst_ni) begin
         current_state_computing <= IDLE;
+        empty_pass_hold         <= 0;
         iact_addr_SPad_addr     <= 0;
         iact_addr_SPad_en_r     <= 0;
         iact_data_SPad_addr     <= 0;
@@ -1811,6 +1875,36 @@ module PE #(
                 psum_data_SPad_en_r[mac_i] <= 0;
                 use_psum[mac_i]            <= 0;
                 used_psum_memory[mac_i]    <= 0;
+              end
+            end else if (data_set & compute_pe) begin
+              // Empty pass (bug #31), as in the sparse FSM
+              current_state_computing <= EMPTY_PASS;
+              empty_pass_hold         <= EMPTY_PASS_HOLD;
+              mux_iact_ready          <= 0;
+              wght_ready_o            <= 0;
+              psum_select             <= 1;
+            end
+          end
+
+          // ==================================================================
+          // EMPTY_PASS: no product; ready low for EMPTY_PASS_HOLD clocks or
+          // until the read-out (see the sparse FSM)
+          // ==================================================================
+          EMPTY_PASS: begin
+            if (empty_pass_hold != 5'd0) begin
+              empty_pass_hold <= empty_pass_hold - 5'd1;
+            end else begin
+              mux_iact_ready  <= 1;
+              wght_ready_o    <= 1;
+            end
+            if (psum_enable_i) begin
+              current_state_computing <= SEND_PSUM;
+              mux_iact_ready          <= 1;
+              wght_ready_o            <= 1;
+              for (mac_i = 0; mac_i < PARALLEL_MACS; mac_i=mac_i+1) begin
+                adder_en[mac_i]         <= 1;
+                use_psum[mac_i]         <= 0;
+                used_psum_memory[mac_i] <= 0;
               end
             end
           end

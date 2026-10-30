@@ -4,6 +4,9 @@
                    value of every lane, listed per cluster (cluster row cr, cluster column cc) as [g0, g1, g2, g3].
   B35_DUMP=<dir>   save every iact buffer check of the testbench (expected words and DUT words, in check order) as
                    <dir>/iact_check_<k>.npz, for an analysis of bug #35 (run35.py).
+  B31_TOP=<t0>:<t1>  log, between t0 and t1 ns, every change of the pass control: main FSM, psum FSM, psum_transmitted,
+                   OpenEye_Parallel's FSM and finished_cycles, compute pulses, iact ready / enable bus, weight enable,
+                   current_cycle, single_iteration (bug #31 fix, Dense hang).
   B32_REVERSE=1    emulate a Python-only fix of bug #32 in the simulation process only: the conv bias stream of
                    psum_stream_mapper sends the kernel groups of every buffer address in reverse order (src/ unchanged).
 
@@ -87,8 +90,47 @@ async def watch_bias(dut, n):
         seen += 1
 
 
+TOP_SIGNALS = (("main", "fsm_current_state"), ("psum", "psum_pipeline_inst.fsm_psum_current_state"),
+               ("ptx", "psum_pipeline_inst.psum_transmitted"), ("par", "OpenEye_Parallel.fsm_current_state"),
+               ("fin", "OpenEye_Parallel.finished_cycles"), ("cmp", "OpenEye_Parallel.compute_cluster_i_reg"),
+               ("rdy", "iact_ready_o_oep_w"), ("ien", "iact_enable_i_oep_w"), ("wen", "wght_enable_i_reg"),
+               ("cur", "current_cycle"), ("si", "single_iteration"))
+
+
+async def watch_top(dut, t0, t1, max_lines=4000):
+    from cocotb.utils import get_sim_time
+    handles = []
+    for name, path in TOP_SIGNALS:
+        h = dut
+        try:
+            for part in path.split("."):
+                h = getattr(h, part)
+            handles.append((name, h))
+        except AttributeError:
+            tb.logger.info("B31_TOP: %s not found", path)
+    last, lines = None, 0
+    while lines < max_lines:
+        await RisingEdge(dut.clk_i)
+        t = get_sim_time("ns")
+        if t < t0:
+            continue
+        if t > t1:
+            return
+        vals = []
+        for name, h in handles:
+            v = h.value
+            vals.append("%s=%s" % (name, ("%x" % int(v)) if v.is_resolvable else "x"))
+        if vals != last:
+            last = vals
+            tb.logger.info("b31top t=%.0f %s", t, " ".join(vals))
+            lines += 1
+
+
 @cocotb.test()
 async def probe_test(dut):
+    if os.environ.get("B31_TOP"):
+        t0, t1 = (float(v) for v in os.environ["B31_TOP"].split(":"))
+        cocotb.start_soon(watch_top(dut, t0, t1))
     if os.environ.get("B32_REVERSE"):
         psm.PsumStreamMapper.get_psum_stream = reversed_group_stream
     if os.environ.get("B35_DUMP"):

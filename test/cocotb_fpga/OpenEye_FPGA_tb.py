@@ -469,6 +469,21 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
         dram.fmap[0][0] = o2m.quantize_input(model, image[0, 0]).tolist()
         logger.info("OPENEYE_INPUT_IMAGE: MNIST test image %s (label %d), input scale %g",
                     os.environ["OPENEYE_INPUT_IMAGE"], int(label[0]), model[0].input_scale)
+    if os.environ.get("OPENEYE_ZERO_BLOCK"):
+        # A block of zero activations in the layer-0 input, so a pass can have no non-zero activation while others
+        # have (bug #31; DRAMContents replaces every random 0 by +-1, OPENEYE_ZERO_IACTS zeroes everything): "y:<a>:<b>"
+        # zeroes the lines y = a..b-1 of every channel (fmap[c][x][y]), "k:<a>:<b>" the inputs a..b-1 of a Dense layer
+        axis, first, last = os.environ["OPENEYE_ZERO_BLOCK"].split(":")
+        first, last = int(first), int(last)
+        if axis == "k":
+            for k in range(first, last):
+                dram.fmap[0][k] = 0
+        else:
+            for channel in dram.fmap[0]:
+                for column in channel:
+                    for y in range(first, last):
+                        column[y] = 0
+        logger.info("OPENEYE_ZERO_BLOCK: layer-0 input %s = %d..%d set to 0", axis, first, last - 1)
     # After the debug hooks above, which fill every channel
     channel_pad.fill_padding_channels(model, dram)
     # OPENEYE_KEEP_GOING: a failed iact buffer check between chained layers is

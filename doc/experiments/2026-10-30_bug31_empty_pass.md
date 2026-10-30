@@ -1,5 +1,7 @@
 # 2026-10-30: bug #31 investigated - a pass with no non-zero activation in any PE stops the rest of the layer (no RTL change)
 
+**Update (same day): fixed with fix A in `PE.v` (state `EMPTY_PASS`), approved by the user: `2026-10-30_bug31_fix.md`.**
+
 Bug #31 (found with real MNIST data, `2026-10-30_real_data_bugs.md`): conv1 and conv2 of the trained model returned the bias
 alone. Investigated with the project's own flow and random weights (bias 1); only the layer-0 input is chosen
 (`2026-10-30_bug31/probe31.py`, `run31.py`). The RTL and the testbench are not modified.

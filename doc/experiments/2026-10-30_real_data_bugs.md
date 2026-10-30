@@ -1,5 +1,8 @@
 # 2026-10-30: three hardware bugs seen with real MNIST data (#31, #32, #33)
 
+**Update (same day, later):** all three fixed or merged: #31 (with #33) fixed in `PE.v` (`2026-10-30_bug31_fix.md`), #32 fixed in
+`psum_stream_mapper` (`2026-10-30_bug32_bias_order.md`).
+
 **Update (same day):** #31 investigated in `2026-10-30_bug31_empty_pass.md`: a compute pass with no non-zero activation in any
 PE stops every later pass of the layer (RTL control); #33 is the same bug. #32 is not investigated.
 

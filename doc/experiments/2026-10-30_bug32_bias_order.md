@@ -118,7 +118,8 @@ load matches the read-out. Same function, but an RTL change and `CONV_BIAS_CYCLE
 checked; no advantage over the Python fix.
 
 **#31 (= #35):** RTL fix A in `PE.v` (an empty PE still runs the pass protocol with zero products) as proposed in
-`2026-10-30_bug31_empty_pass.md`; no Python-only workaround (making every pass non-empty would change the data).
+`2026-10-30_bug31_empty_pass.md`; no Python-only workaround (making every pass non-empty would change the data). **Fixed the same day (`2026-10-30_bug31_fix.md`)**: with #31 and #32 fixed, MNIST test images 0..7 run through the whole
+trained model on the RTL bit-exact with the right class.
 
 ## 6. The fix of #32 (approved by the user, Python only, same day)
 

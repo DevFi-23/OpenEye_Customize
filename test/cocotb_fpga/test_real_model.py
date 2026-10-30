@@ -10,10 +10,10 @@ biases, quantizer multipliers and ReLU bounds to the RTL, which runs Conv 32, Ma
 Dense 3136 -> 10 on chip. The testbench checks the iact buffer after every layer and the final psums against its
 reference; test/test_onnx_model_flow.py checks that reference against ONNX Runtime (rounding differences only).
 
-Image 1 runs through the whole model bit-exact (every buffer check and the Dense psums) and the DUT gives its class, 2.
-Image 0 is xfail(strict) on bug #31: in the window of conv3's last output line the channels 44..47 are all zero, that pass
-is empty and every later pass of conv3 is lost (doc/experiments/2026-10-30_bug32_bias_order.md; the old bug #35). Bug #32
-(conv3 computes two filters at a time and got the biases of the filter pairs swapped) is fixed in psum_stream_mapper.
+Both images run through the whole model bit-exact (every buffer check and the Dense psums) and the DUT gives their
+class (7 and 2). Image 0 has an empty pass in conv3 (in the window of the last output line the channels 44..47 are all
+zero), which stopped the rest of the layer before bug #31 was fixed in PE.v (doc/experiments/2026-10-30_bug31_fix.md);
+image 1 needed the fix of bug #32 (conv3 computes two filters at a time and got the biases of the filter pairs swapped).
 
 Usage (from the repository root; about 11 minutes per image):
   venv/bin/python -m pytest -q test/cocotb_fpga/test_real_model.py
@@ -27,11 +27,7 @@ from open_eye import open_eye_dir
 
 CHECKPOINT = os.path.abspath(os.path.join(open_eye_dir, os.pardir, os.pardir, "doc", "demo_notebooks",
                                           "mnist_unquantized_model.pth"))
-BUG31 = pytest.mark.xfail(strict=True, reason="bug #31: empty pass at conv3's last output line (iact buffer check before "
-                                               "the Dense layer)")
-
-
-@pytest.mark.parametrize("image", [pytest.param(0, marks=BUG31), 1])
+@pytest.mark.parametrize("image", [0, 1])
 def test_real_model(image, request, monkeypatch):
     if not os.path.exists(CHECKPOINT):
         pytest.skip("trained checkpoint not available")
