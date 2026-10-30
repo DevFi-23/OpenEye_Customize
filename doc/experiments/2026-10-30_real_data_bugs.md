@@ -1,4 +1,7 @@
-# 2026-10-30: three hardware bugs seen with real MNIST data (#31, #32, #33), not investigated
+# 2026-10-30: three hardware bugs seen with real MNIST data (#31, #32, #33)
+
+**Update (same day):** #31 investigated in `2026-10-30_bug31_empty_pass.md`: a compute pass with no non-zero activation in any
+PE stops every later pass of the layer (RTL control); #33 is the same bug. #32 is not investigated.
 
 Found while running the trained MNIST int8 model (`doc/demo_notebooks/mnist_quantized_model.tflite`) on real test images
 through the RTL. The code that did it (`src/open_eye/ptq.py`, testbench hook `OPENEYE_PTQ`, `test/test_ptq.py`,

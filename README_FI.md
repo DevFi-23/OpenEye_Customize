@@ -231,6 +231,7 @@ Chi tiết: mục 6 (profiler), 6.13 (model nhiều layer), 6.14 (Bảng 3).
 | #25 (`NUM_GLB_PSUM=2`, **đã sửa**) | Sau bản sửa: `venv/bin/python -m pytest -q test/cocotb_fpga/test_glb_psum2.py`. Lỗi cũ (trên commit `e062707` qua `git worktree`, như #26). Ca nhỏ nhất: `venv/bin/python doc/experiments/2026-10-26_bug25/run25.py k2 Convolution_Stack 2 GLBP=2 CH=4 H=4` (conv → conv; `GLBP=4` thì PASS). Mạng paper: `venv/bin/python tools/run_profile.py -k paper_cr2_x2_y3` | `test/.temp/b25_k2/cocotb_sim.log`: `Iact buffer check failed after layer 0`, mỗi word đổi chỗ 2 nhóm 2 byte ở giữa |
 | #26 (Dense nối tiếp Dense, **đã sửa**) | Sau bản sửa: `venv/bin/python -m pytest -q test/cocotb_fpga/test_dense_chain.py` (11 test). Lỗi cũ chỉ tái hiện được trên commit trước bản sửa (`142ee6c`): `git worktree add ../oe_old 142ee6c`, rồi trong `../oe_old` chạy `PYTHONPATH=src ../OpenEye_orig/venv/bin/python doc/experiments/2026-10-24_bug26/run_dense.py x16 D_16_8_10 2` (thêm `TRACE_RAM_WRITES=1` để thấy pha ghi ngược không ghi RAM) | `test/.temp/.../cocotb_sim.log`: `Iact buffer check: first N activations only`; bản cũ: `DUT-Value` = input của layer 0 |
 | #24 (không có hàm kích hoạt) | Không có mô phỏng; đọc `hdl/af_cluster.v` (không được khởi tạo ở đâu) | Mục 8b |
+| #31 (lượt rỗng, không cần model thật) | `venv/bin/python doc/experiments/2026-10-30_bug31/run31.py s_zy02 zy:0:2` (Conv 8×4×4, hai hàng input đầu bằng 0, khoảng 40 s); ảnh MNIST: `run31.py img0 image:0 W=28 H=28 CH=1 NF=4`; Dense: `run31.py d_z0 zk:0:512 L=DENSE_CHAIN_3136_10 K=3136`; công tắc theo dõi `B31_WATCH`, `B31_CONV`, `B31_ENC` (docstring của `probe31.py`) | `RESULT ... DUT == bias at ...` |
 | #31, #32, #33 (dữ liệu MNIST thật) | Code chạy model thật đã gỡ khỏi `dev` (revert theo yêu cầu, nhật ký 2026-10-30); chạy trên commit `440f36d`: `git worktree add ../oe_ptq 440f36d`, rồi trong `../oe_ptq`: `export PYTHONPATH=$PWD/src` (venv cài `open_eye` dạng editable trỏ vào `OpenEye_orig/src`), `cp ../OpenEye_orig/doc/demo_notebooks/mnist_quantized_model.tflite doc/demo_notebooks/` (file `.tflite` bị `.gitignore` bỏ qua), `../OpenEye_orig/venv/bin/python -m pytest -q "test/cocotb_fpga/test_ptq_mnist.py::test_ptq_layer[conv1-0]"` (id khác: `conv2-0`, `conv3-0`, `fc1_probe-0`; các ca đánh `xfail(strict)`); thêm `OPENEYE_DUMP_VERIFY=1` rồi `tools/verify_conv_output.py test/.temp/<thư mục test>` để có toàn bộ output. #32 tái hiện không cần model thật: Conv 7×7×64 → 64 ngẫu nhiên với `OPENEYE_BIAS_STEP` | `DUT vs numpy: ... differ`; Conv1: DUT = bias; Conv3: lệch hằng số theo cặp filter |
 | Weight Conv đã huấn luyện cho test bất kỳ | `OPENEYE_TFLITE_CONV=$PWD/doc/demo_notebooks/mnist_quantized_model.tflite:sequential_1/conv2d_1_2/convolution` (tensor Conv2; Conv1 `sequential_1/conv2d_1/convolution`, Conv3 `sequential_1/conv2d_2_1/convolution`) | Log `OPENEYE_TFLITE_CONV: layer-0 weights from ... (N zero weights)` |
 
@@ -1235,7 +1236,7 @@ dài 96 thay vì 192 chu kỳ.
 | Giai đoạn | Nội dung | Trạng thái |
 |---|---|---|
 | 0. Đo lường | Profiler, báo cáo, so sánh, baseline 12 case, mô hình bộ nhớ, mốc phần cứng Vivado, kiểm tra độc lập từng word, đo theo từng layer, Bảng 3 của paper | **Xong** (2026-10-24); còn: hiệu chỉnh mô hình bộ nhớ theo board |
-| 0b. Sửa lỗi tính đúng (phát sinh) | Lỗi làm phần cứng/mô phỏng tính sai | **Đã sửa:** #3, #13, #6, #7 (`NUM_GLB_IACT=3`), #14, #18, #19, #22, #25, #26, #30 (kẹp int8, ReLU gộp); #17 có workaround Python; #5 là báo động giả của testbench. **Còn mở:** #9, #12, #18b, #19b, #21, #23, #27, #28, #29, #31, #32, #33 (lộ ra với dữ liệu MNIST thật, 2026-10-30), 3 channel (#7), không có hàm kích hoạt (#24) |
+| 0b. Sửa lỗi tính đúng (phát sinh) | Lỗi làm phần cứng/mô phỏng tính sai | **Đã sửa:** #3, #13, #6, #7 (`NUM_GLB_IACT=3`), #14, #18, #19, #22, #25, #26, #30 (kẹp int8, ReLU gộp); #17 có workaround Python; #5 là báo động giả của testbench. **Còn mở:** #9, #12, #18b, #19b, #21, #23, #27, #28, #29, #31 (đã điều tra, gồm cả #33: lượt rỗng làm mất các lượt sau), #32 (lộ ra với dữ liệu MNIST thật, 2026-10-30), 3 channel (#7), không có hàm kích hoạt (#24) |
 | 1. Giảm lưu lượng DMA | Bias theo filter, đóng gói weight, bảng quant theo F hoặc lưu BRAM, readout INT8 | Chưa làm. Đề xuất bắt đầu với bias |
 | 2. Che độ trễ | Double-buffering (`BRANCHES=2`): nạp lượt sau trong lúc lượt hiện tại tính toán | Chưa làm (cần sửa lỗi chọn nửa buffer iact trước) |
 | 3. Mô hình và DSE | Mô hình Python dự đoán chu kỳ và byte, roofline, quét cấu hình | Chưa làm |
@@ -1293,9 +1294,9 @@ dài 96 thay vì 192 chu kỳ.
 | 28 | Conv ở `CLUSTER_ROWS=1` với `NUM_GLB_PSUM=2` tính sai một số output (đường đọc thẳng ra, không có ghi ngược): Conv 14×14 32 → 32 channel sai, 16 → 32 đúng; conv2 của mạng paper (sau pooling) sai ở vài pixel. CR 1 X 4 và CR 2 X 2 đều đúng. Là nguyên nhân của 2 hàng CR 1 X 2 còn FAIL trong Bảng 3 | ? (phép tính, tổ hợp CR = 1 + 2 lane) | **Chưa điều tra** (phát hiện 2026-10-26 khi kiểm chứng bản sửa #25) |
 | 29 | Dense K = 3136 với ≥ 32 output tính sai trên RTL (chuỗi 3136 → 64 → 10, 3136 → 32 → 10 sai từ kiểm tra bộ đệm sau Dense đầu); 2560 → 32, 2048 → 32, 1024/512/256 → 64, 3136 → 16, 3136 → 10 đúng. Chặn Dense 3136 → 64 của model MNIST int8 đã huấn luyện | ? (có thể cùng họ #19b) | **Chưa điều tra** (phát hiện 2026-10-28) |
 | 30 | Bộ lượng tử **không kẹp int8**: lấy 8 bit thấp, giá trị tràn bị quấn vòng (130 → −126, −129 → 127); tham chiếu Python cũng không kẹp nên mọi test PASS (dữ liệu test chưa từng tràn). Đưa model MNIST int8 thật vào phần cứng: **9,3 %** thay vì 99,2 % (giả lập) | `quantization_unit.v` | **Đã sửa** (2026-10-28, được bạn đồng ý): kẹp về `[act_min, 127]`, `act_min` theo layer (thanh ghi `quant_clamp_low`). Test mới 9/9 RTL + 2/2 bộ lượng tử, đối chứng âm 9/9 FAIL trên RTL cũ, hồi quy 157 test 0 FAIL, 12 case mốc 0 chu kỳ lệch, lint 462. Mục 9 |
-| 31 | Conv với **input thật, thưa** (ảnh MNIST, 85 % pixel bằng 0; activation sau ReLU, 68 % bằng 0) nạp qua DMA **mất các tích**: phần cứng trả về đúng bias. Conv1 28×28 (2 channel do đệm #17): bias ở cả 25.088/25.088 output (6.591 sai so với numpy); Conv2 14×14×32 → 64: bias ở 12.320/12.544 (cả 12.544 sai). Cùng cấu hình với dữ liệu ngẫu nhiên thì đúng, vì `DRAMContents` thay mọi số 0 bằng ±1. Chạy cả model: bộ đệm sau max pooling đầu chứa giá trị nền (output của ảnh trắng) ở mọi vị trí. Conv3 7×7 với 73 % số 0 không mất tích | ? (đường iact thưa: mapper Python hoặc `iact_stream_constructor`/PE) | **Chưa điều tra** (phát hiện 2026-10-30 khi chạy model MNIST đã huấn luyện với ảnh test thật; tái hiện: commit `440f36d` qua `git worktree` (mục 3c)) |
+| 31 | Conv/Dense **mất mọi lượt tính từ một lượt rỗng trở đi**: lượt mà không PE nào có activation khác 0 (Conv 3×3: cửa sổ 3 hàng input toàn 0 trên phần hàng một lượt phủ; Dense: một khối K input của lượt toàn 0) và mọi lượt sau không được tính, output giữ bias (+ các lượt trước); layer vẫn chạy hết, không treo. Ảnh MNIST thật: Conv1 ra bias ở cả 25.088 output (hàng trên của ảnh trống), Conv2 ở 12.320/12.544. Dữ liệu test ngẫu nhiên không có số 0 (`DRAMContents` thay 0 bằng ±1) nên không lộ | RTL điều khiển: PE chỉ bắt đầu lượt khi có activation khác 0 (`PE.v:1135`); `OpenEye_FPGA.v` đếm lượt (Process 2) và khởi động lượt converter/weight kế tiếp (Process 5) khi bus iact ready của mảng PE rời trạng thái toàn 1, việc chỉ xảy ra khi có PE bắt đầu tính | **Đã điều tra** (2026-10-30, không sửa RTL; mục 9): hướng sửa A (PE rỗng vẫn đi trọn giao thức một lượt) hoặc B (đếm lượt theo sự kiện tường minh), cần bạn đồng ý; giả lập chỉ một xung ready là chưa đủ |
 | 32 | Conv3 7×7×64 → 64: **bias của cặp filter (2k, 2k+1) bị đổi chỗ** (output = đúng + b[2k+1] − b[2k] ở filter 2k và ngược lại, ở mọi vị trí; các tích đúng). Mọi test trước đây cho mọi filter bias 1 nên không thấy; Conv1/Conv2 không đổi chỗ | ? (thứ tự bias: `psum_stream_mapper` hoặc RTL; cấu hình 7 pixel / 4 cột cluster) | **Chưa điều tra** (phát hiện 2026-10-30; tái hiện rẻ không cần model thật: Conv 7×7×64 → 64, dữ liệu ngẫu nhiên, `OPENEYE_BIAS_STEP`; hoặc tái hiện: commit `440f36d` qua `git worktree` (mục 3c)) |
-| 33 | Dense 3136 → 10 (10 output đầu của fc1 đã huấn luyện) với input thật (output Conv3, 78 % số 0): ảnh test 0 sai cả 10 output (lệch −6.372 … +5.276), ảnh 1 đúng cả 10. Không phải dịch vị trí, đổi cặp hay mất một khối input | ? | **Chưa điều tra** (phát hiện 2026-10-30; tái hiện: commit `440f36d` qua `git worktree` (mục 3c)) |
+| 33 | Dense 3136 → 10 (10 output đầu của fc1 đã huấn luyện) với input thật: ảnh test 0 sai cả 10 output, ảnh 1 đúng | **Cùng nguyên nhân #31**: kết quả của ảnh 0 bằng đúng bias + tích của input 0…2653; input 2654 mở đầu chuỗi 109 số 0 (một lượt rỗng); chuỗi 0 dài nhất của ảnh 1 là 75 | **Đã điều tra** (2026-10-30): gộp vào #31 |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-24)
 
@@ -2186,6 +2187,46 @@ Kết luận:
 
 Chi tiết: `doc/experiments/2026-10-28_int8_clamp.md`, công cụ `doc/experiments/2026-10-28_int8/`.
 
+### Điều tra lỗi #31: một lượt rỗng làm mất mọi lượt sau (2026-10-30, không sửa RTL)
+
+Chi tiết: `doc/experiments/2026-10-30_bug31_empty_pass.md`, công cụ `doc/experiments/2026-10-30_bug31/` (`probe31.py` bọc testbench gốc, `run31.py` chạy một
+layer với input tự chọn và so mọi output với numpy). Dùng luồng gốc của project (weight ngẫu nhiên của model Keras, bias 1), chỉ thay input layer 0.
+
+**Điều kiện kích hoạt:** một lượt tính mà **không PE nào có activation khác 0**. Conv 3×3: hàng output có cửa sổ 3 hàng input (y−1, y, y+1) toàn 0 trên phần
+hàng một lượt phủ; Dense 3136 → 10: một khối K input của lượt toàn 0 (65–109 input). **Hậu quả:** lượt đó và **mọi lượt sau** không được tính, output giữ bias
+(+ các lượt trước); layer vẫn kết thúc đúng giờ nên không có gì báo lỗi.
+
+| Input (28×28×1, đệm 2 channel) | Kết quả |
+|---|---|
+| Ảnh MNIST số 0 | sai: bias ở cả 3.136 output |
+| Cùng ảnh, thay mọi số 0 bằng 1 | đúng |
+| 50 % số 0 rải rác / hàng y = 0 toàn 0 / hàng 10–11 toàn 0 / x = 0…4 toàn 0 ở mọi hàng | đúng |
+| Hàng y = 0–1 toàn 0 (cả 2, 4 channel thật và layer 8×4×4) | sai: bias toàn bộ |
+| Hàng 4–6 toàn 0 | sai: bias từ hàng 5 (cửa sổ rỗng đầu tiên) đến hết |
+| Ba hàng cuối toàn 0 | đúng (phía sau không còn gì) |
+| 90 % số 0 rải rác | sai từ hàng 16 (cửa sổ có chuỗi 20 vị trí x toàn 0) |
+| Dense: input 0…511 toàn 0 / 1024…1535 toàn 0 / 0…63 toàn 0 | bias / sai (mất các lượt sau) / đúng |
+
+**Lần theo dữ liệu** (layer 8×4×4, hàng 0–1 toàn 0 sai, hàng 1–2 toàn 0 đúng): luồng DMA Python đúng; bộ đệm iact sau khi nạp đúng; bộ chuyển đổi ghi 72 word
+(20 khác 0) vào RAM của nó ở cả hai ca; nhưng ở ca sai nó **chỉ phát một lượt** (72 word, toàn 0) thay vì 4 lượt (288 word, 80 khác 0), vì `enable_converter`
+không bao giờ được phát lại; PE có `second_spad_words_iact` = 0 suốt layer và ở IDLE; xung `compute_i` vẫn đủ 12 lần, layer kết thúc cùng thời điểm (10.540 ns).
+
+**Nguyên nhân (điều khiển RTL):** PE chỉ bắt đầu một lượt khi có ít nhất một activation khác 0 và một weight (`PE.v:1135`); PE rỗng ở IDLE, iact ready vẫn 1.
+`OpenEye_FPGA.v` đếm lượt (Process 2, `current_cycle`) và khởi động lượt converter + gửi weight kế tiếp (Process 5) **chỉ khi bus `iact_ready_o_oep_w` rời trạng
+thái toàn 1**, tức khi có PE bắt đầu tính. Lượt rỗng: không PE nào bắt đầu → bus giữ toàn 1 → lượt sau không được khởi động, không được đếm.
+
+**Lỗi #33 cùng nguyên nhân:** output sai của fc1 ở ảnh 0 bằng đúng bias + tích của input 0…2653; input 2654 mở đầu chuỗi 109 số 0; ảnh 1 có chuỗi dài nhất 75 nên
+đúng. Lỗi #32 (đổi chỗ bias cặp filter ở Conv3) là lỗi khác.
+
+**Giả lập (chỉ trong mô phỏng):** ép bus ready xuống 1 chu kỳ khi lượt rỗng chữa được ca 8×4×4 với một cách kích hoạt, nhưng ở 28×28 FSM psum lại chờ psum từ các
+PE đã bỏ lượt (kẹt ở trạng thái 3). Vậy bản sửa phải làm cho lượt rỗng đi trọn giao thức như một lượt có tích bằng 0, không chỉ tạo xung ready.
+
+**Hướng sửa (sửa RTL, cần bạn đồng ý, chưa làm):** (A) `PE.v`: PE rỗng vẫn rời IDLE, bỏ qua CALCULATING (tích 0), đi qua WAIT_TO_SEND_PSUM/SEND_PSUM như PE có tính:
+thay đổi cục bộ, mọi bắt tay giữ nguyên, tốn vài chu kỳ cho lượt rỗng; (B) `OpenEye_FPGA.v`: đếm lượt và khởi động lượt sau theo một sự kiện tường minh (xung
+compute hoặc converter phát xong) thay cho bus ready, và FSM psum không chờ PE bỏ lượt: bỏ hẳn điều khiển phụ thuộc dữ liệu nhưng đụng vào lịch trung tâm,
+rủi ro hồi quy cao hơn. Đề xuất A. Kiểm chứng: các ca `run31.py` ở trên khớp numpy, hồi quy, mốc chu kỳ (lượt có dữ liệu không được đổi), Vivado. Không có
+workaround chỉ bằng Python (làm mọi lượt khác rỗng là đổi dữ liệu).
+
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
 **Số liệu mục này là của ngày 2026-10-10.** Hiện tại (baseline lint `tools/lint_baseline/`, sau các bản sửa #14, #19 và #30): `fpga` **462**, `parallel` **36** (#30 xoá cảnh báo
@@ -2600,3 +2641,10 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   **#31** Conv1/Conv2 với input thật thưa mất các tích (phần cứng ra đúng bias: Conv1 ở 25.088/25.088 output), **#32** Conv3 7×7×64 → 64 đổi chỗ bias của cặp filter
   (2k, 2k+1), **#33** Dense 3136 → 10 sai với ảnh 0 (ảnh 1 đúng). Bị che vì dữ liệu test thay số 0 bằng ±1 và cho mọi filter bias 1. Chưa điều tra. Mục 8b,
   cách tái hiện ở mục 3c, chi tiết `doc/experiments/2026-10-30_real_data_bugs.md`.
+- **Điều tra lỗi #31** (theo yêu cầu, không sửa RTL; mục 9, `doc/experiments/2026-10-30_bug31_empty_pass.md`, công cụ `doc/experiments/2026-10-30_bug31/`):
+  tái hiện bằng luồng gốc của project với weight ngẫu nhiên, chỉ thay input layer 0. Điều kiện: **một lượt tính không có activation khác 0 ở PE nào** (Conv 3×3:
+  cửa sổ 3 hàng input toàn 0; Dense: một khối K input của lượt toàn 0) → lượt đó và mọi lượt sau không được tính, output giữ bias, layer vẫn chạy hết. Nguyên nhân
+  ở điều khiển RTL: PE chỉ bắt đầu khi có activation khác 0 (`PE.v:1135`), còn `OpenEye_FPGA.v` đếm lượt và khởi động lượt converter/weight kế tiếp khi bus iact
+  ready của mảng PE rời trạng thái toàn 1, việc chỉ xảy ra khi có PE bắt đầu tính. **#33 cùng nguyên nhân** (output ảnh 0 = bias + tích của input 0…2653, input
+  2654 mở đầu chuỗi 109 số 0). Giả lập một xung ready là chưa đủ (FSM psum chờ psum của PE bỏ lượt). Hướng sửa A (PE rỗng vẫn đi trọn giao thức một lượt, đề
+  xuất) hoặc B (đếm lượt theo sự kiện tường minh), cần bạn đồng ý.
