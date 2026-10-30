@@ -107,10 +107,29 @@ A looks the smaller and safer step. Either way the check would be the `run31.py`
 empty windows, image 0, Dense with zero blocks) bit-exact against numpy, plus the regression, the cycle baseline (passes
 with data must not change) and Vivado. No Python-only workaround: making every pass non-empty would change the data.
 
+## 6b. Upstream has the same bug (checked 2026-10-30, `upstream/main` = 93f0e82)
+
+* Code: the PE start condition (`PE.v`, IDLE), Process 2 (pass counting) and the ready-bus trigger of Process 5 are
+  identical to `dev`; the only difference in Process 5 is the weight-send end (`wghts_per_pe + 2` in `dev`, `+ 1` upstream),
+  unrelated. The start condition dates back to a83260d (2025-03-19, refined in 6006cc6 and b2f1898), the ready-bus trigger
+  of the next pass to 337bd44 (2025-07-22, "Added multichannel support for X not equal to PEs"); both are on every recent
+  upstream branch (no_sparsity, main_old, gemm, DAG, dev_dse).
+* Simulation on upstream's own RTL and testbench (worktree of upstream/main, `run31_upstream.py` with
+  `probe31_upstream.py`; conv 8x4x4, 4 filters, upstream's constant weights 8, bias 1):
+
+| Input | Upstream |
+|---|---|
+| random, no zero | PASS |
+| lines 1..2 zero | PASS |
+| lines 0..1 zero (empty first pass) | FAIL: all 4 feature maps, the 96 logged differences all equal 1 = the bias |
+
+Same behaviour as `dev`. Upstream's test data hides it the same way (constant or random activations, zeros replaced by +-1).
+
 ## 7. Tools (`2026-10-30_bug31/`)
 
 `probe31.py` (cocotb module around the unmodified testbench): `B31_IACT` (layer-0 input from a .npy, 1-D for Dense),
 `B31_WATCH` (start-of-compute inputs of chosen PEs), `B31_CONV` (converter RAM writes and sends per main state),
 `B31_ENC` (converter start handshake), `B31_EMU` (variant 2 above). `run31.py <name> <pattern> [KEY=VALUE]`: one layer with
-a chosen input, DUT vs numpy for every output (patterns and options in its docstring). Testbench switches used:
+a chosen input, DUT vs numpy for every output (patterns and options in its docstring). `run31_upstream.py` and
+`probe31_upstream.py`: the same check on a worktree of upstream/main (usage in the docstring). Testbench switches used:
 `TRACE_ALL_PE`, `TRACE_PE_IACT`, `DUMP_IACT_BUFFER`, `TRACE_CONVERTER`, `TRACE_CONVERT_WINDOW`.
