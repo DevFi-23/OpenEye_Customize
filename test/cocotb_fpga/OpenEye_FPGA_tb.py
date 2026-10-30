@@ -5,6 +5,7 @@
 
 import sys
 import os
+import re
 import cocotb
 import tensorflow as tf
 from cocotb.clock import Clock
@@ -453,6 +454,25 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
         tflite_path, tensor_name = os.environ["OPENEYE_TFLITE_CONV"].split(":", 1)
         zeros = dram.load_conv_weights_tflite(0, tflite_path, tensor_name)
         logger.info("OPENEYE_TFLITE_CONV: layer-0 weights from %s (%d zero weights)", tensor_name, zeros)
+    ptq_model = None
+    if os.environ.get("OPENEYE_PTQ"):
+        # A trained int8 TFLite model on one MNIST test image ("<file>:<image index>[:<first layer>]"),
+        # quantized for the hardware by open_eye.ptq: its weights, biases, input and quantizer settings
+        # replace the test data, and the reference of every layer is checked against the int8 model
+        # (ptq.forward). The testbench layers are the model's layers from <first layer> on (default 0;
+        # e.g. up to a probe of fc1, bug #29); a later first layer gets the model's activation there.
+        from open_eye import ptq
+        ptq_path, ptq_image, ptq_first = re.fullmatch(r"(.*?):(\d+)(?::(\d+))?", os.environ["OPENEYE_PTQ"]).groups()
+        ptq_first = int(ptq_first or 0)
+        images, labels = ptq.load_mnist_test()
+        ptq_layers = ptq.quantize_tflite(ptq_path)
+        ptq_model = ptq.TestbenchModel(ptq_layers, images[int(ptq_image)], ptq_first, len(layer_parameters))
+        ptq_model.fill(dram, layer_parameters)
+        logger.info("OPENEYE_PTQ: %s (layers %d-%d of %d), test image %s (label %d), quantizer mant/shift %s, "
+                    "act_min %s", os.path.basename(ptq_path), ptq_first, ptq_first + len(layer_parameters) - 1,
+                    len(ptq_layers), ptq_image, int(labels[int(ptq_image)]),
+                    [(int(l.mant[0]), int(l.shift[0])) for l in ptq_model.layers if l.kind != "pool"],
+                    [l.act_min for l in ptq_model.layers if l.kind != "pool"])
     # After the debug hooks above, which fill every channel
     channel_pad.fill_padding_channels(model, dram)
     # OPENEYE_KEEP_GOING: a failed iact buffer check between chained layers is
@@ -464,6 +484,11 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
         for layer_number, layer in enumerate(model):
             time_printer.timestamp("Layer parameters created. ", logger)
             calculated_results = tum.collect_results(layer_number, layer_parameters[layer_number], dram, openeye_parameter.SERIAL)
+            if ptq_model is not None:
+                diff = ptq_model.check(layer_number, layer_parameters[layer_number], calculated_results)
+                assert diff == 0, ("OPENEYE_PTQ: the reference of layer %d differs from the int8 model in %d values"
+                                   % (layer_number, diff))
+                logger.info("OPENEYE_PTQ: reference of layer %d = int8 model", layer_number)
             output_order = tum.make_ref(openeye_parameter, layer_parameters[layer_number], layer_number, dram, calculated_results)
             if os.environ.get("OPENEYE_DUMP_VERIFY") and "Convolution" in str(layer_parameters[layer_number].layer_name):
                 # Raw operands, reference and stream order for the independent
