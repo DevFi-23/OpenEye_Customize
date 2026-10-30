@@ -1,4 +1,4 @@
-# 2026-10-30: bugs #32 and #35 investigated (no RTL change, no change in src/)
+# 2026-10-30: bugs #32 and #35 investigated (no RTL change); #32 fixed in Python (section 6)
 
 Approved by the user: investigate #32 (conv3 of the real model swaps the biases of filter pairs) and #35 (conv3 wrong when
 it writes back for the Dense layer), without changing the RTL. Result: **#32 is the order of the conv bias words** (the
@@ -103,7 +103,7 @@ bias pairs swapped). The Dense layer is computed exactly (its own form of #31, b
 The first and last output lines of conv3 see the blank border of the digit (after ReLU and two poolings mostly zero), so
 #31 is the main blocker for real data; #32 alone rarely changes the class of this model but gives wrong values.
 
-## 5. Fix directions (need the user's approval; nothing changed in `src/` or the RTL)
+## 5. Fix directions (at the time of the investigation; the Python fix of #32 was approved and made, section 6)
 
 **#32, Python (recommended):** `psum_stream_mapper.PsumStreamMapper.get_psum_stream`, serial conv path: send the
 `kernels_per_calc` filters of every buffer address in reverse order (filter f_base + D - 1 first), exactly what
@@ -120,7 +120,25 @@ checked; no advantage over the Python fix.
 **#31 (= #35):** RTL fix A in `PE.v` (an empty PE still runs the pass protocol with zero products) as proposed in
 `2026-10-30_bug31_empty_pass.md`; no Python-only workaround (making every pass non-empty would change the data).
 
-## 6. Tools (`2026-10-30_bug32/`)
+## 6. The fix of #32 (approved by the user, Python only, same day)
+
+`src/open_eye/psum_stream_mapper.py`: `PsumStreamMapper.bias_stream_filter_order()` gives the filters in stream order, every
+group of `different_kernels_per_calculation` consecutive filters reversed ([1, 0, 3, 2, ...] for two kernel groups, [3, 2,
+1, 0, ...] for four, the plain order for one); the serial `get_psum_stream` loops over it instead of `range(filters)`. Same
+words, same count (no `trans_cycles_psum` or cycle change), no RTL change. Only Conv2D sets more than one kernel group
+(`check_for_multiple_lines_per_computation`); Depthwise keeps one, Dense / GEMM have their own bias stream. With equal biases
+(every regression model: `DRAMContents` gives conv layers bias 1) the stream is identical word for word. A filter count that is
+not a multiple of the kernel groups does not run anyway (`calculate_conv_serial` divides by zero, tried with 5 filters, 8 wide).
+
+| Check | Result |
+|---|---|
+| `test/test_psum_bias_order.py` (new, 22): the stream against a model of the RTL bias load (`psum_pipeline.v` GET_BIAS: shift in at the low end, one address per `CONV_BIAS_CYCLES` words), 1 / 2 / 4 kernel groups, DMA 64 / 32, psum 20 / 32 bit: every cluster gets the bias of the filter it computes; the old order on the same model gives the groups reversed; one kernel group = the old stream | 22/22; on the old mapper 15 fail |
+| `test_conv_const.py::test_conv_bias_order` (new, RTL, distinct biases 1 + 3f, random data): 8 wide 8 filters (2 kernel groups), 4 wide 16 filters (4) | 2 PASS (about 10 s each); on the old mapper 2 FAIL (DUT - reference +3 / +9 at the first values) |
+| `test_real_model.py` | image 1 **PASS** (the whole trained model bit-exact, DUT class 2 = label); image 0 xfail(strict) on #31 (45 of 392 words before the Dense layer, as emulated) |
+| unit tests `test/test_*.py` | 290 pass (268 + 22), the 11 pre-existing failures of `test_dense_output.py` |
+| RTL regression | `test_int8_clamp` 9/9, `test_glb_psum2` 7/7, `test_mnist_layers -k random` 9/9 (with 8x4 64 filters: two kernel groups, bias 1), `test_conv_const` 36/36 PASS (34 + the 2 new) |
+
+## 7. Tools (`2026-10-30_bug32/`)
 
 * `probe32.py` (cocotb module around probe31 and the unmodified testbench): `B32_BIAS=<n>` logs the lanes of the first n
   bias writes; `B32_REVERSE=1` emulates the Python fix of #32 in the simulation process; `B35_DUMP=<dir>` saves every iact

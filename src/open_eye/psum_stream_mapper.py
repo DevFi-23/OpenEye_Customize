@@ -125,7 +125,7 @@ class PsumStreamMapper(object):
             # Generate bias stream for each output position and filter
             for k in range (self.layer_params.iact_x_line_repetitions) :
                 for j in range(self.layer_params.iact_size_y) :
-                    for i in range(self.layer_params.filters) :
+                    for i in self.bias_stream_filter_order() :
                         # Convert bias to two's complement
                         temp = 0
                         bias_bit = gtu.to_twos_complement(self.dram_bias[i], self.params.DATA_PSUM_BITWIDTH)
@@ -149,6 +149,30 @@ class PsumStreamMapper(object):
             # Flatten the hierarchical structure into a complete stream
             psum_stream = self.create_complete_psum_stream(psum_stream)
         return psum_stream
+
+    def bias_stream_filter_order(self):
+        """Order of the filters in the serial bias stream (bug #32).
+
+        A layer that computes different_kernels_per_calculation filters at a time
+        keeps them in one psum buffer address: kernel group k (filter f_base + k)
+        on the k-th block of clusters, counted from cluster 0 as the compute and
+        the read-out (calculate_conv_serial) do. GET_BIAS in psum_pipeline.v
+        shifts the words of one address in at the low end of the buffer bus, so
+        the first word sent ends up in the last cluster. The filters of every
+        address are therefore sent last group first. With one kernel group (every
+        layer type but Conv2D with short output lines) this is the plain filter
+        order and the stream is unchanged.
+
+        Returns:
+            list: filter indices in stream order, e.g. [1, 0, 3, 2, ...] for two
+                  kernel groups.
+        """
+        groups = self.layer_params.different_kernels_per_calculation
+        filters = self.layer_params.filters
+        order = []
+        for base in range(0, filters, groups):
+            order.extend(reversed(range(base, min(base + groups, filters))))
+        return order
 
     def write_psum_data_glb(self, cl_x, cl_y, router):
         """Generate partial sum data for a specific cluster and router.

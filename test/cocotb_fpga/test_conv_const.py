@@ -297,3 +297,18 @@ if __name__ == "__main__":
         CONST_VALUE=8, CLUSTER_ROWS=2, NUM_GLB_IACT=3, INPUT_CHANNELS=1,
         request=_Request(),
     )
+
+
+# Output lines of 8 and 4 pixels fill half and a quarter of the PEs, so the layer
+# computes 2 and 4 filters at a time (different_kernels_per_calculation); one psum
+# buffer address then holds the biases of 2 / 4 filters. Distinct biases per filter
+# check the order of the bias stream against the RTL bias load (bug #32: the
+# filters of every pair got each other's bias). No padding pixels (bug #9).
+@pytest.mark.parametrize("width,filters", [(8, 8), (4, 16)], ids=["2_kernels", "4_kernels"])
+def test_conv_bias_order(width, filters, request, monkeypatch):
+    """Biases of layers that compute several filters at a time."""
+    monkeypatch.setitem(globals(), "INPUT_SIZE_X", width)
+    monkeypatch.setitem(globals(), "NUM_FILTERS", filters)
+    _run_conv_const("Convolution_Single", 8, 2, num_glb_iact=1, input_channels=4,
+                    request=request, input_height=2, quant_amount=32, dma_bitwidth=64,
+                    random_data=True, bias_step=3)

@@ -10,10 +10,10 @@ biases, quantizer multipliers and ReLU bounds to the RTL, which runs Conv 32, Ma
 Dense 3136 -> 10 on chip. The testbench checks the iact buffer after every layer and the final psums against its
 reference; test/test_onnx_model_flow.py checks that reference against ONNX Runtime (rounding differences only).
 
-Today conv1 + pool1 and conv2 + pool2 are bit-exact on chip, conv3 is not (xfail(strict)): bug #32 (conv3 computes two
-filters at a time and gets the biases of the filter pairs (2k, 2k+1) swapped) on both images, and on image 0 also bug #31
-(an empty pass at conv3's last output line loses the rest of the layer; the old bug #35).
-doc/experiments/2026-10-30_bug32_bias_order.md: with #32 corrected in the simulation, image 1 passes end to end.
+Image 1 runs through the whole model bit-exact (every buffer check and the Dense psums) and the DUT gives its class, 2.
+Image 0 is xfail(strict) on bug #31: in the window of conv3's last output line the channels 44..47 are all zero, that pass
+is empty and every later pass of conv3 is lost (doc/experiments/2026-10-30_bug32_bias_order.md; the old bug #35). Bug #32
+(conv3 computes two filters at a time and got the biases of the filter pairs swapped) is fixed in psum_stream_mapper.
 
 Usage (from the repository root; about 11 minutes per image):
   venv/bin/python -m pytest -q test/cocotb_fpga/test_real_model.py
@@ -27,12 +27,11 @@ from open_eye import open_eye_dir
 
 CHECKPOINT = os.path.abspath(os.path.join(open_eye_dir, os.pardir, os.pardir, "doc", "demo_notebooks",
                                           "mnist_unquantized_model.pth"))
-BUG32 = "bug #32: conv3 swaps the biases of filter pairs (iact buffer check before the Dense layer)"
-BUG31 = "; bug #31: empty pass at conv3's last output line"
+BUG31 = pytest.mark.xfail(strict=True, reason="bug #31: empty pass at conv3's last output line (iact buffer check before "
+                                               "the Dense layer)")
 
 
-@pytest.mark.parametrize("image", [pytest.param(0, marks=pytest.mark.xfail(strict=True, reason=BUG32 + BUG31)),
-                                   pytest.param(1, marks=pytest.mark.xfail(strict=True, reason=BUG32))])
+@pytest.mark.parametrize("image", [pytest.param(0, marks=BUG31), 1])
 def test_real_model(image, request, monkeypatch):
     if not os.path.exists(CHECKPOINT):
         pytest.skip("trained checkpoint not available")
