@@ -20,7 +20,7 @@ After the fixes of bugs #31 and #32 (2026-10-30) the trained model runs on chip 
 | 1 | 220,941 | 883.8 | 32,980 | 5,213 | 112,586 | 2,861 | 54,270 | 13,031 |
 | 2 | 213,040 | 852.2 | 32,980 | 5,213 | 108,423 | 2,861 | 50,538 | 13,025 |
 | 7 | 218,374 | 873.5 | 32,980 | 5,213 | 110,858 | 2,861 | 53,458 | 13,004 |
-| `model_mnist_real_c1` (baseline, random weights and data) | 240,671 | 962.7 | 32,980 | 5,213 | 120,807 | 2,861 | 65,029 | 14,016 |
+| `model_mnist_real_c1` (baseline, random weights and data) | 240,671 | 962.7 | 32,980 | 5,213 | 120,807 | 2,861 | 64,813 | 13,997 |
 
 Image 0 by phase: compute 126,318 (57.5 %), load_wght 39,120 (17.8 %), load_bias 23,308 (10.6 %), writeback 11,951 (5.4 %),
 convert_iact 10,376 (4.7 %), pooling 7,952 (3.6 %), load_iact / config / quant 559, readout 14. Everything but compute is
@@ -32,8 +32,8 @@ Only the compute phase depends on the data (zero skipping):
 |---|---:|---:|---:|---:|
 | Conv1 | 0 % (the normalised background is -19) | 9,582 | 9,582 | 0 |
 | Conv2 | 44 % | 81,489 | 89,838 | -9 % |
-| Conv3 | 87 % | 31,801 | 44,033 | -28 % |
-| Dense | 74 % | 3,446 | 4,351 | -21 % |
+| Conv3 | 87 % | 31,801 | 43,636 | -27 % |
+| Dense | 74 % | 3,446 | 4,335 | -21 % |
 
 The saving is much smaller than the share of zeros: the passes keep their fixed cost (loading, the pass handshake, the
 psum read-out of every pass) whatever the activations are. Over images 0-7 the zeros are 43-45 % (Conv2 input), 82-91 %

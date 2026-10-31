@@ -343,7 +343,7 @@ OpenEye_orig/
 │   ├── check_dma_trace.py        Kiểm tra DUT nhận đúng stream DMA (mục 9)
 │   ├── decode_iact_read_loops.py Giải mã thanh ghi vòng lặp đọc iact từ stream DMA
 │   ├── verify_conv_output.py     Kiểm tra độc lập từng word output của layer Conv (numpy)
-│   └── report/make_progress_report*.py  Tạo báo cáo Word cho giáo viên hướng dẫn (2026-10-10, 2026-10-15)
+│   └── report/make_progress_report*.py  Tạo báo cáo Word cho giáo viên hướng dẫn (2026-10-10, 2026-10-15, 2026-10-31)
 ├── doc/
 │   ├── perf/                  ★  Số liệu đo chu kỳ: baseline_2026-10-24/ (**mốc hiện tại**, 12 case), paper_table3_2026-10-24/ (Bảng 3 paper),
 │   │                             baseline_2026-10-22/, baseline_2026-10-15/, baseline_2026-10-10/ (mốc cũ), mem_typical_2026-10-10/, ...
@@ -351,7 +351,8 @@ OpenEye_orig/
 │   ├── experiments/           ★  Báo cáo thí nghiệm và điều tra lỗi (#13, #6/#7, #18, #14, #19, cherry-pick upstream, model nhiều layer,
 │   │                             #17 đệm channel, #22 mã hoá weight, #26 Dense nối tiếp Dense, #25 NUM_GLB_PSUM=2, int8/kẹp/ReLU #30 + bộ giả lập model int8, #31 lượt rỗng, #32 thứ tự bias + #35) kèm script probe/lockstep để chạy lại
 │   ├── lint/                  ★  Output lint gốc
-│   ├── reports/               ★  Báo cáo tiến độ (Word): BaoCao_TienDo_OpenEye_2026-10-10.docx, BaoCao_TienDo_OpenEye_2026-10-15.docx
+│   ├── reports/               ★  Báo cáo tiến độ (Word): BaoCao_TienDo_OpenEye_2026-10-10.docx, BaoCao_TienDo_OpenEye_2026-10-15.docx,
+│   │                             BaoCao_TienDo_OpenEye_2026-10-31.docx (+ 5 hình PNG)
 │   ├── OpenEye_FPGA_documentation.md, test_status_handover.md   Tài liệu của upstream
 │   └── demo_notebooks/           Notebook demo của upstream
 ├── yosys/, nextpnr/              Flow tổng hợp mã nguồn mở của upstream (FPGA GateMate)
@@ -843,11 +844,11 @@ kiểm tra khớp từng bit, lớp đúng cả 4 ảnh. Chạy: `doc/experiment
 | 1 | 220.941 | 883,8 | 32.980 | 5.213 | 112.586 | 2.861 | 54.270 | 13.031 |
 | 2 | 213.040 | 852,2 | 32.980 | 5.213 | 108.423 | 2.861 | 50.538 | 13.025 |
 | 7 | 218.374 | 873,5 | 32.980 | 5.213 | 110.858 | 2.861 | 53.458 | 13.004 |
-| `model_mnist_real_c1` (mốc, dữ liệu ngẫu nhiên) | 240.671 | 962,7 | 32.980 | 5.213 | 120.807 | 2.861 | 65.029 | 14.016 |
+| `model_mnist_real_c1` (mốc, dữ liệu ngẫu nhiên) | 240.671 | 962,7 | 32.980 | 5.213 | 120.807 | 2.861 | 64.813 | 13.997 |
 
 Ảnh 0 theo pha: tính toán 126.318 (57,5 %), nạp weight 39.120 (17,8 %), nạp bias 23.308 (10,6 %), ghi ngược 11.951 (5,4 %), chuyển đổi iact 10.376 (4,7 %),
 pooling 7.952 (3,6 %). Mọi pha trừ tính toán giống hệt dữ liệu ngẫu nhiên (stream chỉ phụ thuộc kích thước). Tính toán phụ thuộc số 0 (bỏ qua số 0): input Conv1
-0 % số 0 (nền −19) → không đổi; Conv2 44 % số 0 → −9 %; Conv3 87 % số 0 → −28 %; Dense 74 % số 0 → −21 %. **Lợi ích nhỏ hơn nhiều so với tỉ lệ số 0** vì mỗi lượt
+0 % số 0 (nền −19) → không đổi; Conv2 44 % số 0 → −9 %; Conv3 87 % số 0 → −27 %; Dense 74 % số 0 → −21 %. **Lợi ích nhỏ hơn nhiều so với tỉ lệ số 0** vì mỗi lượt
 vẫn tốn phần cố định (nạp, bắt tay lượt, đọc psum của từng lượt): ứng viên tối ưu độ trễ.
 
 **Cách đọc:**
@@ -922,7 +923,7 @@ Kết quả: `doc/perf/paper_table3_2026-10-24.md` (7 bảng theo layer: hàng =
 layer 5 (Dense nối tiếp Dense) không ghi kết quả vào bộ đệm (lỗi mới #26) nên kết quả cuối sai; với X = 2, kiểm tra sau layer 1, 3, 4, 5 báo sai (lỗi mới #25; kiểm tra sau
 layer 0 và 2, conv → pooling, thật ra **không được làm** vì testbench không có bố cục cho input của pooling, xem mục 9). Thời gian của các layer đó vẫn đo được (số word mỗi pha không phụ thuộc giá trị), nhưng đánh dấu FAIL trong bảng.
 
-**Sau bản sửa #25 (2026-10-26, `doc/perf/paper_table3_2026-10-26_fix25.md`):** 14/16 cấu hình PASS cả 7 layer; X = 2 với CR 2/4/8 nay đúng và chậm hơn số đo cũ
+**Sau bản sửa #25 (2026-10-26, `doc/perf/paper_table3_2026-10-26_fix25.md`):** 13/16 cấu hình PASS cả 7 layer (sửa 31/10: trước đây ghi nhầm 14/16; 7 + 6 = 13, `status.json` có 3 cấu hình FAIL); X = 2 với CR 2/4/8 nay đúng và chậm hơn số đo cũ
 4,4–7,8 % (pha ghi ngược Conv trước đây bị cắt nửa chừng); X = 4 không đổi; còn CR 1 X 4 Y 3 (#19b) và CR 1 X 2 (#28). **Mốc Bảng 3 hiện tại: `paper_table3_2026-10-26_fix25`.**
 
 **Sau bản sửa #26 (2026-10-24, `doc/perf/paper_table3_2026-10-24_fix26.md`):** 7/8 cấu hình X = 4 **PASS cả 7 layer** (bộ đệm sau mỗi layer và kết quả cuối);
@@ -1290,7 +1291,7 @@ dài 96 thay vì 192 chu kỳ.
 | Mốc phần cứng: tổng hợp + place & route Vivado (`tools/export_vivado.py`) | **Xong** (2026-10-12 → 2026-10-21, mục 6d): 250 MHz, 63,9k LUT, 39,3k FF, 192 BRAM tile |
 | Kiểm tra độc lập từng word + test dữ liệu ngẫu nhiên | **Xong** (2026-10-15, mục 6.12) |
 | Baseline sau các bản sửa | **Xong**: `doc/perf/baseline_2026-10-24/` (12 case) |
-| Bảng 3 của paper đo bằng profiler (16 cấu hình, theo layer) | **Xong** (2026-10-24, mục 6.14); sau bản sửa #26 và #25: **14/16 cấu hình tính đúng cả mạng**; còn #19b (CR 1 X 4 Y 3) và #28 (CR 1 X 2) |
+| Bảng 3 của paper đo bằng profiler (16 cấu hình, theo layer) | **Xong** (2026-10-24, mục 6.14); sau bản sửa #26 và #25: **13/16 cấu hình tính đúng cả mạng**; còn #19b (CR 1 X 4 Y 3) và #28 (CR 1 X 2) |
 
 ### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-24)
 
@@ -1322,7 +1323,7 @@ dài 96 thay vì 192 chu kỳ.
 | 22 | Conv có **weight bằng 0** tính sai hoặc treo (mọi mẫu số 0 trừ "mỗi cột một số 0 ở đầu"; model MNIST int8 đã huấn luyện: Conv2 140/384, Conv3 116/384 lần nạp weight sai) | Định dạng nén weight: mapper Python không khớp cách `data_pipeline_wght.v` giải mã (cột rỗng, ô đệm, overhead 4 bit, reset địa chỉ ở word 0) và bộ ghép stream | **Đã sửa** (2026-10-24, được bạn đồng ý, **chỉ Python**): `conv_wght_encoding.py`; stream giống hệt khi không có số 0; MNIST Conv1/2/3 với weight đã huấn luyện tính đúng mọi output. Mục 9 |
 | 23 | `test_conv3x3_sparse` 32×4×8 → 16 (iact và weight thưa dạng bàn cờ, `NUM_GLB_IACT=3`) sai: output 0 ở các x lẻ của hàng 1 | ? (phía activation thưa: weight của ca này giải mã đúng theo mô hình RTL) | **Chưa điều tra** (có từ trước bản sửa #22: code cũ cũng fail, kiểu sai khác) |
 | 24 | **Không có hàm kích hoạt**: `af_cluster.v` (ReLU) không được dùng ở đâu, còn 2 lỗi (so sánh `< 0` trên dây không dấu, chọn bit `[a:+b]` sai), testbench riêng lỗi thời; `af_cluster_mode` chỉ reset về 0, không có trường cấu hình | RTL | **Giải quyết cho ReLU** (2026-10-28, được bạn đồng ý): ReLU đứng ngay sau Conv/Dense được thực hiện bằng cận dưới của bộ kẹp int8 trong `quantization_unit.v` (`act_min = 0`), đúng cách TFLite làm "fused ReLU", không cần `af_cluster`. `af_cluster.v` vẫn không dùng (giữ nguyên, 2 lỗi của nó không cần sửa). Hàm không phải dạng kẹp (leaky ReLU, sigmoid, tanh) vẫn chưa có. Mục 9 |
-| 25 | `NUM_GLB_PSUM = 2` (PE trục X = 2): mọi model nối một Conv với layer khác trên chip tính sai (cả 8 hàng X = 2 của Bảng 3). Ghi chú cũ "sau Conv2 lại đúng" là sai: kiểm tra đó bị bỏ qua | **Pha ghi ngược của Conv**: RTL (`RECEIVE_PSUMS_TO_IACT` gom nhóm `WRITEBACK_WORDS` = 2 channel thay vì 4 channel/pixel, và đếm pixel đệm theo nhóm) + Python (`fsm_psum_limit` chia 4 thay vì `NUM_GLB_PSUM`) | **Đã sửa** (2026-10-26, được bạn đồng ý): RTL `RECEIVE_PSUMS_TO_IACT` gom nhóm 4 channel/pixel với mọi số lane (`WRITEBACK_CHANNELS`), chỉ phát W lane, `x_pos` đếm theo pixel; Python `fsm_psum_limit` chia theo số lane. Với `NUM_GLB_PSUM = 4` mạch như cũ. Test mới 7/7, hồi quy 146 test 0 FAIL, 12 case mốc 0 chu kỳ lệch, lint 0 mới, Bảng 3 14/16 cấu hình PASS (còn #19b, #28). Mục 9 |
+| 25 | `NUM_GLB_PSUM = 2` (PE trục X = 2): mọi model nối một Conv với layer khác trên chip tính sai (cả 8 hàng X = 2 của Bảng 3). Ghi chú cũ "sau Conv2 lại đúng" là sai: kiểm tra đó bị bỏ qua | **Pha ghi ngược của Conv**: RTL (`RECEIVE_PSUMS_TO_IACT` gom nhóm `WRITEBACK_WORDS` = 2 channel thay vì 4 channel/pixel, và đếm pixel đệm theo nhóm) + Python (`fsm_psum_limit` chia 4 thay vì `NUM_GLB_PSUM`) | **Đã sửa** (2026-10-26, được bạn đồng ý): RTL `RECEIVE_PSUMS_TO_IACT` gom nhóm 4 channel/pixel với mọi số lane (`WRITEBACK_CHANNELS`), chỉ phát W lane, `x_pos` đếm theo pixel; Python `fsm_psum_limit` chia theo số lane. Với `NUM_GLB_PSUM = 4` mạch như cũ. Test mới 7/7, hồi quy 146 test 0 FAIL, 12 case mốc 0 chu kỳ lệch, lint 0 mới, Bảng 3 13/16 cấu hình PASS (còn #19b, #28). Mục 9 |
 | 26 | **Dense nối tiếp Dense trên chip** (MLP, Dense 1568→32 → Dense 32→10 của paper): Dense đầu tính psum **đúng** nhưng pha ghi ngược (`SEND_PSUM_TO_IACT` + `RECEIVE_PSUMS_TO_IACT`) **không ghi gì** vào bộ đệm iact, Dense sau đọc lại input của Dense đầu; mọi cấu hình, mọi K, N | Python (`fsm_psum_limit` quá ngắn, vòng đọc psum không cấu hình cho Dense) **và** RTL (bộ đóng gói chỉ biết bố cục conv; nhánh FC bị upstream bỏ ở `1320759`/`8350a00` để giảm LUT) | **Đã sửa** (2026-10-24, được bạn đồng ý): 1 dòng RTL (`x_pos` quay về 0 ở mỗi nhóm khi FC) + thanh ghi Python (`configure_fc_writeback`). 11/11 chuỗi Dense qua RTL, hồi quy 128 test không đổi, 12 case mốc 0 chu kỳ lệch, Bảng 3: 7/8 cấu hình X = 4 tính đúng cả mạng. Mục 9 |
 | 27 | Pooling 4×4 → 2×2 (lần pooling thứ hai của `Conv_Pool_Conv_Pool_Conv` với input 8×8): bộ đệm sau pooling chứa −128 (giá trị khởi đầu của max-pool) và 2 ô không được ghi; xảy ra với cả `NUM_GLB_PSUM` 4 và 2; input 16×16 thì đúng | ? (pooling, kích thước nhỏ) | **Chưa điều tra** (phát hiện 2026-10-26 khi viết test cho #25) |
 | 28 | Conv ở `CLUSTER_ROWS=1` với `NUM_GLB_PSUM=2` tính sai một số output (đường đọc thẳng ra, không có ghi ngược): Conv 14×14 32 → 32 channel sai, 16 → 32 đúng; conv2 của mạng paper (sau pooling) sai ở vài pixel. CR 1 X 4 và CR 2 X 2 đều đúng. Là nguyên nhân của 2 hàng CR 1 X 2 còn FAIL trong Bảng 3 | ? (phép tính, tổ hợp CR = 1 + 2 lane) | **Chưa điều tra** (phát hiện 2026-10-26 khi kiểm chứng bản sửa #25) |
@@ -1409,7 +1410,7 @@ kết quả ra.
 | `LAYER=MNIST` của `data_create.py` (Conv 2→16, Pool, Conv 16→16, Pool, Conv 7×7 16→16, Dense 784→10), `NUM_GLB_IACT` 1 và 3 | **PASS** cả 6 layer |
 | Kiến trúc MNIST thật (`models/mnist_conv_net.py`: Conv 32, Pool, Conv 64, Pool, Conv 7×7 64, FC 3136→10), đầu vào **đệm thành 2 channel**, `QUANT_AMOUNT=64` | **PASS** cả 6 layer |
 | Như trên với **1 channel** (đúng model gốc) | FAIL ở bộ đệm iact sau Conv1 (lỗi #17); **PASS từ 2026-10-22** nhờ đệm 2 channel bằng Python (`model_mnist_real_c1`, 241.250 chu kỳ = 965 µs; 240.671 sau #22) |
-| `LAYER=PAPER_MNIST` (mạng Bảng 2 của paper: Conv 16, Pool, Conv 32, Pool, Conv 32, Dense 1568→32, Dense 32→10), 16 cấu hình | Trước bản sửa #26 FAIL ở mọi cấu hình. Sau bản sửa #26 (2026-10-24): 7/8 cấu hình X = 4 PASS. **Sau bản sửa #25 (2026-10-26): 14/16 cấu hình PASS cả 7 layer**; còn CR 1 X 4 Y 3 (lỗi tính #19b ở Dense 1568→32) và CR 1 X 2 (lỗi tính #28 ở Conv) (mục 6.14, 9) |
+| `LAYER=PAPER_MNIST` (mạng Bảng 2 của paper: Conv 16, Pool, Conv 32, Pool, Conv 32, Dense 1568→32, Dense 32→10), 16 cấu hình | Trước bản sửa #26 FAIL ở mọi cấu hình. Sau bản sửa #26 (2026-10-24): 7/8 cấu hình X = 4 PASS. **Sau bản sửa #25 (2026-10-26): 13/16 cấu hình PASS cả 7 layer**; còn CR 1 X 4 Y 3 (lỗi tính #19b ở Dense 1568→32) và CR 1 X 2 (lỗi tính #28 ở Conv) (mục 6.14, 9) |
 
 **Còn thiếu để mô phỏng đúng model MNIST thật (ngữ nghĩa của testbench):** (1) lỗi #17: **đã làm** đệm 1 → 2 channel bằng Python (2026-10-22, channel thêm
 toàn 0, +472 chu kỳ = +1,5 % Conv1, mục 9; sửa RTL vẫn là lựa chọn sau này); (2) dựng phần cứng với `QUANT_AMOUNT=64`; (3) nới ngưỡng phát hiện treo (layer 64 filter tính 90.000 chu kỳ trong trạng thái 11);
@@ -2147,7 +2148,7 @@ Với `NUM_GLB_PSUM = 4` mọi điều kiện mới luôn đúng: mạch như tr
 | `run_profile` 12 case so với mốc | 12/12 PASS, **0 chu kỳ và 0 word DMA lệch** |
 | Lint cấu hình mặc định | `parallel` 36, `fpga` 463: **0 mới** (phép so sánh bộ đếm viết 4 bit để không thêm cảnh báo WIDTHEXPAND) |
 | Lint với `NUM_GLB_PSUM=2` (RTL mới so với RTL cũ, cùng cấu hình) | Không có cảnh báo mới |
-| Bảng 3 chạy lại (`doc/perf/paper_table3_2026-10-26_fix25.md`; chạy trên bản RTL đầu, trước khi OR thêm hằng vào phép kiểm lane, không đổi hành vi; hồi quy và 12 case mốc đã chạy lại trên RTL cuối) | **14/16 cấu hình PASS** (trước: 7/16). X = 2 với CR 2/4/8: FAIL → PASS, chu kỳ +4,4 % đến +7,8 % (pha ghi ngược Conv không còn bị cắt). X = 4: giống hệt từng chu kỳ. Còn sai: CR 1 X 4 Y 3 (#19b) và CR 1 X 2 Y 3/Y 4 (lỗi mới #28) |
+| Bảng 3 chạy lại (`doc/perf/paper_table3_2026-10-26_fix25.md`; chạy trên bản RTL đầu, trước khi OR thêm hằng vào phép kiểm lane, không đổi hành vi; hồi quy và 12 case mốc đã chạy lại trên RTL cuối) | **13/16 cấu hình PASS** (trước: 7/16). X = 2 với CR 2/4/8: FAIL → PASS, chu kỳ +4,4 % đến +7,8 % (pha ghi ngược Conv không còn bị cắt). X = 4: giống hệt từng chu kỳ. Còn sai: CR 1 X 4 Y 3 (#19b) và CR 1 X 2 Y 3/Y 4 (lỗi mới #28) |
 | Vivado tổng hợp + place & route ở 4 ns (`doc/synth/2026-10-26_route4ns_fix25_zu7ev/`) | **0 ERROR, 0 CRITICAL WARNING**, cảnh báo như mốc fix26; sau tổng hợp LUT +113 (+0,17 %, trong biên dao động giữa các lần chạy), FF −10; BRAM/URAM/DSP không đổi; WNS +0,205 / **+0,084 ns**, đạt 250 MHz; đường găng không nằm ở bộ ghi ngược. Lần chạy đầu (phép kiểm lane chưa gấp hằng) LUT +92; RTL cuối OR thêm hằng `WRITEBACK_WORDS >= WRITEBACK_CHANNELS` |
 | Kiểm tra tương đương hình thức bằng Yosys (thử) | **Không dùng được**: quy trình báo "tương đương" cả với một sai khác cố ý cài vào, nên không phải bằng chứng |
 
@@ -2773,7 +2774,7 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   chỉ phát đủ số lane thật, `x_pos` đếm theo pixel; với 4 lane mọi điều kiện mới là hằng đúng (mạch như cũ). Python: `fsm_psum_limit` chia theo số lane.
   Mô hình chu kỳ dùng chung `src/open_eye/writeback_model.py`; test mới `test/cocotb_fpga/test_glb_psum2.py` (7) và `test/test_conv_writeback.py` (12).
   Kiểm chứng: 7/7; đối chứng âm (RTL cũ) FAIL đúng kiểu đổi byte; hồi quy 146 test 141 PASS + 5 xfail, 0 FAIL; 12 case mốc 0 chu kỳ / 0 word DMA lệch; lint 0 mới
-  (cả cấu hình 2 lane); Bảng 3 (`doc/perf/paper_table3_2026-10-26_fix25.md`, mốc Bảng 3 mới) **14/16 cấu hình PASS** (X = 2 với CR 2/4/8 nay đúng, chậm hơn số đo cũ
+  (cả cấu hình 2 lane); Bảng 3 (`doc/perf/paper_table3_2026-10-26_fix25.md`, mốc Bảng 3 mới) **13/16 cấu hình PASS** (X = 2 với CR 2/4/8 nay đúng, chậm hơn số đo cũ
   4,4–7,8 % vì pha ghi ngược không còn bị cắt; X = 4 giống hệt); Vivado 4 ns (`doc/synth/2026-10-26_route4ns_fix25_zu7ev/`, **mốc phần cứng mới**): 0 CRITICAL,
   LUT +113 (+0,17 %, dao động), WNS +0,084 ns. Thử kiểm tra tương đương hình thức bằng Yosys: quy trình không phát hiện được sai khác cài sẵn nên không dùng.
   Lỗi mới: **#27** (pooling 4×4 → 2×2 sai, cả 4 lane), **#28** (Conv ở `CLUSTER_ROWS=1` với 2 lane tính sai: 2 hàng CR 1 X 2 của Bảng 3). Mục 8b, 9,
@@ -2856,7 +2857,12 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   hồi quy RTL 162 test: 157 PASS + 5 xfail đã biết, 0 FAIL; 12 ca mốc 0 chu kỳ lệch; Vivado 0 critical, đạt 250 MHz (WNS +0,074 ns), FF +10/PE, mốc phần cứng mới `doc/synth/2026-10-30_route4ns_fix31_zu7ev/`.
 - **Đo model đã huấn luyện trên chip bằng profiler** (2026-10-31, chỉ đo, mục 6.13, `doc/perf/trained_mnist_2026-10-31.md`): ảnh test 0, 1, 2, 7: 213.040–220.941
   chu kỳ (852–884 µs ở 250 MHz), so với 240.671 của `model_mnist_real_c1` (dữ liệu ngẫu nhiên); chỉ pha tính toán khác (bỏ qua số 0): Conv2 −9 % với 44 % số 0, Conv3
-  −28 % với 87 % số 0, Dense −21 % với 74 % số 0.
+  −27 % với 87 % số 0, Dense −21 % với 74 % số 0 (sửa 31/10: bản đầu ghi nhầm −28 % và số Conv3/Dense của ca `_c2`).
 - **Phân tích lượng tử động của `onnx2model` cũ / upstream** (2026-10-31, không sửa gì, mục 8d, `doc/experiments/2026-10-30_onnx_model_flow.md` mục 7): scale
   activation tính lúc chạy (uint8, zero point khác 0) nên không đưa xuống phần cứng được; model int8 động mà đường cũ tạo ra ONNX Runtime không chạy được; `has_relu`
   tìm thấy nhưng không dùng; thêm các lỗi trích xuất: `input_scale` = 1,0, kernel chuyển vị sai chiều, Dense đảo `in`/`out`, code tham chiếu chết.
+- **Báo cáo tiến độ lần 3** (Word, 2026-10-31): `doc/reports/BaoCao_TienDo_OpenEye_2026-10-31.docx`, tạo bằng
+  `~/tools/docenv/bin/python tools/report/make_progress_report_2026-10-31.py` từ số đo (`doc/perf/baseline_2026-10-24`, `doc/perf/trained_mnist_2026-10-31`,
+  `doc/perf/paper_table3_2026-10-26_fix25`) và Vivado. 5 hình: đường model thật qua toolchain, chu kỳ theo layer của 7 ca model, pha theo layer của model đã huấn
+  luyện, bỏ qua số 0 (ngẫu nhiên so với thật), mạng Bảng 3 trên 16 cấu hình. Khi lấy số cho hình đã sửa 2 chỗ ghi sai: Bảng 3 là **13/16** cấu hình đúng (không phải
+  14/16: 7 + 6, `status.json` có 3 FAIL), và hàng `model_mnist_real_c1` trong mục 6.13 lấy nhầm số Conv3/Dense của ca `_c2` (Conv3 −27 %, không phải −28 %).
