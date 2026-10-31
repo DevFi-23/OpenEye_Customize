@@ -28,13 +28,14 @@ the same as with random data (the streams depend on the shape only).
 
 Only the compute phase depends on the data (zero skipping):
 
-| Layer (image 0) | zeros in its input | compute, trained | compute, random | change |
+| Layer (image 0) | zeros in its input, trained / random | compute, trained | compute, random | change |
 |---|---:|---:|---:|---:|
-| Conv1 | 0 % (the normalised background is -19) | 9,582 | 9,582 | 0 |
-| Conv2 | 44 % | 81,489 | 89,838 | -9 % |
-| Conv3 | 87 % | 31,801 | 43,636 | -27 % |
-| Dense | 74 % | 3,446 | 4,335 | -21 % |
+| Conv1 | 0 % / 0 % (image channel; the normalised background is -19) | 9,582 | 9,582 | 0 |
+| Conv2 | 44 % / 6 % | 81,489 | 89,838 | -9 % |
+| Conv3 | 87 % / 11 % | 31,801 | 43,636 | -27 % |
+| Dense | 74 % / 10 % | 3,446 | 4,335 | -21 % |
 
-The saving is much smaller than the share of zeros: the passes keep their fixed cost (loading, the pass handshake, the
+Random data has zeros too after the first layer (small values after the shift by 7, no ReLU; testbench reference of
+MNIST_REAL with seed 1). The saving is much smaller than the difference in zeros: the passes keep their fixed cost (loading, the pass handshake, the
 psum read-out of every pass) whatever the activations are. Over images 0-7 the zeros are 43-45 % (Conv2 input), 82-91 %
 (Conv3 input), 74-78 % (Dense input).

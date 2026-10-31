@@ -848,7 +848,8 @@ kiểm tra khớp từng bit, lớp đúng cả 4 ảnh. Chạy: `doc/experiment
 
 Ảnh 0 theo pha: tính toán 126.318 (57,5 %), nạp weight 39.120 (17,8 %), nạp bias 23.308 (10,6 %), ghi ngược 11.951 (5,4 %), chuyển đổi iact 10.376 (4,7 %),
 pooling 7.952 (3,6 %). Mọi pha trừ tính toán giống hệt dữ liệu ngẫu nhiên (stream chỉ phụ thuộc kích thước). Tính toán phụ thuộc số 0 (bỏ qua số 0): input Conv1
-0 % số 0 (nền −19) → không đổi; Conv2 44 % số 0 → −9 %; Conv3 87 % số 0 → −27 %; Dense 74 % số 0 → −21 %. **Lợi ích nhỏ hơn nhiều so với tỉ lệ số 0** vì mỗi lượt
+0 % số 0 (nền −19) → không đổi; Conv2 44 % số 0 (ngẫu nhiên 6 %) → −9 %; Conv3 87 % (ngẫu nhiên 11 %) → −27 %; Dense 74 % (ngẫu nhiên 10 %) → −21 %. Dữ liệu ngẫu nhiên chỉ không có số 0
+ở channel ảnh của layer đầu; sau đó giá trị nhỏ sau phép dịch 7 bit (không ReLU) cũng có số 0. **Lợi ích nhỏ hơn nhiều so với tỉ lệ số 0** vì mỗi lượt
 vẫn tốn phần cố định (nạp, bắt tay lượt, đọc psum của từng lượt): ứng viên tối ưu độ trễ.
 
 **Cách đọc:**
@@ -2866,3 +2867,7 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   `doc/perf/paper_table3_2026-10-26_fix25`) và Vivado. 5 hình: đường model thật qua toolchain, chu kỳ theo layer của 7 ca model, pha theo layer của model đã huấn
   luyện, bỏ qua số 0 (ngẫu nhiên so với thật), mạng Bảng 3 trên 16 cấu hình. Khi lấy số cho hình đã sửa 2 chỗ ghi sai: Bảng 3 là **13/16** cấu hình đúng (không phải
   14/16: 7 + 6, `status.json` có 3 FAIL), và hàng `model_mnist_real_c1` trong mục 6.13 lấy nhầm số Conv3/Dense của ca `_c2` (Conv3 −27 %, không phải −28 %).
+  Bổ sung cùng ngày (theo câu hỏi của bạn): bảng cấu hình các ca model (mục 4), Hình 4 ghi tỉ lệ số 0 của cả hai ca (ca ngẫu nhiên có 6–11 % số 0 sau layer đầu,
+  không phải "không có số 0" như bản đầu), phụ lục A (bỏ qua số 0: chỉ activation khác 0 vào SPad, số chu kỳ nhân ≈ N_khác0 × F / 2 mỗi PE mỗi lượt, cộng
+  phần cố định) và phụ lục B (bộ lượng tử: q = kẹp(⌊mant·(psum + offset)/2^shift⌋, act_min, 127), cách tính mant/shift, ReLU bằng act_min = 0, vì sao offset
+  luôn 0).

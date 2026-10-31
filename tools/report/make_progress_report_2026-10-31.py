@@ -71,8 +71,10 @@ PHASE_GROUPS = [   # (label, phases), slot order
     ("Pooling", ["pooling"]),
     ("Khác (cấu hình, iact, lượng tử, đọc ra)", ["load_config", "load_iact", "load_quant", "readout"]),
 ]
-# Share of zero activations in each layer's input, image 0 (measured on the RTL run, doc/perf/trained_mnist_2026-10-31.md)
+# Share of zero activations in each layer's input (the image channel for Conv1): the trained model on image 0 (measured
+# on the RTL run, doc/perf/trained_mnist_2026-10-31.md) and the random-data case (testbench reference of MNIST_REAL, seed 1)
 ZEROS_IMG0 = {0: 0, 2: 44, 4: 87, 5: 74}
+ZEROS_RANDOM = {0: 0, 2: 6, 4: 11, 5: 10}
 
 
 def load(path):
@@ -219,21 +221,21 @@ def figure_phases(profile):
 
 def figure_zeros(random, trained):
     """Grouped bars: compute cycles per compute layer, random data vs the trained model on image 0."""
-    fig, ax = new_figure(8.4, 3.5)
+    fig, ax = new_figure(8.4, 3.8)
     style_axes(ax, "y")
     idx = [0, 2, 4, 5]
     xs = list(range(len(idx)))
     w = 0.36
     a = [random["layers"][i]["phases"]["compute"]["cycles"] for i in idx]
     b = [trained["layers"][i]["phases"]["compute"]["cycles"] for i in idx]
-    ax.bar([x - w / 2 - 0.01 for x in xs], a, w, color=NEUTRAL, label="Weight và dữ liệu ngẫu nhiên (mốc, không có số 0)")
+    ax.bar([x - w / 2 - 0.01 for x in xs], a, w, color=NEUTRAL, label="Weight và dữ liệu ngẫu nhiên (mốc model_mnist_real_c1)")
     bars = ax.bar([x + w / 2 + 0.01 for x in xs], b, w, color=SLOTS[0], label="Model đã huấn luyện, ảnh test 0")
     for x, va, vb in zip(xs, a, b):
         ax.text(x - w / 2 - 0.01, va, fmt(va), ha="center", va="bottom", fontsize=7.5, color=INK)
         ax.text(x + w / 2 + 0.01, vb, f"{fmt(vb)}\n{(vb - va) / va * 100:+.0f} %".replace("+0 %", "0 %"),
                 ha="center", va="bottom", fontsize=7.5, color=INK)
     ax.set_xticks(xs)
-    ax.set_xticklabels([f"{LAYER_LABELS[i]}\n{ZEROS_IMG0[i]} % input bằng 0" for i in idx], color=INK)
+    ax.set_xticklabels([f"{LAYER_LABELS[i]}\nsố 0 trong input:\n{ZEROS_RANDOM[i]} % / {ZEROS_IMG0[i]} %" for i in idx], color=INK)
     ax.set_ylabel("Chu kỳ pha tính toán", color=INK_2)
     ax.set_ylim(0, max(a) * 1.25)
     ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: fmt(int(v))))
@@ -428,6 +430,27 @@ def build():
     doc.add_heading("4. Kết quả đo chu kỳ của các model", level=1)
     para(doc, "Cấu hình: 2×2 cluster, mỗi cluster 12 PE (48 PE), psum 20 bit, DMA 64 bit, bảng lượng tử 64 entry, bộ nhớ lý tưởng (một "
               "word DMA mỗi chu kỳ). Thời gian quy đổi ở 250 MHz, tần số đạt được sau place & route.")
+    para(doc, "Cấu hình các ca model:").runs[0].bold = True
+    table(doc, ["Ca", "Model", "Weight, bias, lượng tử", "Input"], [
+        ["Mạng MNIST nhỏ (16 filter), ngẫu nhiên (model_mnist16_c2)",
+         "Mạng thử của mã nguồn gốc (LAYER=MNIST): Conv 3×3 2→16 (28×28), MaxPool, Conv 16→16 (14×14), MaxPool, Conv 16→16 (7×7), "
+         "Dense 784→10",
+         "Model Keras khởi tạo ngẫu nhiên, chưa huấn luyện: weight = floor(127·w), bias Conv = 1, bias Dense = 1, 2, 3, …; "
+         "mant/shift mặc định 1/7 (Conv), 1/9 (Dense); không ReLU",
+         "28×28×2 số nguyên ngẫu nhiên −32…31, mọi số 0 thay bằng ±1; seed 1"],
+        ["Kiến trúc MNIST thật, ngẫu nhiên, 2 ch / 1 ch (model_mnist_real_c2 / _c1)",
+         "Kiến trúc của models/mnist_conv_net.py (LAYER=MNIST_REAL): Conv 1→32 (28×28), MaxPool, Conv 32→64 (14×14), MaxPool, "
+         "Conv 64→64 (7×7), Dense 3136→10",
+         "Như trên (ngẫu nhiên, chưa huấn luyện)",
+         "_c2: 2 channel ngẫu nhiên; _c1: 1 channel ngẫu nhiên (đúng model thật), đệm thêm 1 channel 0 (lỗi #17)"],
+        ["Đã huấn luyện, ảnh test i",
+         "SimpleMNISTConvNet (cùng kiến trúc), checkpoint mnist_unquantized_model.pth: huấn luyện 5 epoch, 99,35 % trên tập test",
+         "Lượng tử tĩnh int8 qua onnx2model: weight int8 và bias int32 thật, mant/shift tính từ scale, ReLU sau 3 Conv",
+         "Ảnh thứ i (đếm từ 0) của tập test MNIST 10.000 ảnh; chữ số trong ngoặc là nhãn của ảnh (ảnh 7 là chữ số 9); "
+         "chuẩn hoá như lúc huấn luyện, lượng tử int8, đệm 1 channel 0"],
+    ], widths=[3.6, 4.6, 4.6, 3.8])
+    para(doc, "Phần cứng chung: 2×2 cluster, mỗi cluster 4×3 PE (48 PE, mỗi PE 2 phép nhân/chu kỳ), NUM_GLB_IACT = 1, psum 20 bit, "
+              "DMA 64 bit, bảng lượng tử 64 entry (32 với mạng nhỏ), bộ nhớ lý tưởng; µs quy đổi ở 250 MHz.")
     doc.add_heading("4.1. Tổng chu kỳ theo layer", level=2)
     rows = []
     for label, m in models:
@@ -464,11 +487,13 @@ def build():
 
     doc.add_heading("4.3. Bỏ qua số 0 với dữ liệu thật", level=2)
     doc.add_picture(FIG_ZEROS, width=Cm(15.0))
-    caption(doc, "Hình 4. Chu kỳ pha tính toán: dữ liệu ngẫu nhiên và model đã huấn luyện (ảnh test 0).")
-    para(doc, "Sau ReLU và pooling, input của Conv2 có khoảng 44 % số 0, Conv3 82–91 %, Dense 74–78 % (ảnh 0–7). Thiết kế bỏ qua các "
-              "activation bằng 0, nhưng mức giảm chu kỳ nhỏ hơn nhiều so với tỉ lệ số 0 (Conv3: 87 % số 0, chỉ giảm 27 %): mỗi lượt "
-              "tính vẫn tốn một phần cố định (nạp dữ liệu, bắt tay lượt, đọc psum) không phụ thuộc activation. Đây là một hướng tối "
-              "ưu độ trễ mới thấy được nhờ chạy dữ liệu thật.")
+    caption(doc, "Hình 4. Chu kỳ pha tính toán: dữ liệu ngẫu nhiên và model đã huấn luyện (ảnh test 0); dưới mỗi layer là tỉ lệ "
+                 "số 0 trong input (ngẫu nhiên / ảnh thật).")
+    para(doc, "Với model đã huấn luyện, sau ReLU và pooling input của Conv2 có khoảng 44 % số 0, Conv3 82–91 %, Dense 74–78 % "
+              "(ảnh 0–7); với dữ liệu ngẫu nhiên chỉ 6–11 % (giá trị nhỏ sau phép dịch, không có ReLU). Thiết kế bỏ qua các activation "
+              "bằng 0 (phụ lục A), nhưng mức giảm chu kỳ nhỏ hơn nhiều so với chênh lệch tỉ lệ số 0 (Conv3: 11 % → 87 % số 0, chỉ "
+              "giảm 27 %): mỗi lượt tính vẫn tốn một phần cố định (bắt tay lượt, đưa psum vào và đọc psum ra) và phải chờ PE bận nhất. "
+              "Đây là một hướng tối ưu độ trễ mới thấy được nhờ chạy dữ liệu thật.")
 
     doc.add_heading("4.4. Mạng của bài báo OpenEye trên 16 cấu hình", level=2)
     doc.add_picture(FIG_PAPER, width=Cm(15.0))
@@ -539,6 +564,50 @@ def build():
         "Tổng hợp là out-of-context (chỉ khối bộ tăng tốc); 250 MHz là tần số của khối này.",
         "Model thật mới được kiểm trên RTL với 8 ảnh (mỗi ảnh mô phỏng 10–20 phút); độ chính xác 99,5 % trên 1000 ảnh là của tham "
         "chiếu phần mềm, vốn khớp từng bit với RTL ở mọi ảnh đã chạy.",
+    ])
+
+    # ---------------------------------------------------------------- appendices
+    doc.add_heading("Phụ lục A. Bộ tăng tốc bỏ qua activation bằng 0 như thế nào", level=1)
+    bullets(doc, [
+        "Mỗi PE nhận activation của lượt tính qua bộ nạp iact (data_pipeline_iact.v). Bộ nạp xét từng giá trị 8 bit: chỉ giá trị "
+        "khác 0 được ghi vào SPad dữ liệu iact, kèm một nhãn vị trí 4 bit (giá trị đó ở vị trí nào trong cửa sổ của PE); SPad địa "
+        "chỉ ghi số giá trị khác 0 cộng dồn theo nhóm. Giá trị 0 không được lưu và không bao giờ đi vào bộ nhân.",
+        "Khi tính (trạng thái CALCULATING của PE.v), PE chỉ duyệt các activation khác 0. Với mỗi activation, nhãn vị trí chọn dãy "
+        "weight tương ứng (SPad địa chỉ weight cho điểm bắt đầu), rồi mỗi chu kỳ nhân activation đó với weight của 2 filter "
+        "(PARALLEL_MACS = 2) và cộng vào psum của 2 filter trong SPad psum. Weight bằng 0 cũng được nén và bỏ qua.",
+        "Số chu kỳ nhân của một PE trong một lượt ≈ Σ (activation khác 0) ⌈số weight khác 0 của nó / 2⌉ ≈ N_khác0 × F / 2, với F là "
+        "số filter PE giữ trong lượt (16 ở các Conv của model này). Ví dụ Conv3: mỗi PE giữ 12 activation và 192 weight; không có "
+        "số 0 thì 12 × 16 / 2 = 96 chu kỳ nhân, với 87 % số 0 trung bình chỉ khoảng 12.",
+        "Thời gian một lượt = chu kỳ nhân của PE bận nhất trong 48 PE (các PE chạy đồng bộ theo lượt) + phần cố định (nạp lượt, chờ "
+        "16 chu kỳ, đưa psum vào và đọc psum ra theo số filter). Đo được (ngẫu nhiên → ảnh thật): Conv2 200 → 182 chu kỳ/lượt (448 lượt), "
+        "Conv3 195 → 142 (224 lượt). Phần cố định và PE bận nhất làm lợi ích nhỏ hơn tỉ lệ số 0.",
+        "Lượt mà không PE nào có activation khác 0 trước đây làm mất mọi lượt sau (lỗi #31); nay PE rỗng đi trạng thái EMPTY_PASS.",
+    ])
+    doc.add_heading("Phụ lục B. Bộ lượng tử: mant, shift, offset và ReLU", level=1)
+    para(doc, "Sau mỗi Conv/Dense, psum 20 bit (bias + Σ weight·activation, số nguyên) được đổi về activation int8 của layer sau ngay "
+              "trên chip (quantization_unit.v, 8 bộ chạy song song):")
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.add_run("q = kẹp( ⌊ mant × (psum + offset) / 2^shift ⌋ , act_min , 127 )").bold = True
+    bullets(doc, [
+        "Toán học: giá trị thực r = s·q (zero point 0). Psum = Σ w_q·x_q + b_q, với b_q = round(b / (s_x·s_w)), biểu diễn y ≈ s_x·s_w·psum. "
+        "Activation int8 của layer sau: q_y = y / s_y = M·psum với M = s_x·s_w / s_y. Phần cứng xấp xỉ M bằng mant / 2^shift.",
+        "Python (onnx2model.hardware_multiplier) chọn shift lớn nhất sao cho mant = round(M·2^shift) vẫn nhỏ hơn 256 (RTL chỉ "
+        "dùng 8 bit thấp của trường mant 25 bit), nên mant luôn ở 128…255 và sai số tương đối ≤ 0,4 %. Ví dụ Conv1: s_x = 0,0222164, "
+        "s_w = 0,00358664, s_y = 0,0241571 → M = 0,00329851 → 0,00329851 × 2^16 = 216,2 → mant 216, shift 16 (2^17 cho 432, quá 8 "
+        "bit); sai số 0,08 %. Conv2 190/17, Conv3 211/17, Dense 130/17.",
+        "LayerParameters ghi [mant, shift] cho từng filter; conv_mapper.write_quant_and_offset đóng gói mỗi filter thành 40 bit "
+        "(offset 8 | shift 7 | mant 25) và gửi xuống ở pha nạp bảng lượng tử (20–40 chu kỳ mỗi layer). Do lỗi #12 phần cứng dùng "
+        "hệ số của filter 0 cho mọi filter, nên model dùng một scale weight cho cả layer.",
+        "Kẹp và ReLU: act_min là −128 (bão hoà int8) hoặc 0 khi layer có ReLU. Vì zero point bằng 0, ReLU sau lượng tử chính là "
+        "max(q, 0), nên chỉ cần đặt cận dưới của phép kẹp bằng 0, không cần khối kích hoạt riêng. Python gửi act_min + 128 trong "
+        "một trường 8 bit của từ trạng thái; RTL lấy lại act_min bằng cách đảo bit cao.",
+        "Offset: số 8 bit có dấu cho từng filter, cộng vào psum trước phép nhân. Trong RTL nó được ghi là “zero-point offset”, "
+        "nhưng zero point của output phải cộng sau phép nhân (q = z + M·psum); cộng trước thì cần offset = z / M, ví dụ −128 / 0,0033 "
+        "≈ −39.000, không vừa 8 bit. Zero point của input cần −z_x·Σw cho mỗi filter, cũng không vừa và đã có chỗ trong bias. Làm "
+        "tròn gần nhất cần 2^(shift−1) / mant = 32.768 / 216 ≈ 152, cũng không vừa. Vì vậy toolchain (cả mã nguồn gốc) luôn gửi "
+        "offset = 0: lượng tử đối xứng (zero point 0) không cần nó, và bias đã nằm sẵn trong psum. Nó chỉ có thể dùng như một hiệu "
+        "chỉnh nhỏ (±127 đơn vị psum) theo filter.",
     ])
 
     doc.save(OUT)
