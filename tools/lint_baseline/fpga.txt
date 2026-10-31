@@ -1,6 +1,6 @@
 # Verilator 5.020 lint baseline. count<TAB>code | file | message
 # Regenerate with: python3 tools/lint_check.py --update
-10	BLKSEQ | hdl/OpenEye_FPGA.v | Blocking assignment '=' in sequential logic process
+9	BLKSEQ | hdl/OpenEye_FPGA.v | Blocking assignment '=' in sequential logic process
 1	EOFNEWLINE | hdl/quantization_unit.v | Missing newline at end of file (POSIX 3.206).
 1	EOFNEWLINE | hdl/ring_buffer_pipelined.v | Missing newline at end of file (POSIX 3.206).
 1	EOFNEWLINE | hdl/router_configurator.v | Missing newline at end of file (POSIX 3.206).

@@ -1,11 +1,13 @@
-"""up_run.py <tree> <name> LAYER W H CH NF CR GLBP [layers]: one model through <tree>'s own test_conv_const._run_conv_const
-(RTL, testbench and Python of that tree), random data (no constant operands), 2 cluster columns, NUM_GLB_IACT 1.
-Run with PYTHONPATH=<tree>/src so that open_eye (hdl_dir, test_dir) is the tree's."""
+"""up_run.py <tree> <name> LAYER W H CH NF CR GLBP [layers] [KEY=VALUE...]: one model through <tree>'s own
+test_conv_const._run_conv_const (RTL, testbench and Python of that tree), random data (no constant operands), 2 cluster
+columns. KEY=VALUE pairs become environment variables of the simulation (e.g. OUTPUT_SIZE=32), except GLBI=<n>, the
+NUM_GLB_IACT of the platform (default 1). Run with PYTHONPATH=<tree>/src so that open_eye (hdl_dir, test_dir) is the tree's."""
 import os, re, sys, types
 tree, name, layer = os.path.abspath(sys.argv[1]), sys.argv[2], sys.argv[3]
 W, H, CH, NF, CR, GLBP = (int(v) for v in sys.argv[4:10])
 layers = sys.argv[10] if len(sys.argv) > 10 else "1"
 extra = dict(a.split("=", 1) for a in sys.argv[11:])
+glb_iact = int(extra.pop("GLBI", "1"))
 sys.path.insert(0, os.path.join(tree, "test", "cocotb_fpga"))
 os.chdir(os.path.join(tree, "test", "cocotb_fpga"))
 import cocotb_test.simulator  # noqa: E402
@@ -27,7 +29,7 @@ cocotb_test.simulator.run = run
 request = types.SimpleNamespace(node=types.SimpleNamespace(nodeid=f"up_{name}"))
 verdict = "PASS"
 try:
-    conv._run_conv_const(layer, 8, CR, num_glb_iact=1, input_channels=CH, request=request, input_height=H)
+    conv._run_conv_const(layer, 8, CR, num_glb_iact=glb_iact, input_channels=CH, request=request, input_height=H)
 except BaseException as e:
     verdict = f"FAIL ({type(e).__name__})"
 log = open(os.path.join(tree, "test", ".temp", f"up_{name}", "cocotb_sim.log"), errors="replace").read()

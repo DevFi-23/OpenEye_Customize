@@ -66,3 +66,16 @@ the FC write check) are already fixed in `dev`, in a way that is tested by our r
 fails the Dense 3136 -> 10/16 that the trained MNIST model needs. Worth keeping in mind: `655a2ae` (when a layer
 outgrows a field), `c342d04` (residual nets), the `+ 1` weight-send end of `3258813` (one clock per weight send,
 latency experiment, RTL approval needed).
+
+## 5. Follow-up on the same day (user decisions)
+
+* `e78e5b7` **taken** (approved): `git cherry-pick -x e78e5b7` = `5595d15` (original author kept). Verification: RTL
+  regression 162 tests 157 PASS + 5 known xfail, 0 FAIL (identical to before); `test_quantization_unit` 2/2; Python
+  unit tests 290 pass, 11 old fails; 12 baseline cases 0 cycles and 0 DMA words of change; Table 3 of the paper
+  13/16, 0 cycles of change in all 16 configurations; lint `fpga` 462 -> 461 (the `BLKSEQ` of this line), baseline
+  lowered; Vivado: see README_FI section 6d (`doc/synth/2026-10-31_route4ns_e78_zu7ev/`).
+* `551cf85` compared in detail with the module of `dev`: `2026-10-31_upstream_551cf85_iact.md`. It is a byte-for-byte
+  revert to `f84f064`, brings bug #13 back, fails a Conv with 8 channels and three banks, is not faster. Not taken.
+* The `wghts_per_pe + 1` line of `3258813` tested as an experiment (approved): `2026-10-31_wght_send_end.md`. Correct
+  everywhere, -0.1 % to -0.3 % cycles. Not in `dev` until the user decides.
+* `up_run.py` got the option `GLBI=<n>` (`NUM_GLB_IACT` of the platform) for these comparisons.

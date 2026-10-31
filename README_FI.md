@@ -42,60 +42,52 @@ git add <file> && git commit -m "..."
 git push origin dev
 ```
 
-### Upstream mới so với `dev` (kiểm tra ngày 2026-10-19)
+### Trạng thái các commit của upstream (cập nhật 2026-10-31, `upstream/main` = `93f0e82`)
 
-`dev` dựa trên upstream `c4bd562`. `git log dev..upstream/main` cho 6 commit (12–15/10/2026). Commit merge `c085224` chỉ đưa `c4bd562`
-vào nhánh main của upstream, nên `dev` đã có nội dung đó. **Upstream không động tới các file mà mình đã sửa lỗi** (`psum_pipeline.v`,
-`iact_stream_constructor.v`, phần `GET_BIAS` của `OpenEye_FPGA.v`, `conv_mapper.py`), nên các bản sửa #3, #6/#7, #13, #14, #18 vẫn chỉ có ở `dev`.
+`dev` dựa trên upstream `c4bd562`. Từ đó upstream có 22 commit không phải merge (12–29/10/2026). Bảng dưới gộp mọi lần kiểm tra
+(2026-10-19, 21, 24, 30, 31); chi tiết và cách chạy lại: `doc/experiments/2026-10-21_upstream_cherry_pick.md`,
+`doc/experiments/2026-10-31_upstream_review.md` (chạy upstream nguyên bản trong worktree, so với `dev` cùng bộ chạy),
+`doc/experiments/2026-10-31_upstream_551cf85_iact.md`, `doc/experiments/2026-10-31_wght_send_end.md`.
 
-| Commit | Thay đổi | So với `dev` | Trạng thái |
+| Commit (ngày) | Nội dung | So với `dev` | Trạng thái |
 |---|---|---|---|
-| `b6fa369` | Sửa comment `TRANS_WORDS` trong `OpenEye_FPGA.v` ("số word mỗi lần truyền từ layer sang layer") | Chỉ comment | **Đã lấy** (2026-10-21, `0cacda1`) |
-| `2c8c324` | `OpenEye_Parallel.v`: 4 khối generate của router **psum** đặt nhầm tên `gen_router_iact_*` → `gen_router_psum_*` | Chỉ đổi tên hierarchy; không xung đột thật (hai vòng `for` không tên khác nhau); không file nào của mình tham chiếu các tên này | **Đã lấy** (2026-10-21, `22614d2`) |
-| `fc9ace3` | `test/cocotb_fpga/Makefile`: đổi cấu hình mặc định khi chạy bằng `make` (`Convolution_Single`, 16 filter, `NUM_GLB_PSUM=4`, `QUANT_AMOUNT=64`, `TRANS_WORDS=4`, `STRIDE_ENABLED=1`, ...) | Mình chạy test qua pytest (`test_*.py`), không dùng Makefile | Chưa lấy (không ảnh hưởng) |
-| `2bf497d` | `PE.v`: `first_spad_words_wght` 5 → `$clog2(WGHT_ADDR_ADDR+1)` bit (= 7), `filters_reg_M0` 6 → 8 bit, cho khớp cổng của `data_pipeline_wght` | **Chính là lỗi #11 phần `PE.v:2210`** (cắt 7 → 5 bit). Probe 48 PE trên 7 layer (4–64 channel, 4–64 filter): giá trị lớn nhất của `first_spad_words_o` là **13**, chưa bao giờ ≥ 32, nên **không đổi kết quả** ở các cấu hình hiện tại; đây là lỗi tiềm ẩn. Lint: −2 cảnh báo cổng, +1 cảnh báo mới (`assign filters_reg_M0 = stream_data[5:0]` 6 → 8 bit) | **Đã lấy** (2026-10-21, `9c0c8dc`) + mở rộng 0 tường minh (commit riêng) |
-| `18772d6` | `rtl_test_utils.py`: tắt các `assert` của `check_fc_activation_writes` (comment và bọc trong chuỗi `"""..."""`), ghi chú "For Claude to rewrite: kiểm tra sau khi ghi xong thay vì kiểm tra trực tiếp" | Đúng là nguyên nhân 23 test GEMM/Dense FAIL: tắt bằng công tắc `OPENEYE_SKIP_FC_WRITE_CHECK` (đã có trong `dev`) thì 23/23 PASS (lỗi #5 là báo động giả, mục 8b) | **Không lấy** |
+| `b6fa369` (12/10) | Comment `TRANS_WORDS` trong `OpenEye_FPGA.v` | Chỉ comment | **Đã lấy** 2026-10-21 (`0cacda1`) |
+| `2c8c324` (12/10) | `OpenEye_Parallel.v`: 4 khối generate của router psum đặt nhầm tên `gen_router_iact_*` → `gen_router_psum_*` | Chỉ đổi tên hierarchy | **Đã lấy** 2026-10-21 (`22614d2`) |
+| `2bf497d` (15/10) | `PE.v`: `first_spad_words_wght` 5 → 7 bit, `filters_reg_M0` 6 → 8 bit | = lỗi #11 phần `PE.v:2210` (tiềm ẩn: giá trị lớn nhất đo được 13) | **Đã lấy** 2026-10-21 (`9c0c8dc`) + mở rộng 0 tường minh (`f337693`) |
+| `fc9ace3` (12/10) | `test/cocotb_fpga/Makefile`: đổi cấu hình mặc định khi chạy bằng `make` | Fork chạy test qua pytest, không dùng Makefile | Không lấy (không ảnh hưởng) |
+| `18772d6` (15/10) | `rtl_test_utils.py`: tắt các `assert` của bộ kiểm tra ghi FC "live" ("For Claude to rewrite") | Đúng nguyên nhân của #5 (báo động giả); `dev` tắt bằng `OPENEYE_SKIP_FC_WRITE_CHECK=1` và giữ bộ kiểm tra | Không lấy. Ý tưởng đáng giữ: viết lại bộ kiểm tra để so RAM sau khi ghi xong |
+| `240bc35`, `28415e5` (16/10) | Giá trị test (`test_nets` CR 8 → 4; `test_conv_input_mapping` thêm 2 và 3 channel) | Chỉ test; 3 channel sai trên cả hai cây (#7) | Không lấy |
+| `81173dc` (20/10), merge `4daa41e` | `hdl/config/regmap.yaml` giống `test/cocotb_fpga/regmap.yaml` | Toolchain không đọc bản `hdl/config`; bản `test/` của `dev` có thêm trường (`quant_clamp_low`) | Không lấy (vô hại) |
+| `c48899f` (21/10) | `psum_pipeline.v`: mọi phép gán `results_ready` thành blocking `=` | Cách sửa #14 của upstream, **ngược hướng** với `dev` (`3717d12`, xem dưới) | Không lấy |
+| `e78e5b7` (21/10) | `OpenEye_FPGA.v`: xoá `temp_var = 0;` nằm ngoài `if (!rst_n) ... else` của một khối reset bất đồng bộ | Không đổi chức năng, làm sạch mẫu reset | **Đã lấy** 2026-10-31 (`5595d15`, được bạn đồng ý). Kiểm chứng: hồi quy 162 test 157 PASS + 5 xfail như cũ, 12 ca mốc và 16 cấu hình Bảng 3 0 chu kỳ lệch, lint `fpga` 462 → 461, Vivado: netlist giống hệt (mục 9) |
+| `3ba44e3` (23/10) | Bỏ một kiểm tra cũ trong test của bộ sinh tài liệu | Không liên quan | Không lấy |
+| `2dde2db` (26/10) | Unit testbench: bỏ cổng `fc_size_i`, tham số `TRANS_BITWIDTH_WGHT` của `hdl/debug/PE_IO_debug.v` | Fork không chạy các testbench này | Không lấy |
+| `551cf85` (27/10) | `iact_stream_constructor.v` về đúng bản trước `23be043` (giống từng byte `f84f064`, có đường FC riêng) | Sửa #6, #7 như `dev`, nhưng **mang lại lỗi #13** (bộ đếm vòng đọc bị lái từ 2 khối, Vivado giữ 0), sai Conv 8 channel `NUM_GLB_IACT=3`, không nhanh hơn | **Không lấy**, đã so sánh chi tiết (mục dưới) |
+| `c342d04` (27/10), merge `b4b643a` | DAG: `DRAMContents`, tham chiếu, testbench theo tên layer; ca `Residual_Block` | Viết lại `DRAM.py`, `test_utils_main.py`, testbench: xung đột lớn với mô hình DRAM, profiler, đường lượng tử của `dev` | Chưa lấy. **Đáng xem** khi làm mạng có nhánh (residual) |
+| `3258813` (27/10) | Xếp weight conv nhiều channel/thưa: xoá khoá `used_wght_per_PE` lặp; giữ word weight 0 khi nhiều lượt gửi; `OpenEye_FPGA.v` kết thúc gửi weight ở `wghts_per_pe + 1` thay vì `+ 2` | Hai phần đầu = #18 và một phần #22 (đã có trong `dev`) | Hai phần đầu: không cần. Dòng `+ 1`: **đã thử 2026-10-31** (được bạn đồng ý, `doc/experiments/2026-10-31_wght_send_end.md`): đúng ở mọi kiểm tra (162 test, 12 ca mốc, model đã huấn luyện 4 ảnh, Bảng 3 13/16 như `dev`), −0,1 đến −0,3 % chu kỳ (−673 trên model MNIST), 0 tài nguyên. **Chưa đưa vào `dev`, chờ bạn quyết định** |
+| `80d6e67` (27/10), `d1da389` (28/10) | Luồng Verilator; `router_iact.v` bỏ đường e12 (cổng 1 → 2) để hết vòng tổ hợp của Verilator | Đổi cách định tuyến; `dev` mô phỏng bằng Icarus, Vivado không báo vòng | Không lấy. Xem lại nếu chuyển sang Verilator |
+| `655a2ae` (28/10) | Nới độ rộng trường/bộ đếm cho mạng lớn (`iact_read/write_limit_*` 18 bit, vòng psum 12/24 bit), CC ≠ 2 | Không sửa lỗi nào của `dev`: không model nào của ta tràn trường (`field_overflow*.py`) | Chưa lấy. **Đáng xem** khi một layer vượt độ rộng trường hiện tại |
+| `57781cd`, `c2bf7a9`, `93f0e82` (28–29/10) | Flatten trong DAG; `make_stream` song song rồi lại tuần tự (bản song song làm mất cập nhật `layer_params`); stream bộ đệm layer | Chỉ cho DAG; `make_stream` của `dev` vẫn tuần tự, có bản sửa `trans_cycles` | Không lấy |
 
-Commit mới hơn, xem ngày 2026-10-21: `81173dc` (2026-10-20, Barsch32) làm cho `hdl/config/regmap.yaml` giống hệt `test/cocotb_fpga/regmap.yaml`. Không chương trình nào đọc bản `hdl/config` (chỉ được nhắc trong comment), nên vô hại; **chưa lấy** vì không nằm trong 3 commit đã duyệt.
+Lỗi còn mở của `dev` chạy trên upstream `93f0e82` (2026-10-31): #7 (3 channel), #9, #19b, #21, #23, #27, #28, #29 **sai y như trên `dev`**
+(#27 sai còn sớm hơn); upstream còn sai Dense 3136 → 10/16 (Dense của model MNIST đã huấn luyện) mà `dev` đúng, do lỗi #19 phần 2 (`current_x`
+có dấu trong `OpenEye_FPGA.v`, đã sửa ở `dev` `10bcaf7`): với `551cf85`, K = 2032 đúng, K = 2064 sai. Upstream `93f0e82` vẫn có lỗi #13.
+**Không commit nào nhắm tới băng thông DMA, độ trễ, hay lượng tử hoá** (`DRAM.py` vẫn `floor(127·w)`, bộ lượng tử RTL vẫn lấy 8 bit thấp).
 
-**Kiểm tra lại ngày 2026-10-24** (`git fetch upstream`): upstream có thêm 5 commit (16–21/10) chưa có trong `dev`, **chưa lấy** (phân tích ngày 2026-10-24, xem phần "Hướng đi của upstream" bên dưới):
+**Commit đáng xem sau này:** `655a2ae` (mạng lớn hơn MNIST), `c342d04` (mạng residual), `d1da389` (nếu dùng Verilator), ý tưởng của
+`18772d6` (bộ kiểm tra ghi FC sau khi ghi xong). Dòng `+ 1` của `3258813` đã thử (bảng trên), sẵn sàng đưa vào `dev` nếu bạn đồng ý.
 
-| Commit | Thay đổi | Đánh giá sơ bộ |
-|---|---|---|
-| `240bc35`, `28415e5` (16/10) | `test_nets.py`: `CLUSTER_ROWS` 8 → 4, `NUM_GLB_IACT` 3 → 1; `test_conv_const.py`: `test_conv_input_mapping` thêm 2 và 3 channel | Chỉ test. 3 channel sẽ fail (lỗi #7 phần Python) |
-| `c48899f` (21/10) | `psum_pipeline.v`: đổi mọi phép gán `results_ready` thành blocking `=` | Cách sửa lỗi #14 của upstream, **ngược hướng** với bản sửa của `dev` (tách phần tổ hợp, chỉ dùng `<=`, mục 9). Không nên lấy: sẽ xung đột và mất lợi ích netlist Yosys/Verilator |
-| `4daa41e` (21/10) | Merge: `hdl/config/regmap.yaml` (nội dung của `81173dc`) | Vô hại (không chương trình nào đọc bản này) |
-| `e78e5b7` (21/10) | `OpenEye_FPGA.v`: xoá dòng `temp_var = 0;` ở cuối một khối tuần tự ("Probably fixed a reset error") | Dòng này nằm **ngoài** cặp `if (!rst_n) ... else ...` của khối `always @(posedge clk_i, negedge rst_n)` (dòng 1296), nên chạy cả ở cạnh xuống của reset: khối không còn đúng mẫu reset bất đồng bộ mà công cụ tổng hợp nhận dạng. `temp_var` chỉ là biến tạm (gán rồi dùng ngay và đặt lại 0 ở dòng 1196–1198), nên xoá dòng này **không đổi chức năng**, chỉ làm sạch mẫu reset. Lấy được (RTL, cần bạn đồng ý) |
-
-**Kiểm tra lại ngày 2026-10-30** (`git fetch upstream`, `upstream/main` = `93f0e82`): thêm **15 commit** (23–29/10) sau `e78e5b7`, **chưa lấy**:
-DAG (`c342d04`, merge `b4b643a`: `DRAMContents`, tham chiếu và testbench đổi sang dict theo tên layer, ca `Residual_Block`), nới độ rộng địa chỉ và vòng
-lặp cho mạng lớn (`655a2ae`: `iact_read_limit_*`/`iact_write_limit_*` 18 bit, vòng psum 12/24 bit trong `regmap.yaml` và `psum_pipeline.v`), Verilator
-(`80d6e67`, `d1da389`), `551cf85` đưa `iact_stream_constructor.v` về trước `23be043`, `3258813` sửa xếp weight conv nhiều channel và thưa, `c2bf7a9`,
-`57781cd`, `93f0e82` sửa nhỏ. **Không commit nào động tới lượng tử hoá** (`DRAM.py` vẫn `floor(127·w)`, Dense ngẫu nhiên, bias 1 / c+1; bộ lượng tử RTL
-vẫn lấy 8 bit thấp; testcase `model_test` vẫn tắt). Phần DAG viết lại `DRAM.py` và testbench nên sẽ xung đột với các thay đổi Python của `dev` nếu hợp nhất.
-
-**Kiểm tra lại ngày 2026-10-31** (`upstream/main` vẫn là `93f0e82`, rà soát chi tiết từng commit, `doc/experiments/2026-10-31_upstream_review.md`):
-19 commit chưa có trong `dev` (22 commit trừ 3 commit đã cherry-pick). Chạy upstream nguyên bản trong một worktree riêng (RTL, testbench, Python của
-upstream) và `dev` với cùng bộ chạy, cùng dữ liệu ngẫu nhiên (`doc/experiments/2026-10-31_upstream_review/up_run.py`): các lỗi còn mở #7 (3 channel), #9,
-#19b, #21, #23, #27, #28, #29 **sai y như nhau trên cả hai** (#27 trên upstream còn sai sớm hơn, ở bộ đệm iact); upstream còn sai Dense 3136 → 10 và
-3136 → 16 (10/10, 16/16 output) mà `dev` chạy đúng (Dense của model MNIST đã huấn luyện). Kiểm tra độ rộng trường thanh ghi (`field_overflow*.py`): không
-model nào của ta tràn trường, nên phần nới độ rộng của `655a2ae` không phải nguyên nhân của #19b, #21, #29. Các lỗi mà upstream sửa (#6/#7 bằng `551cf85`,
-#14 bằng `c48899f`, #18 và một phần #22 bằng `3258813`, kiểm tra ghi FC bằng `18772d6`) đều **đã sửa trong `dev`** theo cách khác, có test hồi quy.
-**Kết luận: không lấy commit nào.** Đáng nhớ cho sau này: `655a2ae` (khi layer lớn vượt độ rộng trường), `c342d04` (mạng residual), dòng `wghts_per_pe + 1`
-của `3258813` (bớt 1 chu kỳ mỗi lần gửi weight: thí nghiệm độ trễ, là RTL nên cần bạn đồng ý). `e78e5b7` vẫn là tuỳ chọn (không đổi chức năng).
-
-**Đã làm (2026-10-21, được bạn đồng ý):** `git cherry-pick -x b6fa369 2c8c324 2bf497d` (giữ tác giả gốc, mỗi commit ghi lại hash upstream nên sau này `git merge upstream/main` nhận ra), cộng một commit riêng mở rộng 0 tường minh cho `filters_reg_M0`. Kiểm chứng: mục 9, `doc/experiments/2026-10-21_upstream_cherry_pick.md`.
-
-### Hướng đi của upstream (phân tích 2026-10-24)
+### Hướng đi của upstream (phân tích 2026-10-24, bổ sung 2026-10-31)
 
 Số commit của upstream theo tháng (từ 05/2026): 7/2026: 66 (DenLeb 40, Hendrik Woehrle 26), 8/2026: 10, 9/2026: 124 (Hendrik 80, DenLeb 44),
-10/2026: 15. Ba giai đoạn:
+10/2026: 23 (DenLeb 15, Hendrik Woehrle 7, Barsch32 1; 15 trong số đó từ 21/10). Bốn giai đoạn:
 
 | Giai đoạn | Commit tiêu biểu | Mục tiêu |
 |---|---|---|
 | 7–8/2026: **giảm diện tích (LUT)** để vừa FPGA nhỏ **GateMate A1** và gắn với SoC RISC-V | `1320759` "Reduced logic for smaller designs" (14/7: bỏ `router_wght_3P.v`, **comment-out các bộ đóng gói ghi ngược**, gồm cả nhánh FC), `24057c8` "Reduced LUTs further" (tách FSM psum ra `psum_pipeline.v`, thêm `router_configurator.v`), `3fbb272` "Optimized WGHT Stream", `8350a00` "Optimized PSUM Flow for LUT Efficiency" (ghi ngược dùng vòng đếm tổng quát thay cho mẫu đọc viết tay, **mất nhánh FC**), `9926af4` PE thưa/SISD, `6318f8c` stream lượng tử gọn hơn, `204704b` (7/8) "Reduced Amount of LUTs under the threshold for GateMate A1", `9a900cc` giao tiếp 32 bit cho RISC-V | Diện tích, tích hợp hệ thống |
 | 7–9/2026: **chạy đúng lại** sau các lần viết lại | Hendrik Woehrle: ánh xạ activation conv, ghi ngược, pooling (15 commit), Dense/FC/GEMM, kernel lớn, stride, móc debug/trace (`TRACE_*`), sửa lint; `e8f39ad` thêm ca `MLP` (Dense 6→32→16→4, mặc định của Makefile), `7bdebb7` testbench đơn vị cho `data_pipeline_wght` + `doc/sparse_weight_encoding.md` | Chức năng |
-| 10/2026: sửa nhỏ | `2bf497d` độ rộng bit (#11), `c48899f` `results_ready` (#14), `e78e5b7` mẫu reset, test `240bc35`/`28415e5`, đồng bộ `regmap.yaml` | Dọn dẹp |
+| 10/2026 (tới 23/10): sửa nhỏ | `2bf497d` độ rộng bit (#11), `c48899f` `results_ready` (#14), `e78e5b7` mẫu reset, test `240bc35`/`28415e5`, đồng bộ `regmap.yaml` | Dọn dẹp |
+| 26–29/10: **mở rộng** | `c342d04` DAG (mạng residual), `655a2ae` trường/bộ đếm rộng hơn cho mạng lớn, `80d6e67`/`d1da389` Verilator, `551cf85` và `3258813` sửa lại conv nhiều channel/thưa | Mạng lớn hơn, mô phỏng nhanh hơn; vẫn không có tối ưu DMA/độ trễ |
 
 **Không commit nào nhắm tới băng thông DMA hay độ trễ** (không burst, không DMA rộng hơn, không gửi bias theo filter, không chồng nạp với tính).
 Tối ưu của họ là diện tích, đôi khi đánh đổi chức năng: bỏ ghi ngược FC để giảm LUT chính là nguyên nhân gốc của lỗi #26 (mục 9).
@@ -112,6 +104,27 @@ blocking** `=`: các công cụ hết bất đồng, diff nhỏ, nhưng thanh gh
 hợp ra các dây (`chain_ready_terms`, `all_psum_ready`, `all_psum_enable`, `results_ready_calc`) và chỉ gán thanh ghi bằng `<=`: đúng mẫu thiết kế đồng bộ,
 lockstep 125 test không lệch, netlist Yosys chạy đúng, lint −4 lỗi −3 cảnh báo, Vivado hết cảnh báo 8-6090. Lấy `c48899f` sẽ xung đột với bản của
 `dev` mà không thêm gì, nên **không lấy**.
+
+### `551cf85` so với `dev`: hướng nào tốt hơn (phân tích 2026-10-31, `doc/experiments/2026-10-31_upstream_551cf85_iact.md`)
+
+- **Bản chất:** `551cf85` chỉ đổi `iact_stream_constructor.v`, và file sau commit **giống từng byte** bản `f84f064` (ngay trước `23be043`):
+  một bản revert, không có code mới. Các thay đổi khác của `23be043` (`OpenEye_FPGA.v`, `OpenEye_Parallel.v`, Python) vẫn giữ.
+- **"Đường FC riêng"** là cấu trúc của bản cũ: mỗi khối `always` tách `if (fully_connected_i) ... else <FSM conv>`. Phía ghi: FPGA báo
+  `fc_storage_valid_i` cho từng cặp activation; các bộ đếm hàng PE / cặp / hàng cluster đi theo thứ tự của `DenseWghtStreamMapper`; chỉ
+  cluster có `CLUSTER_ROW_ID` khớp mới lưu, vào bank `hàng PE % NUM_GLB_IACT`, mỗi bank một bộ đếm địa chỉ khi ít bank hơn hàng PE.
+  Phía đọc: FSM 2 trạng thái riêng, đọc `channels` word cho mỗi hàng PE (đọc trước từng cặp vì RAM có 2 tầng đọc), lần lượt từng hàng
+  khi ít bank. `23be043` bỏ đường này, cho FC đi qua bộ ghi của conv (xoay bank); `dev` giữ cấu trúc đó và sửa 4 lỗi (#13, #6, #7, #19,
+  khoảng 40 dòng). Ở `dev`, cổng `fc_storage_valid_i` vẫn còn nhưng không được đọc.
+- **Kết quả** (cùng bộ chạy, mỗi cây dùng RTL/testbench/Python của nó): 8 ca, `dev` đúng 8/8; `551cf85` đúng 6/8 (sai Conv 14×4×8 → 8 với
+  `NUM_GLB_IACT=3`, lỗi có từ cây trước `23be043`, và FC 3136 → 10 do #19 phần 2 nằm ở `OpenEye_FPGA.v`); cha `2dde2db` đúng 3/8. Chu kỳ
+  bằng nhau ở mọi ca cùng đúng, trừ Conv 4 channel `NUM_GLB_IACT=3` (`dev` nhanh hơn 23 chu kỳ, 1,4 %); đường FC riêng không nhanh hơn
+  (FC 256/512/1024 cùng tổng chu kỳ).
+- **Lỗi #13 quay lại:** ở bản cũ, `rd_cycle_loop_cnt_0..3` được đếm ở khối đọc nhưng reset ở khối ghi; Yosys báo "multiple conflicting
+  drivers"; Vivado sẽ giữ các bộ đếm ở 0 như trước bản sửa `5f1e66e` (6/9 ca mốc sai trên FPGA, mô phỏng không thấy). Upstream HEAD còn lỗi này.
+- **Tài nguyên** (Yosys, module riêng, cấu hình mốc): bản cũ +5–11 % LUT, −3–6 % FF, nhưng netlist của nó không hợp lệ (bộ đếm nhiều nguồn
+  lái) nên chỉ để tham khảo. Mỗi instance của `dev` trên Vivado: khoảng 540–565 LUT, 370 FF, 4 instance ≈ 3,7 % thiết kế.
+- **Kết luận: hướng của `dev` tốt hơn** (đúng hơn, không có lỗi phần cứng ẩn, nhanh bằng hoặc hơn, thay đổi nhỏ có test cho từng lỗi).
+  Không lấy `551cf85`. Ý tưởng tách FC khỏi conv tự nó hợp lý, nhưng ở đây không cho lợi chu kỳ.
 
 ## 3. Môi trường và cách chạy
 
@@ -137,8 +150,10 @@ Mẹo:
 
 Một test (ví dụ một case của `test_profile.py`) chạy qua 3 giai đoạn. **Python làm phần lớn công việc**: đóng vai host (CPU + DDR + AXI DMA),
 mô hình tham chiếu và dụng cụ đo. **Chỉ RTL là "phần cứng"**: mọi phép tính của bộ tăng tốc và mọi số chu kỳ đều do RTL tạo ra.
-Không có bước "dạy" (huấn luyện) nào: OpenEye chỉ làm suy luận (inference); weight là ngẫu nhiên, hằng số hoặc dạng dốc do testbench tạo,
-hoặc weight Conv của model MNIST int8 đã huấn luyện có sẵn trong repo (`OPENEYE_TFLITE_CONV`, từ 2026-10-24).
+Không có bước "dạy" (huấn luyện) nào trong mô phỏng: OpenEye chỉ làm suy luận (inference). Weight là ngẫu nhiên, hằng số hoặc dạng dốc do testbench
+tạo; hoặc weight Conv của model MNIST int8 đã huấn luyện có sẵn trong repo (`OPENEYE_TFLITE_CONV`, từ 2026-10-24); hoặc, từ 2026-10-30, **cả model PyTorch
+MNIST đã huấn luyện sẵn** (`doc/demo_notebooks/mnist_unquantized_model.pth`) đi qua đường toolchain (`USE_RANDOM_VALUES=0`, `OPENEYE_MODEL_WEIGHTS`), với
+input là ảnh test MNIST thật (`OPENEYE_INPUT_IMAGE`, mục 8d).
 
 ```
 A. Trước khi chạy simulator (pytest, Python thuần)
@@ -152,7 +167,8 @@ B. Trong lúc mô phỏng (Python và RTL chạy cùng một tiến trình, đ�
    OpenEye_FPGA_tb.py
      ├─ chuẩn bị dữ liệu (tốn 0 chu kỳ mô phỏng):
      │    TensorFlow tạo layer (data_create) → DRAM.py giữ input, weight, bias (có thể thay bằng hằng/ramp,
-     │      hoặc weight Conv đã huấn luyện từ TFLite: OPENEYE_TFLITE_CONV)
+     │      hoặc weight Conv đã huấn luyện từ TFLite: OPENEYE_TFLITE_CONV;
+     │      model thật: USE_RANDOM_VALUES=0 → onnx2model (lượng tử tĩnh) thay cho data_create)
      │    layer_parameters.py tính tham số layer → các word cấu hình
      │    channel_pad: layer 0 một channel cần nhiều lượt x → đệm thành 2 channel (lỗi #17)
      │    test_utils_main.collect_results / make_ref: MÔ HÌNH THAM CHIẾU tính kết quả đúng bằng Python
@@ -170,7 +186,7 @@ C. Sau mô phỏng (Python thuần)
      run_profile.py gom profile.json → profile_report (bảng, --compare); check_dma_trace.py, decode_iact_read_loops.py khi cần
 ```
 
-## 3c. Cách chạy các mô phỏng và test (tổng hợp, cập nhật 2026-10-24)
+## 3c. Cách chạy các mô phỏng và test (tổng hợp, cập nhật 2026-10-31)
 
 Mọi lệnh chạy từ **thư mục gốc repo** (`cd ~/OpenEye_orig`) với `venv/bin/python`; cần `iverilog` trong `PATH`. Mỗi test cocotb để kết quả ở
 `test/.temp/<tên test>/`: `cocotb_sim.log`, `profile.json` (nếu bật profiler), `verify_layer0.pkl` (nếu bật kiểm tra độc lập), `demo/` (stream và tham chiếu).
@@ -194,7 +210,7 @@ cd test/cocotb_fpga
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ../../venv/bin/python -m pytest -q -p no:cacheprovider test_mnist_layers.py -k trained
 ```
 
-| Bộ test | Chọn bằng | Nội dung | Thời gian mỗi test | Kết quả mong đợi (2026-10-24) |
+| Bộ test | Chọn bằng | Nội dung | Thời gian mỗi test | Kết quả mong đợi (cập nhật 2026-10-31) |
 |---|---|---|---:|---|
 | `test_conv_const.py` | (cả file) | 36 layer Conv nhỏ, weight hằng số, nhiều cấu hình; `test_conv_bias_order`: 2 và 4 filter tính cùng lúc với bias khác nhau (#32) | 10 s – 6 phút | 36 PASS |
 | `test_mnist_layers.py` | `-k mapping` | Quét 1/2/3/4/8 channel × `NUM_GLB_IACT` 1, 3 | ~30 s | 8 PASS, 2 xfail (3 channel, lỗi #7) |
@@ -227,7 +243,7 @@ venv/bin/python tools/run_profile.py -k "not model" --compare doc/perf/baseline_
 venv/bin/python tools/run_profile.py -k model --compare doc/perf/baseline_2026-10-24 --clock-mhz 250    # 3 model (4, 11, 11 phút)
 venv/bin/python tools/run_profile.py -k q32 --mem typical                                               # bộ nhớ thực tế hơn (mục 6c)
 venv/bin/python tools/paper_table3.py --run --jobs 6 --save doc/perf/paper_table3_<ngày> --report doc/perf/paper_table3_<ngày>.md   # Bảng 3, khoảng 1 giờ
-venv/bin/python tools/paper_table3.py doc/perf/paper_table3_2026-10-24                                 # in lại Bảng 3 từ profile đã lưu
+venv/bin/python tools/paper_table3.py doc/perf/paper_table3_2026-10-26_fix25                           # in lại Bảng 3 từ profile đã lưu (mốc hiện tại)
 ```
 
 `run_profile.py` mặc định **không** chạy 16 case Bảng 3; chỉ chạy khi biểu thức `-k` có chữ `paper` (ví dụ `-k paper_cr2_x4_y3` để chạy một cấu hình).
@@ -245,7 +261,7 @@ Chi tiết: mục 6 (profiler), 6.13 (model nhiều layer), 6.14 (Bảng 3).
 | #26 (Dense nối tiếp Dense, **đã sửa**) | Sau bản sửa: `venv/bin/python -m pytest -q test/cocotb_fpga/test_dense_chain.py` (11 test). Lỗi cũ chỉ tái hiện được trên commit trước bản sửa (`142ee6c`): `git worktree add ../oe_old 142ee6c`, rồi trong `../oe_old` chạy `PYTHONPATH=src ../OpenEye_orig/venv/bin/python doc/experiments/2026-10-24_bug26/run_dense.py x16 D_16_8_10 2` (thêm `TRACE_RAM_WRITES=1` để thấy pha ghi ngược không ghi RAM) | `test/.temp/.../cocotb_sim.log`: `Iact buffer check: first N activations only`; bản cũ: `DUT-Value` = input của layer 0 |
 | #24 (không có hàm kích hoạt) | Không có mô phỏng; đọc `hdl/af_cluster.v` (không được khởi tạo ở đâu) | Mục 8b |
 | #31 (lượt rỗng, không cần model thật) | `venv/bin/python doc/experiments/2026-10-30_bug31/run31.py s_zy02 zy:0:2` (Conv 8×4×4, hai hàng input đầu bằng 0, khoảng 40 s); ảnh MNIST: `run31.py img0 image:0 W=28 H=28 CH=1 NF=4`; Dense: `run31.py d_z0 zk:0:512 L=DENSE_CHAIN_3136_10 K=3136`; công tắc theo dõi `B31_WATCH`, `B31_CONV`, `B31_ENC` (docstring của `probe31.py`) | `RESULT ... DUT == bias at ...` |
-| #31, #32, #33 (dữ liệu MNIST thật) | Code chạy model thật đã gỡ khỏi `dev` (revert theo yêu cầu, nhật ký 2026-10-30); chạy trên commit `440f36d`: `git worktree add ../oe_ptq 440f36d`, rồi trong `../oe_ptq`: `export PYTHONPATH=$PWD/src` (venv cài `open_eye` dạng editable trỏ vào `OpenEye_orig/src`), `cp ../OpenEye_orig/doc/demo_notebooks/mnist_quantized_model.tflite doc/demo_notebooks/` (file `.tflite` bị `.gitignore` bỏ qua), `../OpenEye_orig/venv/bin/python -m pytest -q "test/cocotb_fpga/test_ptq_mnist.py::test_ptq_layer[conv1-0]"` (id khác: `conv2-0`, `conv3-0`, `fc1_probe-0`; các ca đánh `xfail(strict)`); thêm `OPENEYE_DUMP_VERIFY=1` rồi `tools/verify_conv_output.py test/.temp/<thư mục test>` để có toàn bộ output. #32 tái hiện không cần model thật: Conv 7×7×64 → 64 ngẫu nhiên với `OPENEYE_BIAS_STEP` | `DUT vs numpy: ... differ`; Conv1: DUT = bias; Conv3: lệch hằng số theo cặp filter |
+| #31, #32, #33 (dữ liệu MNIST thật, **đã sửa**) | Model đã huấn luyện chạy thẳng trên `dev`: `venv/bin/python -m pytest -q test/cocotb_fpga/test_real_model.py` (ảnh 0 và 1, khoảng 11 phút mỗi ảnh), hoặc `run35.py` ở hàng dưới cho ảnh bất kỳ. Lỗi cũ chỉ tái hiện trên commit trước bản sửa (`git worktree add ../oe_old 903d5f9^` cho #32, `36b6a59^` cho #31). Bản PTQ thử nghiệm cũ (`440f36d`, đã revert, `test_ptq_mnist.py`) chỉ còn để tham khảo. #32 tái hiện không cần model thật: Conv 7×7×64 → 64 ngẫu nhiên với `OPENEYE_BIAS_STEP` | `DUT vs numpy: ... differ`; Conv1: DUT = bias; Conv3: lệch hằng số theo cặp filter |
 | #32 (thứ tự bias) và #35 (= #31 ở Conv3) | Conv nhỏ có 2 nhóm kernel, bias khác nhau (khoảng 1 phút): `venv/bin/python doc/experiments/2026-10-30_bug32/run32.py w7f8 rand W=7 H=2 CH=4 NF=8 OPENEYE_BIAS_STEP=3 B32_BIAS=4` (thêm `B32_REVERSE=1` = giả lập bản sửa Python; 4 nhóm: `W=4 NF=16`); model thật trên RTL kèm dump mọi lần kiểm tra bộ đệm (khoảng 10 phút): `run35.py img0 0 [B32_REVERSE=1]`, rồi `analyze35.py test/.temp/b35_img0/dump` và `scan31.py check 0 both test/.temp/b35_img0/dump`; mức ảnh hưởng trên N ảnh (chỉ Python, khoảng 2 phút cho 1000 ảnh): `scan31.py 1000` | `RESULT ... DUT vs numpy 0/112 differ`; `model == RTL at 3136 of 3136` |
 | Weight Conv đã huấn luyện cho test bất kỳ | `OPENEYE_TFLITE_CONV=$PWD/doc/demo_notebooks/mnist_quantized_model.tflite:sequential_1/conv2d_1_2/convolution` (tensor Conv2; Conv1 `sequential_1/conv2d_1/convolution`, Conv3 `sequential_1/conv2d_2_1/convolution`) | Log `OPENEYE_TFLITE_CONV: layer-0 weights from ... (N zero weights)` |
 
@@ -282,14 +298,16 @@ OpenEye_orig/
 ├── README_FI.md               ★  File này: nhật ký, hướng dẫn, kết quả
 ├── hdl/                          RTL (Verilog) của bộ tăng tốc
 │   ├── OpenEye_FPGA.v         ★  Top-level FPGA: cổng DMA, FSM chính (nạp → convert → tính → đọc ra), buffer iact/weight/psum
-│   │                             (★ sửa GET_BIAS, lỗi #3; điều kiện lưu FC, lỗi #19)
-│   ├── psum_pipeline.v        ★  FSM psum: nạp bias, thu kết quả, lượng tử hoá, gửi kết quả ra DMA (★ `results_ready`, lỗi #14)
+│   │                             (★ sửa GET_BIAS, lỗi #3; điều kiện lưu FC, lỗi #19; ghi ngược #25, #26; thanh ghi act_min, #30;
+│   │                             mẫu reset, upstream `e78e5b7`)
+│   ├── psum_pipeline.v        ★  FSM psum: nạp bias, thu kết quả, lượng tử hoá, gửi kết quả ra DMA (★ `results_ready`, lỗi #14; kẹp int8, #30)
 │   ├── iact_stream_constructor.v ★ Đọc iact từ buffer và gửi tới các cluster (★ bộ đếm lỗi #13; ghi 1 channel và NUM_GLB_IACT=3, lỗi #6/#7;
 │   │                             bộ đếm cặp FC 12 bit, lỗi #19)
 │   ├── OpenEye_Parallel.v        Mảng tính toán: các cluster + router ("ASIC compute core", SERIAL=0/1)
-│   ├── OpenEye_Cluster.v, PE_cluster.v, PE.v   Cluster → nhóm PE → PE (MAC INT8, sparse) (★ PE.v: độ rộng bit, upstream `2bf497d`)
+│   ├── OpenEye_Cluster.v, PE_cluster.v, PE.v   Cluster → nhóm PE → PE (MAC INT8, sparse) (★ PE.v: độ rộng bit, upstream `2bf497d`;
+│   │                             trạng thái `EMPTY_PASS`, lỗi #31)
 │   ├── data_pipeline_wght.v      Giải mã weight nén vào 2 SPad của PE (định dạng mà lỗi #22 phải khớp)
-│   ├── quantization_unit.v       Lượng tử hoá kết quả khi ghi ngược cho layer sau (không kẹp int8, không ReLU)
+│   ├── quantization_unit.v    ★  Lượng tử hoá kết quả khi ghi ngược cho layer sau (★ kẹp int8 về [act_min, 127], ReLU = act_min 0, lỗi #30)
 │   ├── af_cluster.v              Khối ReLU, **không được dùng ở đâu** và còn lỗi (lỗi #24)
 │   ├── router_*.v, GLB_cluster.v Router iact/weight/psum giữa các cluster, GLB của cluster
 │   ├── dma_storage.v             Bộ giải mã word cấu hình (BẢN CŨ: test và export luôn thay bằng bản sinh từ regmap.yaml)
@@ -301,10 +319,13 @@ OpenEye_orig/
 │   └── sw/                       Phần mềm chạy trên ARM: runtime AXI DMA (hal_xaxidma.c, openeye_runtime.c)
 ├── src/open_eye/                 Thư viện Python (cài kiểu editable vào venv)
 │   ├── open_eye_parameters.py    Cấu hình phần cứng (đọc từ biến môi trường: CLUSTER_ROWS, IACT_RAM_CELLS, ...)
-│   ├── layer_parameters.py       Tính tham số của từng layer (số chu kỳ, giới hạn vòng lặp, ...)
+│   ├── layer_parameters.py    ★  Tính tham số của từng layer (số chu kỳ, giới hạn vòng lặp, ...) (★ ghi ngược #25, #26; act_min #30; model thật)
 │   ├── *_mapper.py               Sinh stream DMA: conv, dense, iact, weight, psum (bias), pooling (★ conv_mapper: lỗi #18;
-│   │                             ★ wght_stream_mapper: weight Conv dùng conv_wght_encoding, lỗi #22)
-│   ├── DRAM.py                ★  Dữ liệu của layer (input, weight, bias); giữ weight Conv bằng 0 thật; nạp weight Conv từ TFLite
+│   │                             ★ wght_stream_mapper: weight Conv dùng conv_wght_encoding, lỗi #22; ★ psum_stream_mapper: thứ tự bias,
+│   │                             lỗi #32; ★ dense_mapper: ghi ngược FC, lỗi #26)
+│   ├── DRAM.py                ★  Dữ liệu của layer (input, weight, bias); giữ weight Conv bằng 0 thật; nạp weight Conv từ TFLite;
+│   │                             giữ nguyên weight/bias của model đã lượng tử (model thật)
+│   ├── onnx2model.py          ★  Model PyTorch → ONNX → HardwareLayer (★ lượng tử tĩnh cho model đã huấn luyện; MaxPool đúng loại, lỗi #34)
 │   ├── data_create.py         ★  Model Keras của test (thêm MNIST_REAL, PAPER_MNIST)
 │   ├── generator.py              regmap.yaml → regmap_params.vh, dma_storage.v, đóng gói word cấu hình
 │   ├── vh_file_creator.py        Sinh parameters_FPGA.vh / parameters_PE.vh / parameters_PE_cluster.vh
@@ -320,7 +341,7 @@ OpenEye_orig/
 │   ├── cocotb_fpga/              Testbench top-level FPGA và các bộ test (cách chạy: mục 3c)
 │   │   ├── OpenEye_FPGA_tb.py ★  Testbench (★ seed, đệm channel, weight TFLite, KEEP_GOING, profiler, các hook dữ liệu)
 │   │   ├── test_profile.py    ★  Case đo: 9 một layer + 3 cả model (mốc, mục 6.7) + 16 cấu hình Bảng 3 của paper (mục 6.14)
-│   │   ├── test_conv_const.py ★  Test Conv (34 test dùng làm hồi quy; ★ thêm random_data)
+│   │   ├── test_conv_const.py ★  Test Conv (36 test dùng làm hồi quy; ★ thêm random_data, thứ tự bias #32)
 │   │   ├── test_gemm_layer.py    Test GEMM/Dense (63 test dùng làm hồi quy)
 │   │   ├── test_mnist_layers.py ★ 26 test: quét channel × NUM_GLB_IACT (lỗi #6/#7), 3 layer Conv MNIST thật, dữ liệu ngẫu nhiên + kiểm tra
 │   │   │                         độc lập (lỗi #18), 1 channel rộng 20/28/40 (lỗi #17), 3 Conv với weight MNIST đã huấn luyện (lỗi #22)
@@ -355,11 +376,12 @@ OpenEye_orig/
 │   ├── verify_conv_output.py     Kiểm tra độc lập từng word output của layer Conv (numpy)
 │   └── report/make_progress_report*.py  Tạo báo cáo Word cho giáo viên hướng dẫn (2026-10-10, 2026-10-15, 2026-10-31)
 ├── doc/
-│   ├── perf/                  ★  Số liệu đo chu kỳ: baseline_2026-10-24/ (**mốc hiện tại**, 12 case), paper_table3_2026-10-24/ (Bảng 3 paper),
+│   ├── perf/                  ★  Số liệu đo chu kỳ: baseline_2026-10-24/ (**mốc hiện tại**, 12 case), paper_table3_2026-10-26_fix25/ (Bảng 3 paper, mốc
+│   │                             hiện tại; bản 2026-10-24 là trước #25/#26), trained_mnist_2026-10-31/ (model đã huấn luyện, ảnh thật),
 │   │                             baseline_2026-10-22/, baseline_2026-10-15/, baseline_2026-10-10/ (mốc cũ), mem_typical_2026-10-10/, ...
 │   ├── synth/                 ★  Báo cáo Vivado theo từng lần chạy (mỗi thư mục có SUMMARY.md)
 │   ├── experiments/           ★  Báo cáo thí nghiệm và điều tra lỗi (#13, #6/#7, #18, #14, #19, cherry-pick upstream, model nhiều layer,
-│   │                             #17 đệm channel, #22 mã hoá weight, #26 Dense nối tiếp Dense, #25 NUM_GLB_PSUM=2, int8/kẹp/ReLU #30 + bộ giả lập model int8, #31 lượt rỗng, #32 thứ tự bias + #35) kèm script probe/lockstep để chạy lại
+│   │                             #17 đệm channel, #22 mã hoá weight, #26 Dense nối tiếp Dense, #25 NUM_GLB_PSUM=2, int8/kẹp/ReLU #30 + bộ giả lập model int8, #31 lượt rỗng, #32 thứ tự bias + #35, đường model thật của toolchain, rà soát upstream 2026-10-31) kèm script probe/lockstep để chạy lại
 │   ├── lint/                  ★  Output lint gốc
 │   ├── reports/               ★  Báo cáo tiến độ (Word): BaoCao_TienDo_OpenEye_2026-10-10.docx, BaoCao_TienDo_OpenEye_2026-10-15.docx,
 │   │                             BaoCao_TienDo_OpenEye_2026-10-31.docx (+ 5 hình PNG)
@@ -1178,9 +1200,9 @@ Lưu ý:
   Kiểm tra danh sách thiết bị trước khi chọn part.
 - Lưu báo cáo vào repo: chép `reports/utilization.txt`, `reports/timing_summary.txt` và `config.json` vào `doc/synth/<ngày>_<cấu hình>/`.
 
-### Kết quả Vivado hiện tại: mốc phần cứng (2026-10-30, sau các bản sửa #13, #6/#7, #14, 3 commit upstream, #19, #26, #25, #30 và #31)
+### Kết quả Vivado hiện tại: mốc phần cứng (2026-10-31, sau các bản sửa #13, #6/#7, #14, 3 commit upstream, #19, #26, #25, #30, #31 và upstream `e78e5b7`)
 
-Chi tiết: `doc/synth/2026-10-30_route4ns_fix31_zu7ev/SUMMARY.md`. Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 4 ns (250 MHz),
+Chi tiết: `doc/synth/2026-10-31_route4ns_e78_zu7ev/SUMMARY.md` (giống từng dòng lần chạy `doc/synth/2026-10-30_route4ns_fix31_zu7ev/`; số liệu dưới đây là của cả hai). Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 4 ns (250 MHz),
 cấu hình ở bảng trên, RTL = `dev` có bản sửa #31 (trạng thái `EMPTY_PASS` trong PE; trước đó #30 kẹp int8 trong bộ lượng tử, #25, #26 ở bộ ghi ngược). Bản sửa lỗi #18 chỉ là Python, không đổi phần cứng. Vivado được chạy batch từ WSL
 (`cmd.exe /c ... vivado.bat -mode batch -source synth_ooc.tcl -tclargs xczu7ev-ffvc1156-2-e 4 impl`).
 
@@ -1222,7 +1244,8 @@ cấu hình ở bảng trên, RTL = `dev` có bản sửa #31 (trạng thái `EM
 | 2026-10-26 | `2026-10-26_route4ns_fix26_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #26 (lần chạy ngày 25/10 bị ngắt khi tắt máy, đã chạy lại) | Cảnh báo không đổi; sau tổng hợp LUT −4, FF −4 (1 cổng OR, phần còn lại là dao động); WNS +0,028 ns |
 | 2026-10-26 | `2026-10-26_route4ns_fix25_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #25 (lần 1 phép kiểm lane chưa được gấp hằng: LUT +92; lần 2 là RTL cuối) | Cảnh báo không đổi; sau tổng hợp LUT +113 (+0,17 %, phần lớn là dao động: các module không đổi cũng lệch ±30), FF −10; WNS +0,084 ns |
 | 2026-10-28 | `2026-10-28_route4ns_clamp_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi thêm kẹp int8 (#30) | Cảnh báo không đổi; LUT +857 (+1,3 %, gần hết ở 8 bộ lượng tử), FF +22; WNS +0,076 ns |
-| 2026-10-30 | `2026-10-30_route4ns_fix31_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #31 (chạy ngày 31/10) | **Mốc hiện tại** (bảng trên). Cảnh báo không đổi; FF +478 (+10/PE); LUT −3.726 (FSM của PE được mã hoá one-hot); WNS +0,074 ns |
+| 2026-10-30 | `2026-10-30_route4ns_fix31_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #31 (chạy ngày 31/10) | Cảnh báo không đổi; FF +478 (+10/PE); LUT −3.726 (FSM của PE được mã hoá one-hot); WNS +0,074 ns |
+| 2026-10-31 | `2026-10-31_route4ns_e78_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi lấy upstream `e78e5b7` | **Mốc hiện tại** (bảng trên). Mọi báo cáo giống từng dòng lần `fix31` (netlist không đổi); 0 CRITICAL, WNS +0,074 ns |
 
 Ước lượng Yosys so với Vivado: LUT logic lệch dưới 1 %, nên Yosys dùng tốt để so sánh LUT tương đối. BRAM, URAM và DSP lệch nhiều (Yosys không dùng URAM
 và đưa bộ nhân vào DSP), nên các số này phải lấy từ Vivado.
@@ -1250,7 +1273,9 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 `baseline_2026-10-15` (sau bản sửa lỗi #18); thêm 3 case cả model có bảng theo layer (mục 6.13): **MNIST thật 1 channel `model_mnist_real_c1` 240.671 chu kỳ
 (963 µs)**, Conv2 chiếm 50 %; `model_mnist_real_c2` 243.517 chu kỳ (974 µs); `model_mnist16_c2` 50.007 chu kỳ (200 µs). So với `baseline_2026-10-22`
 (trước bản sửa #22) các case model giảm 13–579 chu kỳ: weight Conv ngẫu nhiên nay giữ số 0 thật (1–5 %) và PE bỏ qua chúng; số word DMA không đổi.
-**Bảng 3 của paper** (mạng Bảng 2, 16 cấu hình cluster/PE, theo từng layer và từng pha): mục 6.14, `doc/perf/paper_table3_2026-10-24.md`.
+**Bảng 3 của paper** (mạng Bảng 2, 16 cấu hình cluster/PE, theo từng layer và từng pha): mục 6.14, mốc hiện tại `doc/perf/paper_table3_2026-10-26_fix25.md`
+(13/16 cấu hình đúng cả mạng; bản `paper_table3_2026-10-24.md` là trước #25/#26). **Model MNIST đã huấn luyện với ảnh thật** (2026-10-31, mục 6.13):
+213.040–220.941 chu kỳ (852–884 µs) ở ảnh 0, 1, 2, 7, ít hơn 8,2–11,5 % so với `model_mnist_real_c1` vì activation thật có nhiều số 0 (`doc/perf/trained_mnist_2026-10-31.md`).
 
 **Layer kiểu MNIST (0.3):**
 
@@ -1282,12 +1307,12 @@ dài 96 thay vì 192 chu kỳ.
 | Giai đoạn | Nội dung | Trạng thái |
 |---|---|---|
 | 0. Đo lường | Profiler, báo cáo, so sánh, baseline 12 case, mô hình bộ nhớ, mốc phần cứng Vivado, kiểm tra độc lập từng word, đo theo từng layer, Bảng 3 của paper | **Xong** (2026-10-24); còn: hiệu chỉnh mô hình bộ nhớ theo board |
-| 0b. Sửa lỗi tính đúng (phát sinh) | Lỗi làm phần cứng/mô phỏng tính sai | **Đã sửa:** #3, #13, #6, #7 (`NUM_GLB_IACT=3`), #14, #18, #19, #22, #25, #26, #30 (kẹp int8, ReLU gộp), #34 (MaxPool của `onnx2model` thành average, Python), #32 (thứ tự word bias khi nhiều filter chung một địa chỉ psum, Python), #31 (gồm #33, #35: lượt không có activation khác 0 làm mất mọi lượt sau; `PE.v`); #17 có workaround Python; #5 là báo động giả của testbench. **Còn mở:** #9, #12, #18b, #19b, #21, #23, #27, #28, #29, 3 channel (#7), không có hàm kích hoạt (#24) |
+| 0b. Sửa lỗi tính đúng (phát sinh) | Lỗi làm phần cứng/mô phỏng tính sai | **Đã sửa:** #3, #13, #6, #7 (`NUM_GLB_IACT=3`), #14, #18, #19, #22, #25, #26, #30 (kẹp int8, ReLU gộp), #34 (MaxPool của `onnx2model` thành average, Python), #32 (thứ tự word bias khi nhiều filter chung một địa chỉ psum, Python), #31 (gồm #33, #35: lượt không có activation khác 0 làm mất mọi lượt sau; `PE.v`); #17 có workaround Python; #5 là báo động giả của testbench. **Còn mở:** #9, #12, #18b, #19b, #21, #23, #27, #28, #29, 3 channel (#7), hàm kích hoạt khác ReLU (#24); upstream `93f0e82` không sửa lỗi nào trong số này (mục 2) |
 | 1. Giảm lưu lượng DMA | Bias theo filter, đóng gói weight, bảng quant theo F hoặc lưu BRAM, readout INT8 | Chưa làm. Đề xuất bắt đầu với bias |
 | 2. Che độ trễ | Double-buffering (`BRANCHES=2`): nạp lượt sau trong lúc lượt hiện tại tính toán | Chưa làm (cần sửa lỗi chọn nửa buffer iact trước) |
 | 3. Mô hình và DSE | Mô hình Python dự đoán chu kỳ và byte, roofline, quét cấu hình | Chưa làm |
 
-**Giai đoạn 0: trạng thái chi tiết** (cập nhật 2026-10-24)
+**Giai đoạn 0: trạng thái chi tiết** (cập nhật 2026-10-31)
 
 | Việc | Trạng thái |
 |---|---|
@@ -1299,12 +1324,12 @@ dài 96 thay vì 192 chu kỳ.
 | **0.2 Mở rộng phạm vi đo**: payload/hiệu suất cho layer Dense (FC) và cho lượt nhiều layer (pha `writeback`), tách số liệu theo từng layer | **Xong** (2026-10-22, mục 6.13): bảng theo layer, tách `compute`/`writeback` ở trạng thái 11, 3 case model |
 | **0.3 Cấu hình gần thực tế hơn**: 3 case kiểu MNIST (mục 6.7), baseline mới `baseline_2026-10-10` | **Xong** (2026-10-10) |
 | Mô hình bộ nhớ ngoài (độ trễ burst, giới hạn băng thông) | **Xong** (2026-10-10, mục 6c); tham số chưa hiệu chỉnh theo board |
-| Mốc phần cứng: tổng hợp + place & route Vivado (`tools/export_vivado.py`) | **Xong** (2026-10-12 → 2026-10-21, mục 6d): 250 MHz, 63,9k LUT, 39,3k FF, 192 BRAM tile |
+| Mốc phần cứng: tổng hợp + place & route Vivado (`tools/export_vivado.py`) | **Xong** (2026-10-12, cập nhật sau mỗi bản sửa RTL tới 2026-10-31, mục 6d): 250 MHz, 60,8k LUT, 39,8k FF, 192 BRAM tile |
 | Kiểm tra độc lập từng word + test dữ liệu ngẫu nhiên | **Xong** (2026-10-15, mục 6.12) |
 | Baseline sau các bản sửa | **Xong**: `doc/perf/baseline_2026-10-24/` (12 case) |
 | Bảng 3 của paper đo bằng profiler (16 cấu hình, theo layer) | **Xong** (2026-10-24, mục 6.14); sau bản sửa #26 và #25: **13/16 cấu hình tính đúng cả mạng**; còn #19b (CR 1 X 4 Y 3) và #28 (CR 1 X 2) |
 
-### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-24)
+### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-31)
 
 | # | Lỗi | Nơi | Trạng thái |
 |---|---|---|---|
@@ -1328,16 +1353,16 @@ dài 96 thay vì 192 chu kỳ.
 | 18 | Filter 32–63 sai (MNIST Conv2/Conv3); thực chất **mọi layer > 4 channel tính sai với weight thật** | `src/open_eye/conv_mapper.py` (Python) | **Đã sửa** (2026-10-15, được bạn đồng ý; xoá khoá `used_wght_per_PE` bị lặp). Kiểm chứng từng word bằng tính toán numpy độc lập (mục 9). Conv2 MNIST thật PASS, Conv3 đúng mọi giá trị; baseline −16 % đến −25 % chu kỳ |
 | 18b | Số filter > 32 và không chia hết cho 32 (40, 48): sai từ cả filter 0 | Python/psum address generator | **Chưa điều tra xong**: Python báo 768 word ra nhưng tạo tham chiếu 1.024 dòng. MNIST không dùng |
 | 19 | Dense có K > 512 input sai (MNIST: Dense 784 → 10 của mạng trong repo, FC 3136 → 10) | `hdl/iact_stream_constructor.v:218`, `hdl/OpenEye_FPGA.v:2163` | **Đã sửa** (2026-10-21, được bạn đồng ý; `doc/experiments/2026-10-21_bug19_dense_k512.md`). Hai nguyên nhân: (1) bộ đếm vị trí cặp `x_pos_in_w_cycle` 8 bit quay vòng ở cặp 256 → activation ≥ 512 bị bỏ; (2) `current_x` có dấu 12 bit âm từ activation 2048 → activation ≥ 2048 bị bỏ. Sửa: bộ đếm 12 bit, điều kiện lưu của FC không dùng dấu của `current_x`. Loạt K 64 … 4032 (gồm 784 và 3136) đều đúng từng output so với numpy |
-| 19b | Dense N = 32 output với từ 8 lượt K (K ≥ 508) | ? | **Chưa rõ nguyên nhân**: K ≤ 504 đúng, 508/512 sai; N = 16/24 ở K = 512 đúng. Sai ở phía weight hoặc psum, không phải kiểu mất activation. 2026-10-24: Dense 1568→32 (của paper) đúng ở `CLUSTER_ROWS=2` nhưng sai 32/32 ở `CLUSTER_ROWS=1` (giá trị gần đúng, lệch vài đơn vị), cùng họ lỗi |
+| 19b | Dense N = 32 output với từ 8 lượt K (K ≥ 508) | ? | **Chưa rõ nguyên nhân**: K ≤ 504 đúng, 508/512 sai; N = 16/24 ở K = 512 đúng. Sai ở phía weight hoặc psum, không phải kiểu mất activation. 2026-10-24: Dense 1568→32 (của paper) đúng ở `CLUSTER_ROWS=2` nhưng sai 32/32 ở `CLUSTER_ROWS=1` (giá trị gần đúng, lệch vài đơn vị), cùng họ lỗi. 2026-10-31: upstream `93f0e82` cũng sai y như vậy (mục 2) |
 | 20 | `PE.v:829–830`: tham chiếu "tiến" `gen_sparse_fsm.wght_addr_vec` / `wght_addr_use_vec` / `wght_data_use_vec` vào khối generate khai báo sau (dòng 978). Icarus, Verilator, Vivado hiểu đúng; **Yosys tạo dây 1 bit không ai lái** ("implicitly declared") | `hdl/PE.v` | **Chưa sửa** (phát hiện 2026-10-21). Cùng loại với #14 (nghĩa phụ thuộc công cụ). Đề xuất: khai báo 3 tín hiệu ở cấp module trước hai khối generate. |
 | 21 | Dense N > 32 output (cần 2 lượt psum): sai với mọi K | Bước đọc kết quả cuối (`PSUM_SEND_RESULTS` hai lượt) hoặc cách testbench giải mã nó; **không** phải phép tính | **Chưa sửa** (phát hiện 2026-10-21): K = 64, N = 40 chỉ đúng 10 output đầu, N = 48 chỉ đúng 12 output đầu (= P output đầu); N = 32 đúng. 2026-10-24 (điều tra #26): Dense 16→64 làm layer cuối sai 48/64, nhưng cùng layer đó ghi ngược trên chip (cách sửa #26 giả lập) cho đủ 64 giá trị đúng, nên psum buffer đúng |
 | 22 | Conv có **weight bằng 0** tính sai hoặc treo (mọi mẫu số 0 trừ "mỗi cột một số 0 ở đầu"; model MNIST int8 đã huấn luyện: Conv2 140/384, Conv3 116/384 lần nạp weight sai) | Định dạng nén weight: mapper Python không khớp cách `data_pipeline_wght.v` giải mã (cột rỗng, ô đệm, overhead 4 bit, reset địa chỉ ở word 0) và bộ ghép stream | **Đã sửa** (2026-10-24, được bạn đồng ý, **chỉ Python**): `conv_wght_encoding.py`; stream giống hệt khi không có số 0; MNIST Conv1/2/3 với weight đã huấn luyện tính đúng mọi output. Mục 9 |
-| 23 | `test_conv3x3_sparse` 32×4×8 → 16 (iact và weight thưa dạng bàn cờ, `NUM_GLB_IACT=3`) sai: output 0 ở các x lẻ của hàng 1 | ? (phía activation thưa: weight của ca này giải mã đúng theo mô hình RTL) | **Chưa điều tra** (có từ trước bản sửa #22: code cũ cũng fail, kiểu sai khác) |
+| 23 | `test_conv3x3_sparse` 32×4×8 → 16 (iact và weight thưa dạng bàn cờ, `NUM_GLB_IACT=3`) sai: output 0 ở các x lẻ của hàng 1 | ? (phía activation thưa: weight của ca này giải mã đúng theo mô hình RTL) | **Chưa điều tra** (có từ trước bản sửa #22: code cũ cũng fail, kiểu sai khác). 2026-10-31: upstream `93f0e82` cũng sai y như vậy (mục 2) |
 | 24 | **Không có hàm kích hoạt**: `af_cluster.v` (ReLU) không được dùng ở đâu, còn 2 lỗi (so sánh `< 0` trên dây không dấu, chọn bit `[a:+b]` sai), testbench riêng lỗi thời; `af_cluster_mode` chỉ reset về 0, không có trường cấu hình | RTL | **Giải quyết cho ReLU** (2026-10-28, được bạn đồng ý): ReLU đứng ngay sau Conv/Dense được thực hiện bằng cận dưới của bộ kẹp int8 trong `quantization_unit.v` (`act_min = 0`), đúng cách TFLite làm "fused ReLU", không cần `af_cluster`. `af_cluster.v` vẫn không dùng (giữ nguyên, 2 lỗi của nó không cần sửa). Hàm không phải dạng kẹp (leaky ReLU, sigmoid, tanh) vẫn chưa có. Mục 9 |
 | 25 | `NUM_GLB_PSUM = 2` (PE trục X = 2): mọi model nối một Conv với layer khác trên chip tính sai (cả 8 hàng X = 2 của Bảng 3). Ghi chú cũ "sau Conv2 lại đúng" là sai: kiểm tra đó bị bỏ qua | **Pha ghi ngược của Conv**: RTL (`RECEIVE_PSUMS_TO_IACT` gom nhóm `WRITEBACK_WORDS` = 2 channel thay vì 4 channel/pixel, và đếm pixel đệm theo nhóm) + Python (`fsm_psum_limit` chia 4 thay vì `NUM_GLB_PSUM`) | **Đã sửa** (2026-10-26, được bạn đồng ý): RTL `RECEIVE_PSUMS_TO_IACT` gom nhóm 4 channel/pixel với mọi số lane (`WRITEBACK_CHANNELS`), chỉ phát W lane, `x_pos` đếm theo pixel; Python `fsm_psum_limit` chia theo số lane. Với `NUM_GLB_PSUM = 4` mạch như cũ. Test mới 7/7, hồi quy 146 test 0 FAIL, 12 case mốc 0 chu kỳ lệch, lint 0 mới, Bảng 3 13/16 cấu hình PASS (còn #19b, #28). Mục 9 |
 | 26 | **Dense nối tiếp Dense trên chip** (MLP, Dense 1568→32 → Dense 32→10 của paper): Dense đầu tính psum **đúng** nhưng pha ghi ngược (`SEND_PSUM_TO_IACT` + `RECEIVE_PSUMS_TO_IACT`) **không ghi gì** vào bộ đệm iact, Dense sau đọc lại input của Dense đầu; mọi cấu hình, mọi K, N | Python (`fsm_psum_limit` quá ngắn, vòng đọc psum không cấu hình cho Dense) **và** RTL (bộ đóng gói chỉ biết bố cục conv; nhánh FC bị upstream bỏ ở `1320759`/`8350a00` để giảm LUT) | **Đã sửa** (2026-10-24, được bạn đồng ý): 1 dòng RTL (`x_pos` quay về 0 ở mỗi nhóm khi FC) + thanh ghi Python (`configure_fc_writeback`). 11/11 chuỗi Dense qua RTL, hồi quy 128 test không đổi, 12 case mốc 0 chu kỳ lệch, Bảng 3: 7/8 cấu hình X = 4 tính đúng cả mạng. Mục 9 |
-| 27 | Pooling 4×4 → 2×2 (lần pooling thứ hai của `Conv_Pool_Conv_Pool_Conv` với input 8×8): bộ đệm sau pooling chứa −128 (giá trị khởi đầu của max-pool) và 2 ô không được ghi; xảy ra với cả `NUM_GLB_PSUM` 4 và 2; input 16×16 thì đúng | ? (pooling, kích thước nhỏ) | **Chưa điều tra** (phát hiện 2026-10-26 khi viết test cho #25) |
-| 28 | Conv ở `CLUSTER_ROWS=1` với `NUM_GLB_PSUM=2` tính sai một số output (đường đọc thẳng ra, không có ghi ngược): Conv 14×14 32 → 32 channel sai, 16 → 32 đúng; conv2 của mạng paper (sau pooling) sai ở vài pixel. CR 1 X 4 và CR 2 X 2 đều đúng. Là nguyên nhân của 2 hàng CR 1 X 2 còn FAIL trong Bảng 3 | ? (phép tính, tổ hợp CR = 1 + 2 lane) | **Chưa điều tra** (phát hiện 2026-10-26 khi kiểm chứng bản sửa #25) |
+| 27 | Pooling 4×4 → 2×2 (lần pooling thứ hai của `Conv_Pool_Conv_Pool_Conv` với input 8×8): bộ đệm sau pooling chứa −128 (giá trị khởi đầu của max-pool) và 2 ô không được ghi; xảy ra với cả `NUM_GLB_PSUM` 4 và 2; input 16×16 thì đúng | ? (pooling, kích thước nhỏ) | **Chưa điều tra** (phát hiện 2026-10-26 khi viết test cho #25). 2026-10-31: upstream `93f0e82` cũng sai, còn sớm hơn (ở lần kiểm tra bộ đệm iact đầu tiên, mục 2) |
+| 28 | Conv ở `CLUSTER_ROWS=1` với `NUM_GLB_PSUM=2` tính sai một số output (đường đọc thẳng ra, không có ghi ngược): Conv 14×14 32 → 32 channel sai, 16 → 32 đúng; conv2 của mạng paper (sau pooling) sai ở vài pixel. CR 1 X 4 và CR 2 X 2 đều đúng. Là nguyên nhân của 2 hàng CR 1 X 2 còn FAIL trong Bảng 3 | ? (phép tính, tổ hợp CR = 1 + 2 lane) | **Chưa điều tra** (phát hiện 2026-10-26 khi kiểm chứng bản sửa #25). 2026-10-31: upstream `93f0e82` cũng sai y như vậy (mục 2) |
 | 29 | Dense K = 3136 với ≥ 32 output tính sai trên RTL (chuỗi 3136 → 64 → 10, 3136 → 32 → 10 sai từ kiểm tra bộ đệm sau Dense đầu; 2026-10-31: Dense 3136 → 32 **một layer** cũng sai 32/32, cả trên upstream); 2560 → 32, 2048 → 32, 1024/512/256 → 64, 3136 → 16, 3136 → 10 đúng. Chặn Dense 3136 → 64 của model MNIST int8 đã huấn luyện | ? (có thể cùng họ #19b; không phải tràn trường thanh ghi) | **Chưa điều tra** (phát hiện 2026-10-28) |
 | 30 | Bộ lượng tử **không kẹp int8**: lấy 8 bit thấp, giá trị tràn bị quấn vòng (130 → −126, −129 → 127); tham chiếu Python cũng không kẹp nên mọi test PASS (dữ liệu test chưa từng tràn). Đưa model MNIST int8 thật vào phần cứng: **9,3 %** thay vì 99,2 % (giả lập) | `quantization_unit.v` | **Đã sửa** (2026-10-28, được bạn đồng ý): kẹp về `[act_min, 127]`, `act_min` theo layer (thanh ghi `quant_clamp_low`). Test mới 9/9 RTL + 2/2 bộ lượng tử, đối chứng âm 9/9 FAIL trên RTL cũ, hồi quy 157 test 0 FAIL, 12 case mốc 0 chu kỳ lệch, lint 462. Mục 9 |
 | 31 | Conv/Dense **mất mọi lượt tính từ một lượt rỗng trở đi**: lượt mà không PE nào có activation khác 0 (Conv 3×3: cửa sổ 3 hàng input toàn 0 trên phần hàng một lượt phủ; Dense: một khối K input của lượt toàn 0) và mọi lượt sau không được tính, output giữ bias (+ các lượt trước); layer vẫn chạy hết, không treo. Ảnh MNIST thật: Conv1 ra bias ở cả 25.088 output (hàng trên của ảnh trống), Conv2 ở 12.320/12.544. Dữ liệu test ngẫu nhiên không có số 0 (`DRAMContents` thay 0 bằng ±1) nên không lộ | RTL điều khiển: PE chỉ bắt đầu lượt khi có activation khác 0 (`PE.v:1135`); `OpenEye_FPGA.v` đếm lượt (Process 2) và khởi động lượt converter/weight kế tiếp (Process 5) khi bus iact ready của mảng PE rời trạng thái toàn 1, việc chỉ xảy ra khi có PE bắt đầu tính | **Đã sửa** (2026-10-30, được bạn đồng ý, hướng A, `PE.v`; mục 9, `doc/experiments/2026-10-30_bug31_fix.md`): trạng thái mới `EMPTY_PASS`: PE rỗng rời IDLE cùng nhịp PE có dữ liệu (lượt được đếm, lượt sau được nạp), giữ iact/wght ready thấp tới khi FSM psum đọc lượt đó, rồi chuyển psum đi qua như PE rảnh. Upstream `93f0e82` cũng bị |
@@ -1346,9 +1371,9 @@ dài 96 thay vì 192 chu kỳ.
 | 34 | Đường model thật (`USE_RANDOM_VALUES=0`): layer MaxPool của `onnx2model` bị cấu hình thành **average pooling** (`pooling_mode` 1, giới hạn vòng lặp 8/16 thay vì 112): `onnx2model.get_model` đặt tên mọi layer bằng loại (`pooling2d`), còn `LayerParameters.write_pooling_layer` chọn max khi tên chứa `max`. RTL sai từ bộ đệm sau pooling đầu (784/784 word). Upstream có cùng code | Python (`onnx2model`) | **Đã sửa** (2026-10-30, chỉ Python): layer MaxPool tên `max_pooling2d`; xác nhận trên RTL (đổi tên bằng probe → qua kiểm tra sau pool1, pool2). Mục 8d |
 | 35 | Conv3 7×7×64 → 64 của model thật khi ghi ngược cho Dense: ghi chép cũ là "cột cuối x = 6 sai" (đọc nhầm layout) | **Chính là #31**: các output sai nằm ở **hàng output cuối y = 6**; trong cửa sổ của hàng này nhóm channel 44–47 không có activation khác 0 → lượt đó và mọi lượt sau bị mất (mô hình khớp DUT 448/448 giá trị) | **Đã sửa** cùng #31 (`test_real_model[0]` PASS) |
 
-### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-24)
+### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-31)
 
-**Định hướng (mốc phần cứng 2026-10-30 sau bản sửa #31: 60,8k LUT, 39,8k FF, 192 BRAM tile, đạt 250 MHz sau route; mốc chu kỳ `baseline_2026-10-24`: 9 case
+**Định hướng (mốc phần cứng 2026-10-31 sau bản sửa #31 và `e78e5b7`: 60,8k LUT, 39,8k FF, 192 BRAM tile, đạt 250 MHz sau route; mốc chu kỳ `baseline_2026-10-24`: 9 case
 một layer giống hệt `baseline_2026-10-15`, thêm 3 model):**
 
 | # | Việc | Loại | Vì sao | Trạng thái |
@@ -1357,8 +1382,7 @@ một layer giống hệt `baseline_2026-10-15`, thêm 3 model):**
 | B | **Lỗi #13: phần cứng khác mô phỏng** ở `iact_stream_constructor` | Thí nghiệm, rồi sửa RTL | Nếu đúng như Vivado báo, bitstream hiện tại tính sai iact, nên mọi số đo trên board sẽ vô nghĩa | (1) Thí nghiệm **xong 2026-10-13: lỗi có thật**, 6/9 case sai trên phần cứng giả lập. (2) **Đã sửa 2026-10-13** (mục 9). (3) **Vivado xác nhận 2026-10-14**: CRITICAL WARNING biến mất, vẫn đạt 250 MHz. **Xong** |
 | B2 | Lỗi #6/#7 (1 channel, `NUM_GLB_IACT=3`) và #18 (weight đọc gấp đôi) | Sửa RTL (#6/#7), Python (#18) | Kết quả sai | **Xong 2026-10-14/15** (mục 9), Vivado xác nhận |
 | C | Gửi bias theo filter (1.1 bên dưới) | Sửa RTL | Bias chiếm **26 %** chu kỳ `mnist1` sau bản sửa #18; ước tính −23 % chu kỳ, DMA pha bias giảm khoảng 900 lần, chi phí khoảng +2 % FF và 0 BRAM | Chờ đồng ý |
-| C2 | MNIST đầy đủ: lỗi #17 (Conv1), #9 (Conv3), #5 (FC) | Python (đệm channel) hoặc RTL | Chạy cả mạng thật, đo độ trễ end-to-end | **Kiến trúc MNIST chạy đủ 6 layer** (2026-10-22): #17 có workaround Python, #5 là lỗi testbench, #9 không chặn khi nối layer; `model_mnist_real_c1` = 963 µs (dữ liệu ngẫu nhiên). #22 đã sửa (2026-10-24): Conv1/2/3 với weight đã huấn luyện tính đúng. Còn chặn model int8 đã huấn
-luyện: kẹp int8, ReLU (#24) (mục 8d) |
+| C2 | MNIST đầy đủ: lỗi #17 (Conv1), #9 (Conv3), #5 (FC) | Python (đệm channel) hoặc RTL | Chạy cả mạng thật, đo độ trễ end-to-end | **Kiến trúc MNIST chạy đủ 6 layer** (2026-10-22): #17 có workaround Python, #5 là lỗi testbench, #9 không chặn khi nối layer; `model_mnist_real_c1` = 963 µs (dữ liệu ngẫu nhiên). #22 đã sửa (2026-10-24): Conv1/2/3 với weight đã huấn luyện tính đúng. **Xong 2026-10-30**: sau #30 (kẹp int8, ReLU), #34, #32, #31, model int8 đã huấn luyện chạy trọn mạng trên RTL, khớp từng bit ở ảnh test 0–7, đoán đúng cả 8; đo được 852–884 µs (mục 6.13, 8d) |
 | D | Thu nhỏ bộ đệm psum (`BUFFER_WIDTH_PSUM` 14 → 11/12) | Đổi tham số, không sửa RTL | 144/168 RAMB36 là bộ đệm psum, layer lớn nhất chỉ dùng khoảng 1.792/16.384 địa chỉ (ước tính); tiết kiệm khoảng 100–124 BRAM36 để thêm cluster hoặc bộ đệm | Cần kiểm chứng bằng 9 case. Sau route còn thấy lợi thêm: đường găng là dây tới các BRAM này, nên bộ đệm nhỏ hơn có thể tăng fmax |
 | E | DMA 128 bit | Băng thông | Cổng HP của ZU+ rộng 128 bit; 64 bit ở 250 MHz chỉ đạt khoảng 2 GB/s; giảm một nửa số chu kỳ nạp và đọc kết quả | 128 bit chưa từng được kiểm chứng |
 | F | Pipeline đường găng iact converter (`OpenEye_FPGA.v` 943–950) | Sửa RTL (fmax) | Tính trước các tích tham số một lần mỗi layer | Chỉ làm nếu fmax sau route chưa đủ |
@@ -1367,6 +1391,7 @@ luyện: kẹp int8, ReLU (#24) (mục 8d) |
 | I | Lỗi #26 (Dense nối tiếp Dense) và #25 (`NUM_GLB_PSUM=2`) | Điều tra (Python trước) | Chặn mạng của paper và mọi model có 2 Dense; Bảng 3 chưa có cấu hình nào tính đúng hết | #26 **đã sửa** (2026-10-24, 1 dòng RTL + Python, mục 9); #25 **đã sửa** (2026-10-26, mục 9) |
 | J | Bảng 3 với activation thưa (giả lập ReLU) | Chỉ Python | Phần xử lý của fork chậm hơn paper 4–5,6 lần; xem bao nhiêu là do activation không thưa | Đề xuất |
 | K | Hàm kích hoạt (#24) + kẹp int8 trong `quantization_unit` | Sửa RTL | Cần cho model thật (mục 8d) | **Xong** (2026-10-28, #30): kẹp với cận dưới theo layer, ReLU gộp vào kẹp (mục 9) |
+| L | Kết thúc gửi weight sớm 1 chu kỳ (`wghts_per_pe + 1`, từ upstream `3258813`) | Sửa RTL 1 dòng | Mỗi lượt có việc gửi weight trên đường găng bớt 1 chu kỳ | **Đã thử 2026-10-31**: đúng ở mọi kiểm tra, −0,1 đến −0,3 % chu kỳ (−673 trên model MNIST), 0 tài nguyên; chờ bạn quyết định đưa vào `dev` (`doc/experiments/2026-10-31_wght_send_end.md`) |
 
 Thứ tự đề xuất: A, B, B2, C2 (kiến trúc MNIST chạy đủ) **đã xong**; tiếp theo là C (bias theo filter: Bảng 3 cho thấy bias chiếm khoảng 54.000–58.000 ns ở mọi
 cấu hình), rồi D (I: #25, #26 đã sửa).
@@ -1414,13 +1439,14 @@ Chi tiết: `doc/experiments/2026-10-22_multilayer_model.md`, script `doc/experi
 layer trung gian ghi kết quả đã lượng tử ngược vào bộ đệm iact (trạng thái 11), testbench so bộ đệm đó với tham chiếu của layer sau; chỉ layer cuối gửi
 kết quả ra.
 
-**Hiện trạng (dữ liệu ngẫu nhiên, sau bản sửa #19):**
+**Hiện trạng (cập nhật 2026-10-31):**
 
 | Model | Kết quả |
 |---|---|
 | `LAYER=MNIST` của `data_create.py` (Conv 2→16, Pool, Conv 16→16, Pool, Conv 7×7 16→16, Dense 784→10), `NUM_GLB_IACT` 1 và 3 | **PASS** cả 6 layer |
 | Kiến trúc MNIST thật (`models/mnist_conv_net.py`: Conv 32, Pool, Conv 64, Pool, Conv 7×7 64, FC 3136→10), đầu vào **đệm thành 2 channel**, `QUANT_AMOUNT=64` | **PASS** cả 6 layer |
 | Như trên với **1 channel** (đúng model gốc) | FAIL ở bộ đệm iact sau Conv1 (lỗi #17); **PASS từ 2026-10-22** nhờ đệm 2 channel bằng Python (`model_mnist_real_c1`, 241.250 chu kỳ = 965 µs; 240.671 sau #22) |
+| **Model MNIST đã huấn luyện** (`SimpleMNISTConvNet` + `mnist_unquantized_model.pth`, lượng tử tĩnh qua `onnx2model`, ảnh test thật, 1 channel đệm thành 2) | **PASS** cả 6 layer, khớp từng bit, ảnh 0–7 đoán đúng cả 8 (2026-10-30, sau #30, #34, #32, #31; `test_real_model.py`) |
 | `LAYER=PAPER_MNIST` (mạng Bảng 2 của paper: Conv 16, Pool, Conv 32, Pool, Conv 32, Dense 1568→32, Dense 32→10), 16 cấu hình | Trước bản sửa #26 FAIL ở mọi cấu hình. Sau bản sửa #26 (2026-10-24): 7/8 cấu hình X = 4 PASS. **Sau bản sửa #25 (2026-10-26): 13/16 cấu hình PASS cả 7 layer**; còn CR 1 X 4 Y 3 (lỗi tính #19b ở Dense 1568→32) và CR 1 X 2 (lỗi tính #28 ở Conv) (mục 6.14, 9) |
 
 **Còn thiếu để mô phỏng đúng model MNIST thật (ngữ nghĩa của testbench):** (1) lỗi #17: **đã làm** đệm 1 → 2 channel bằng Python (2026-10-22, channel thêm
@@ -1429,14 +1455,17 @@ toàn 0, +472 chu kỳ = +1,5 % Conv1, mục 9; sửa RTL vẫn là lựa chọn
 
 **Còn thiếu để chạy model int8 đã huấn luyện với kết quả đúng** (điều tra bằng bộ giả lập 2026-10-28, `doc/experiments/2026-10-28_int8_clamp.md`;
 TFLite int8 đạt 99,23 % trên 10.000 ảnh): (A) ~~kẹp int8~~ và (B) ~~ReLU~~ **đã làm 2026-10-28** (#30: kẹp với cận dưới theo layer, ReLU = cận dưới 0; giả lập: từ 9,3 %
-lên 99,21–99,25 % với activation lượng tử đối xứng, zero point 0). Còn lại: (C) **luồng Python lượng tử int8 (PTQ)** cho model thật: hiệu chỉnh, weight theo channel,
+lên 99,21–99,25 % với activation lượng tử đối xứng, zero point 0). Còn lại lúc đó (trạng thái 2026-10-31 ghi trong ngoặc vuông): (C) **luồng Python lượng tử int8 (PTQ)** cho model thật
+[**đã làm 2026-10-30** bằng lượng tử tĩnh trong `onnx2model`, một scale weight mỗi layer, `mant`/`shift` mỗi layer, xem bảng bên dưới]: hiệu chỉnh, weight theo channel,
 bias int32, `mant`/`shift` theo filter, `act_min`, lượng tử ảnh input, hoán vị weight Dense đầu tiên theo thứ tự làm phẳng khối 4 channel của phần cứng; (D) tham chiếu
-int8 thật (bộ giả lập bit-exact, đã khớp TFLite) thay cho `floor(mant·x/2^shift)`; (E) lỗi #12 `current_filter` và (F) mantissa bị cắt 8 bit (`OpenEye_FPGA.v:1350`):
-không ảnh hưởng độ chính xác model MNIST (−0,04 điểm) nhưng cần để khớp từng bit; (G) lỗi #29 (Dense 3136 → 64). Với lượng tử đối xứng: psum 20 bit đủ (lớn nhất
+int8 thật (bộ giả lập bit-exact, đã khớp TFLite) thay cho `floor(mant·x/2^shift)` [không cần nữa: tham chiếu của toolchain dùng đúng phép tính của phần cứng và khớp
+RTL từng bit; so với ONNX Runtime chỉ khác do làm tròn]; (E) lỗi #12 `current_filter` [**còn mở**; không chặn vì đang dùng một hệ số mỗi layer] và (F) mantissa bị cắt
+8 bit (`OpenEye_FPGA.v:1350`) [**còn mở**; `onnx2model` chọn mantissa < 256 nên khớp]: không ảnh hưởng độ chính xác model MNIST (−0,04 điểm) nhưng cần để khớp từng bit;
+(G) lỗi #29 (Dense 3136 → 64) [**còn mở**; không chặn model trong repo vì Dense của nó là 3136 → 10]. Với lượng tử đối xứng: psum 20 bit đủ (lớn nhất
 365.571), đệm 0 đúng, không cần cộng zero point, giữ được bỏ-qua-số-0 (63–83 % activation là 0 sau ReLU). Lượng tử bất đối xứng kiểu TFLite (zp −128) thì cần thêm
 psum 32 bit, đệm viền bằng zero point (RTL) và mất bỏ-qua-số-0.
 
-**Đường model thật của toolchain (kiểm tra 2026-10-30, không sửa gì):** testbench có sẵn đường này khi `USE_RANDOM_VALUES=0`: `models/mnist_conv_net.py`
+**Đường model thật của toolchain (kiểm tra 2026-10-30, không sửa gì; đây là trạng thái trước bản sửa ở bảng dưới):** testbench có sẵn đường này khi `USE_RANDOM_VALUES=0`: `models/mnist_conv_net.py`
 (`SimpleMNISTConvNet`, PyTorch) → `onnx2model.get_model` (xuất ONNX, `quantize_dynamic` weight int8, tách thành `HardwareLayer`) → `LayerParameters` → `DRAMContents`
 → mapper → RTL. Makefile chỉ chọn `LAYER`, kích thước, tham số phần cứng và cờ này; nó không ghi đè bias/weight. Kết quả: `onnx2model` cho đủ 6 layer (gồm 2 layer
 pooling để cấu hình pooling trên RTL, cờ ReLU, weight int8, bias int32), `LayerParameters` nhận được (khác `tflite2model`: `TFLite_dense` không có `.kernel` mà
@@ -1457,7 +1486,7 @@ QUANT_AMOUNT 64): FAIL ở bộ đệm sau pooling đầu, 784/784 word sai (DUT
 | Testbench | `OPENEYE_MODEL_WEIGHTS` (nạp `.pth`, lượng tử tĩnh), `OPENEYE_INPUT_IMAGE` (ảnh test thật), log lớp DUT dự đoán |
 
 Kiểm chứng toolchain không cần RTL (`test/test_onnx_model_flow.py`, 6/6): tham chiếu của testbench so với ONNX Runtime chạy cùng model int8, từng layer: chỉ khác
-do làm tròn (Conv1/Pool1 lệch ≤ 1; Conv2…Conv3 lệch ≤ 3, ≥ 98 % lệch ≤ 1), lớp dự đoán trùng ORT và nhãn; trên 100 ảnh test đầu, tham chiếu đúng 100 % và trùng lớp với ORT int8 100 %. Trên RTL (`test_real_model.py`, ảnh 0 và 1):
+do làm tròn (Conv1/Pool1 lệch ≤ 1; Conv2…Conv3 lệch ≤ 3, ≥ 98 % lệch ≤ 1), lớp dự đoán trùng ORT và nhãn; trên 100 ảnh test đầu, tham chiếu đúng 100 % và trùng lớp với ORT int8 100 %. Trên RTL (`test_real_model.py`, ảnh 0 và 1), **lúc đó, trước các bản sửa #32 và #31**:
 Conv1 + ReLU + Pool1 và Conv2 + ReLU + Pool2 **khớp từng bit**; Conv3 sai (112/392 và 138/392 word đúng); test đánh `xfail(strict)`. Dense của model này là
 3136 → 10 nên không vướng #29. Điều tra cùng ngày (`doc/experiments/2026-10-30_bug32_bias_order.md`): ảnh 0 = #32 ở mọi vị trí + #31 ở hàng output cuối
 của Conv3, ảnh 1 = chỉ #32 (mô hình khớp DUT 3136/3136 giá trị ở cả hai); "#35, cột cuối" là đọc nhầm layout, thực ra là #31. **Giả lập bản sửa Python của #32
@@ -2364,7 +2393,7 @@ bias 1) stream giống hệt từng word. Số filter không chia hết cho số
 | Unit test `test/test_*.py` | 290 pass (268 + 22), 11 fail có từ trước (`test_dense_output.py`) |
 | Hồi quy RTL | `test_int8_clamp` 9/9, `test_glb_psum2` 7/7, `test_mnist_layers -k random` 9/9 (gồm 8×4, 64 filter: 2 nhóm kernel, bias 1), `test_conv_const` **36/36 PASS** (34 cũ + 2 mới) |
 
-Thay thế không chọn: dịch word bias từ trên xuống trong `psum_pipeline.v` (sửa RTL, không lợi hơn). #31: hướng A trong `PE.v` như mục trên (chờ đồng ý).
+Thay thế không chọn: dịch word bias từ trên xuống trong `psum_pipeline.v` (sửa RTL, không lợi hơn). #31: hướng A trong `PE.v` như mục trên (đã làm cùng ngày, được bạn đồng ý, mục dưới).
 
 ### Sửa lỗi #31 trong `PE.v` (hướng A, 2026-10-30, được bạn đồng ý)
 
@@ -2409,9 +2438,39 @@ kỳ: không truyền nào bắt đầu trước khi FSM psum rời trạng thá
 | Hồi quy RTL | | **162 test: 157 PASS + 5 xfail đã biết, 0 FAIL**: `test_conv_const` 36/36, `test_mnist_layers` 21 + 5 xfail (#7, #9, #17), `test_gemm_layer` 63/63 (`OPENEYE_SKIP_FC_WRITE_CHECK=1`), `test_dense_chain` 11/11, `test_glb_psum2` 7/7, `test_int8_clamp` 9/9, `test_pooling` 4/4, `test_nets` 1/1, `test_empty_pass` 3/3, `test_real_model` 2/2; unit test Python 290 pass, 11 fail có từ trước |
 | Vivado tổng hợp + place & route 4 ns (`doc/synth/2026-10-30_route4ns_fix31_zu7ev/`) | WNS +0,076 ns; 64.801 LUT; 39.316 FF | **0 ERROR, 0 CRITICAL WARNING**, cảnh báo như cũ; **WNS +0,074 ns** (đạt 250 MHz); FF +480 (+10/PE); LUT −3.961 (Vivado mã hoá FSM của PE one-hot) |
 
+### Lấy upstream `e78e5b7`: mẫu reset trong `OpenEye_FPGA.v` (2026-10-31, được bạn đồng ý)
+
+`git cherry-pick -x e78e5b7` → `5595d15` (giữ tác giả gốc DenLeb). Commit xoá một dòng `temp_var = 0;` nằm **ngoài** cặp `if (!rst_n) ... else ...`
+của khối `always @(posedge clk_i, negedge rst_n)` của Process 5 (gửi weight và iact). Dòng đó chạy cả ở cạnh xuống của reset nên khối không còn đúng
+mẫu reset bất đồng bộ. `temp_var` chỉ là biến tạm, được gán và dùng ngay rồi đặt lại 0 trong vòng tạo mặt nạ enable weight (`OpenEye_FPGA.v:1202–1204`),
+nên xoá dòng này không đổi chức năng.
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Hồi quy RTL 162 test (như #31) | **157 PASS + 5 xfail đã biết, 0 FAIL**, giống hệt trước |
+| `test/cocotb_quantization/test_quantization_unit.py`; unit test Python | 2/2; 290 pass, 11 fail có từ trước |
+| 12 ca mốc (`run_profile --compare doc/perf/baseline_2026-10-24`) | **12/12, 0 chu kỳ, 0 word DMA lệch** |
+| Bảng 3 của paper, 16 cấu hình | 13/16 như cũ; **0 chu kỳ lệch** so với `paper_table3_2026-10-26_fix25` ở cả 16 |
+| Lint | `fpga` 462 → **461** (bớt đúng 1 `BLKSEQ` của dòng đã xoá), `parallel` 36; baseline đã hạ |
+| Vivado tổng hợp + place & route 4 ns (`doc/synth/2026-10-31_route4ns_e78_zu7ev/`) | **0 ERROR, 0 CRITICAL WARNING**, 410 cảnh báo như cũ; WNS +0,205 / **+0,074 ns** (đạt 250 MHz); mọi báo cáo tài nguyên và timing **giống từng dòng** lần chạy `fix31` (60.840 LUT, 39.796 FF sau route): Vivado vốn đã dựng cùng netlist, commit chỉ làm sạch mẫu reset |
+
+### Thí nghiệm: kết thúc gửi weight ở `wghts_per_pe + 1` (dòng RTL của upstream `3258813`, 2026-10-31, được bạn đồng ý thử; chưa đưa vào `dev`)
+
+Chi tiết: `doc/experiments/2026-10-31_wght_send_end.md`, bản vá `doc/experiments/2026-10-31_wght_send_end/wght_send_end_plus1.patch`. Chạy trong một
+worktree của `dev` (`5595d15`) chỉ đổi dòng `if (fsm_sending_cycle > wghts_per_pe + 2)` thành `+ 1` (Process 5 của `OpenEye_FPGA.v`).
+
+- **Vì sao được:** bộ đệm weight trả dữ liệu trễ 2 chu kỳ: địa chỉ tăng ở các chu kỳ đếm 1…N (N = `wghts_per_pe`), dữ liệu ra ở 3…N+2. Với `+ 2`, enable
+  còn bật thêm ở chu kỳ N+3 (gửi một word thừa) và lượt tính bắt đầu muộn 1 chu kỳ; với `+ 1`, enable bật đúng N chu kỳ có dữ liệu.
+- **Đúng:** hồi quy 162 test 157 PASS + 5 xfail như `dev`; 12 ca mốc 12/12; model đã huấn luyện ảnh 0, 1, 2, 7 khớp từng bit, lớp đúng; Bảng 3 13/16 như
+  `dev`; lint 0 cảnh báo mới.
+- **Lợi:** 1 chu kỳ mỗi lượt mà việc gửi weight nằm trên đường găng, **chỉ ở pha compute** (không phải `load_wght`: pha đó là DMA nạp weight vào bộ đệm
+  trên chip, không đổi). Model MNIST −673 chu kỳ (−0,28 %, khoảng 2,7 µs ở 250 MHz: Conv2 −448, Conv3 −224), `mnist1`/`mnist2`/`mnist3` −0,2/−0,3/−0,3 %,
+  Bảng 3 −0,1 % (CR 8) đến −0,3 % (CR 1), các ca nhỏ 0; số word DMA không đổi; không tốn tài nguyên (chỉ đổi hằng số của một phép so sánh).
+- **Trạng thái:** chờ bạn quyết định có đưa vào `dev` hay không (khi đưa vào thì chạy thêm Vivado).
+
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
-**Số liệu mục này là của ngày 2026-10-10.** Hiện tại (baseline lint `tools/lint_baseline/`, sau các bản sửa #14, #19 và #30): `fpga` **462**, `parallel` **36** (#30 xoá cảnh báo
+**Số liệu mục này là của ngày 2026-10-10.** Hiện tại (baseline lint `tools/lint_baseline/`, sau các bản sửa #14, #19, #30 và upstream `e78e5b7`): `fpga` **461**, `parallel` **36** (`e78e5b7` bớt 1 `BLKSEQ` trong `OpenEye_FPGA.v`; #30 xoá cảnh báo
 `WIDTHTRUNC` gán 46 bit vào 8 bit trong `quantization_unit.v`: chính là chỗ quấn vòng mà lint đã chỉ ra từ trước);
 mục (1) bên dưới (`PE.v:2210`) đã sửa (2026-10-21), mục (2)–(3) đã được phân tích trong lỗi #22 (mục 8b, #11).
 Output gốc đầy đủ: `doc/lint/verilator-5.020_2026-10-10.txt`; chạy lại đúng lệnh CI của upstream trên RTL hiện tại (2026-10-14, vẫn 38 warning, giống hệt):
@@ -2866,6 +2925,9 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   kỳ; bản cuối 0 chu kỳ lệch ở 12 ca mốc. Kiểm chứng: các ca `run31.py` đúng hết (Conv và Dense); test mới `test/cocotb_fpga/test_empty_pass.py` (3, móc testbench
   `OPENEYE_ZERO_BLOCK`; với RTL cũ 3 FAIL); **model MNIST đã huấn luyện chạy trọn mạng trên RTL đúng từng bit ở ảnh test 0–7, lớp đúng cả 8**; lint 0 cảnh báo mới;
   hồi quy RTL 162 test: 157 PASS + 5 xfail đã biết, 0 FAIL; 12 ca mốc 0 chu kỳ lệch; Vivado 0 critical, đạt 250 MHz (WNS +0,074 ns), FF +10/PE, mốc phần cứng mới `doc/synth/2026-10-30_route4ns_fix31_zu7ev/`.
+
+### 2026-10-31
+
 - **Đo model đã huấn luyện trên chip bằng profiler** (2026-10-31, chỉ đo, mục 6.13, `doc/perf/trained_mnist_2026-10-31.md`): ảnh test 0, 1, 2, 7: 213.040–220.941
   chu kỳ (852–884 µs ở 250 MHz), so với 240.671 của `model_mnist_real_c1` (dữ liệu ngẫu nhiên); chỉ pha tính toán khác (bỏ qua số 0): Conv2 −9 % với 44 % số 0, Conv3
   −27 % với 87 % số 0, Dense −21 % với 74 % số 0 (sửa 31/10: bản đầu ghi nhầm −28 % và số Conv3/Dense của ca `_c2`).
@@ -2881,7 +2943,25 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   không phải "không có số 0" như bản đầu), phụ lục A (bỏ qua số 0: chỉ activation khác 0 vào SPad, số chu kỳ nhân ≈ N_khác0 × F / 2 mỗi PE mỗi lượt, cộng
   phần cố định) và phụ lục B (bộ lượng tử: q = kẹp(⌊mant·(psum + offset)/2^shift⌋, act_min, 127), cách tính mant/shift, ReLU bằng act_min = 0, vì sao offset
   luôn 0).
-- **Rà soát upstream** (2026-10-31, không lấy gì, không sửa RTL, mục 2, `doc/experiments/2026-10-31_upstream_review.md`, công cụ
+- **Rà soát upstream** (2026-10-31, lúc đó không lấy gì, không sửa RTL; sau đó lấy `e78e5b7`, xem dưới; mục 2, `doc/experiments/2026-10-31_upstream_review.md`, công cụ
   `doc/experiments/2026-10-31_upstream_review/`): 19 commit của upstream chưa có trong `dev`; chạy các ca lỗi còn mở trên upstream nguyên bản và trên `dev`:
   #7 (3 channel), #9, #19b, #21, #23, #27, #28, #29 sai như nhau trên cả hai, upstream còn sai Dense 3136 → 10/16 mà `dev` đúng; không có trường thanh ghi
   nào tràn ở các model của ta. Các lỗi upstream sửa đều đã sửa trong `dev`. Phát hiện thêm: #29 sai cả khi Dense 3136 → 32 đứng một mình (bảng mục 8).
+- **Lấy upstream `e78e5b7`** (2026-10-31, được bạn đồng ý, RTL, mục 2 và 9): `git cherry-pick -x e78e5b7` = `5595d15`, xoá `temp_var = 0;` nằm ngoài
+  `if (!rst_n) ... else` của khối reset bất đồng bộ của Process 5 trong `OpenEye_FPGA.v`. Kiểm chứng: hồi quy RTL 162 test 157 PASS + 5 xfail đã biết, 0 FAIL;
+  bộ lượng tử 2/2; unit test Python 290 pass, 11 fail có từ trước; 12 ca mốc 0 chu kỳ, 0 word DMA lệch; Bảng 3 13/16 và 0 chu kỳ lệch ở cả 16 cấu hình (chạy lại,
+  trùng `paper_table3_2026-10-26_fix25`, nên mốc Bảng 3 giữ nguyên); lint `fpga` 462 → 461, baseline đã hạ; Vivado 4 ns 0 CRITICAL, WNS +0,074 ns, mọi báo cáo giống
+  từng dòng lần `fix31` (netlist không đổi), mốc phần cứng mới `doc/synth/2026-10-31_route4ns_e78_zu7ev/`.
+- **So sánh `551cf85` với `dev`** (2026-10-31, không sửa gì, mục 2, `doc/experiments/2026-10-31_upstream_551cf85_iact.md`): file của commit giống từng byte bản
+  `f84f064` (trước `23be043`, có đường FC riêng); 8 ca chạy trên upstream nguyên bản (cha `2dde2db`, `551cf85`, cây trước `23be043`) và `dev`: `dev` 8/8 đúng,
+  `551cf85` 6/8 (sai Conv 14×4×8 → 8 `NUM_GLB_IACT=3`, lỗi cũ của module; sai FC K > 2048 vì #19 phần 2 nằm ở `OpenEye_FPGA.v`: K = 2032 đúng, 2064 sai), chu kỳ
+  bằng hoặc chậm hơn `dev`; bản cũ còn **mang lại lỗi #13** (Yosys: "multiple conflicting drivers" ở `rd_cycle_loop_cnt_0..3`). Kết luận: hướng của `dev` tốt hơn,
+  không lấy. `up_run.py` có thêm tuỳ chọn `GLBI=<n>`.
+- **Thí nghiệm `wghts_per_pe + 1`** (dòng RTL của upstream `3258813`, 2026-10-31, được bạn đồng ý thử, **chưa đưa vào `dev`**; mục 9,
+  `doc/experiments/2026-10-31_wght_send_end.md`): trong worktree, hồi quy 162 test như `dev`, 12 ca mốc 12/12, model đã huấn luyện ảnh 0/1/2/7 khớp từng bit, Bảng 3
+  13/16 như `dev`, lint 0 mới; chu kỳ −0,1 đến −0,3 % (model MNIST −673, chỉ ở pha compute, không phải `load_wght`), DMA và tài nguyên không đổi. Chờ bạn quyết định.
+- **Rà README_FI.md cho khỏi lỗi thời** (2026-10-31): mục 2 gộp các lần kiểm tra upstream (19/10, 21/10, 24/10, 30/10, 31/10) thành một bảng trạng thái của cả 22
+  commit + danh sách commit đáng xem; mục 3b/3c: đường model thật của toolchain, cách chạy lại #31/#32 trên `dev`, mốc Bảng 3 `fix25`; mục 4: các file fork đã sửa
+  (`PE.v` #31, `quantization_unit.v` kẹp int8, `onnx2model.py`, `psum_stream_mapper.py`, `layer_parameters.py`, `dense_mapper.py`, `test_conv_const` 36 test,
+  `doc/perf`); mục 7: mốc Bảng 3 và số đo model đã huấn luyện; mục 8: danh sách lỗi còn mở (#24 nay chỉ còn hàm khác ReLU), mốc phần cứng, ghi chú upstream ở
+  #19b/#23/#27/#28, hàng C2 (model đã huấn luyện chạy trọn mạng), hàng L mới, trạng thái (C)–(G) của model int8; mục 9b: số lint hiện tại.
