@@ -107,3 +107,36 @@ Regression after the change: unit tests 268 pass (262 + 6), 11 pre-existing fail
 
 Bug #32 and #35 (= #31, see the correction in section 5) block the Dense layer of this model on RTL (the Dense is 3136 -> 10, so bug #29 does not apply);
 bug #31 can still hit other inputs and models. Fix A for #31 and investigations of #32 / #35 need the user's approval.
+
+## 7. The old path: dynamic quantization (2026-10-31, analysis, no change)
+
+`onnx2model` before f4a11ef is identical to `upstream/main` (no diff): `quantize_dynamic(weight_type=QuantType.QInt8)`.
+Run on the trained model with the old module (`git show f4a11ef^:src/open_eye/onnx2model.py`):
+
+* Graph per layer: `DynamicQuantizeLinear` (the activation, **uint8**, scale and zero point computed **at run time** from
+  the min / max of that tensor) -> `ConvInteger` / `MatMulInteger` (int32) -> `Cast` -> `Mul` (activation scale x weight
+  scale) -> `Add` (float bias) -> `Relu` (float) -> `MaxPool` (float) -> the next `DynamicQuantizeLinear`. Weights int8,
+  zero point 0, one scale per tensor. The activation scale is not in the file: it changes with every image (layer 2:
+  0.01055, 0.01125, 0.0087 for test images 0, 1, 2), the input layer has zero point 33.
+* The hardware has one fixed multiplier (`mant`, `shift`) per layer, programmed before the layer, signed int8 activations
+  with zero point 0 (zero skipping and zero padding rely on it), and quantizes every output as it is written back, without
+  a pass over the whole tensor to find its range. A run-time scale cannot be mapped; a calibrated (static) one can. Hence
+  static quantization (section 3).
+* ONNX Runtime itself is right: dynamic with uint8 weights 99.5 % on the first 1,000 test images, float 99.5 %, static int8
+  (the new path) 99.4 %, the toolchain reference of the hardware 99.5 % (`scan31.py`). But the model the old path wrote
+  (int8 weights) **cannot be run by ONNX Runtime** ("Could not find an implementation for ConvInteger(10)": the CPU
+  ConvInteger takes uint8 weights), so it was never checked.
+* ReLU: the old `check_fused_relu` found it (`has_relu` True on the three convs: `Relu` four nodes after `ConvInteger`), but
+  nothing read the flag (upstream neither), the reference had no ReLU and the RTL quantizer wrapped instead of clamping
+  until bug #30. In the dynamic graph the ReLU is a float operation of ONNX Runtime, not part of the quantization.
+* What the old extraction did wrong, besides the dynamic scheme:
+
+| | Old (= upstream) | Effect |
+|---|---|---|
+| activation scale | `inits.get('input_scale', 1.0)`: a run-time tensor, not an initializer, so always 1.0 | `bias_int32 = bias / w_scale` in the wrong unit (should be `/ (s_in * s_w)`); no requantization multiplier, `quantize` stays at its default [1, 7] / [1, 9] |
+| conv kernel | `transpose(3, 2, 1, 0)` = [column][row][c][f] where `DRAMContents` reads [row][column][c][f] | kernel rows and columns swapped: conv1 vs ONNX Runtime 65.8 % within 1, largest difference 199 (the new `transpose(2, 3, 1, 0)`: 100 %, 0) |
+| Dense | `MatMulInteger` weights are [in][out] (3136 x 10), read as [out][in] | `filters` = 3136 instead of 10 |
+| MaxPool | named `pooling2d` | configured as average pooling (bug #34) |
+| ReLU | `has_relu` found, read nowhere | no ReLU (bug #30 for the clamp) |
+| "stable hardware reference generator" | runs the float model on a one-pixel image and divides an activation by conv2's weight scale | result unused (dead code) |
+| `DRAMContents` (not onnx2model) | conv weights x127 (int8 overflow), bias 1 / c + 1, Dense weights random | the model's data never reached the hardware |

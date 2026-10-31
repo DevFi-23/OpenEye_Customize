@@ -832,6 +832,24 @@ tính toán 9.582 thay vì 12.193 vì activation 0 của channel đệm được
 Bảng theo layer ghi `Conv 28x28x1+1pad->32 k3x3`.
 Layer có kích thước iact 7×7 dùng kernel 3×3 (nhãn `Conv 7x7x64->64 k3x3`).
 
+**Model MNIST đã huấn luyện chạy thật trên chip (đo 2026-10-31, sau bản sửa #31, #32; `doc/perf/trained_mnist_2026-10-31.md`, file
+`doc/perf/trained_mnist_2026-10-31/*.json`):** `SimpleMNISTConvNet` với checkpoint đã huấn luyện, qua toolchain (`onnx2model` lượng tử tĩnh int8), input là ảnh
+test MNIST 0, 1, 2, 7 (chuẩn hoá như lúc huấn luyện, lượng tử bằng scale input 0,0222, đệm 2 channel), cấu hình như `model_mnist_real_c1`, bộ nhớ lý tưởng; mọi
+kiểm tra khớp từng bit, lớp đúng cả 4 ảnh. Chạy: `doc/experiments/2026-10-30_bug32/run35.py prof_img0 0 OPENEYE_PROFILE=1`.
+
+| Ảnh | Chu kỳ | µs @250 MHz | Conv1 | Pool1 | Conv2 | Pool2 | Conv3 | Dense |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 219.598 | 878,4 | 32.980 | 5.213 | 112.458 | 2.861 | 52.978 | 13.108 |
+| 1 | 220.941 | 883,8 | 32.980 | 5.213 | 112.586 | 2.861 | 54.270 | 13.031 |
+| 2 | 213.040 | 852,2 | 32.980 | 5.213 | 108.423 | 2.861 | 50.538 | 13.025 |
+| 7 | 218.374 | 873,5 | 32.980 | 5.213 | 110.858 | 2.861 | 53.458 | 13.004 |
+| `model_mnist_real_c1` (mốc, dữ liệu ngẫu nhiên) | 240.671 | 962,7 | 32.980 | 5.213 | 120.807 | 2.861 | 65.029 | 14.016 |
+
+Ảnh 0 theo pha: tính toán 126.318 (57,5 %), nạp weight 39.120 (17,8 %), nạp bias 23.308 (10,6 %), ghi ngược 11.951 (5,4 %), chuyển đổi iact 10.376 (4,7 %),
+pooling 7.952 (3,6 %). Mọi pha trừ tính toán giống hệt dữ liệu ngẫu nhiên (stream chỉ phụ thuộc kích thước). Tính toán phụ thuộc số 0 (bỏ qua số 0): input Conv1
+0 % số 0 (nền −19) → không đổi; Conv2 44 % số 0 → −9 %; Conv3 87 % số 0 → −28 %; Dense 74 % số 0 → −21 %. **Lợi ích nhỏ hơn nhiều so với tỉ lệ số 0** vì mỗi lượt
+vẫn tốn phần cố định (nạp, bắt tay lượt, đọc psum của từng lượt): ứng viên tối ưu độ trễ.
+
 **Cách đọc:**
 - `load` = `load_config + load_iact + load_quant`. Chỉ layer đầu nạp iact (196 chu kỳ); các layer sau đọc iact từ bộ đệm (`skip_iact`).
 - Layer cuối (Dense) không ở trạng thái 11 mà ở trạng thái 10 (chờ kết quả) nên `writeback = 0`, và chỉ layer cuối có `readout`.
@@ -1439,6 +1457,19 @@ phần cứng). Quét 1000 ảnh test (chỉ Python, mô hình lỗi đã kiểm
 **#31 đã sửa trong `PE.v`** (cùng ngày, được bạn đồng ý, hướng A, mục 9): **model MNIST đã huấn luyện chạy trọn mạng trên RTL, khớp từng bit với tham chiếu, ở cả 8
 ảnh test 0–7, DUT đoán đúng nhãn cả 8** (7, 2, 1, 0, 4, 1, 4, 9); `test_real_model.py` 2 PASS. Tham chiếu của toolchain (= phần cứng) đúng 99,5 % trên 1000 ảnh
 test đầu (mô hình Python `scan31.py`).
+
+**Vì sao lượng tử tĩnh, không phải động như upstream (phân tích 2026-10-31, không sửa gì; `doc/experiments/2026-10-30_onnx_model_flow.md` mục 7):**
+`onnx2model` cũ giống hệt upstream: `quantize_dynamic(weight_type=QInt8)`. Đồ thị động mỗi layer: `DynamicQuantizeLinear` (activation **uint8**, scale và zero
+point tính **lúc chạy** từ min/max của chính tensor đó) → `ConvInteger` (int32) → `Cast` → `Mul` (scale) → `Add` (bias float) → `Relu` (float) → `MaxPool` (float).
+Scale activation không có trong file và đổi theo từng ảnh (layer 2: 0,01055 / 0,01125 / 0,0087 với ảnh 0, 1, 2), layer đầu có zero point 33. Phần cứng chỉ có **một
+hệ số cố định** (`mant`, `shift`) mỗi layer, nạp trước khi chạy, activation int8 có dấu zero point 0 (bỏ qua số 0 và đệm 0 dựa vào đó), và lượng tử từng output ngay
+khi ghi ngược, không duyệt cả tensor để tìm min/max: scale lúc chạy không đưa xuống được, scale đã hiệu chỉnh (tĩnh) thì được. Bản thân ONNX Runtime đúng: động với
+weight uint8 99,5 %, float 99,5 %, tĩnh int8 99,4 %, tham chiếu phần cứng 99,5 % (1000 ảnh test đầu); nhưng **model int8 mà đường cũ ghi ra ONNX Runtime không chạy
+được** (`ConvInteger` trên CPU chỉ nhận weight uint8), nên chưa bao giờ được kiểm. **ReLU:** `check_fused_relu` cũ tìm thấy (`has_relu` True ở 3 Conv) nhưng không ai
+đọc cờ (upstream cũng vậy), tham chiếu không có ReLU, bộ lượng tử RTL quấn vòng tới #30; trong đồ thị động ReLU là phép float của ONNX Runtime. **Lỗi khác của phần
+trích xuất cũ:** `input_scale` tìm trong initializer nên luôn 1,0 (bias int32 sai đơn vị, không có hệ số lượng tử); kernel chuyển vị `(3,2,1,0)` = [cột][hàng] trong
+khi `DRAMContents` đọc [hàng][cột] (Conv1 so với ONNX Runtime chỉ 65,8 % lệch ≤ 1, lệch tới 199; cách mới `(2,3,1,0)` khớp 100 %); weight Dense `[in][out]` đọc như
+`[out][in]` nên `filters` = 3136 thay vì 10; MaxPool thành average (#34); khối "stable hardware reference generator" là code chết.
 
 **Đo pha khi chạy nhiều layer (phân tích ngày 2026-10-22, đã làm xong cùng ngày):** khi đó profiler cộng dồn mọi layer, và với layer trung gian thì tính toán diễn ra trong trạng thái 11 nên bị ghi là `writeback`
 (`compute = 0`). Bản thử `probe_model.py` tách theo từng lần vào `GET_PARAMETERS` và tách trạng thái 10/11 theo FSM psum (1–3 = tính toán, 4/6 = ghi ngược).
@@ -2823,3 +2854,9 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   kỳ; bản cuối 0 chu kỳ lệch ở 12 ca mốc. Kiểm chứng: các ca `run31.py` đúng hết (Conv và Dense); test mới `test/cocotb_fpga/test_empty_pass.py` (3, móc testbench
   `OPENEYE_ZERO_BLOCK`; với RTL cũ 3 FAIL); **model MNIST đã huấn luyện chạy trọn mạng trên RTL đúng từng bit ở ảnh test 0–7, lớp đúng cả 8**; lint 0 cảnh báo mới;
   hồi quy RTL 162 test: 157 PASS + 5 xfail đã biết, 0 FAIL; 12 ca mốc 0 chu kỳ lệch; Vivado 0 critical, đạt 250 MHz (WNS +0,074 ns), FF +10/PE, mốc phần cứng mới `doc/synth/2026-10-30_route4ns_fix31_zu7ev/`.
+- **Đo model đã huấn luyện trên chip bằng profiler** (2026-10-31, chỉ đo, mục 6.13, `doc/perf/trained_mnist_2026-10-31.md`): ảnh test 0, 1, 2, 7: 213.040–220.941
+  chu kỳ (852–884 µs ở 250 MHz), so với 240.671 của `model_mnist_real_c1` (dữ liệu ngẫu nhiên); chỉ pha tính toán khác (bỏ qua số 0): Conv2 −9 % với 44 % số 0, Conv3
+  −28 % với 87 % số 0, Dense −21 % với 74 % số 0.
+- **Phân tích lượng tử động của `onnx2model` cũ / upstream** (2026-10-31, không sửa gì, mục 8d, `doc/experiments/2026-10-30_onnx_model_flow.md` mục 7): scale
+  activation tính lúc chạy (uint8, zero point khác 0) nên không đưa xuống phần cứng được; model int8 động mà đường cũ tạo ra ONNX Runtime không chạy được; `has_relu`
+  tìm thấy nhưng không dùng; thêm các lỗi trích xuất: `input_scale` = 1,0, kernel chuyển vị sai chiều, Dense đảo `in`/`out`, code tham chiếu chết.
