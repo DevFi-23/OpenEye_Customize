@@ -170,7 +170,7 @@ class DenseMapper(LayerMapper):
             # Process 5's weight-send phase (hdl/OpenEye_FPGA.v) uses this as
             # the upper bound of its wght_buffer_rd_addr sweep and the
             # window width of the wght_enable_i broadcast pulse to every PE
-            # (fsm_sending_cycle in (1, wghts_per_pe+2]). wght_buffer holds
+            # (fsm_sending_cycle in (1, wghts_per_pe+1]). wght_buffer holds
             # one packed PARALLEL_MACS-wide word per address (data_pipeline_wght
             # advances its own SPad address once per word, extracting both
             # packed values from it), so this must be an address/word count

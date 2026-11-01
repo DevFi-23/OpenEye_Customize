@@ -93,5 +93,7 @@ X axis: fewer, larger passes, so fewer weight sends.
   needs no resources (one constant of a comparison). Small, but free.
 * Not synthesised with Vivado: the change is the constant of one comparison, so no change in resources or timing is
   expected; a Vivado run belongs to taking it into `dev`.
-* Not in `dev`: the experiment was approved, taking it into `dev` is a separate decision (the patch is in
-  `2026-10-31_wght_send_end/`).
+* Taken into `dev` on 2026-11-01 (approved by the user) on the strength of these worktree results: the same line, plus a
+  comment at it and two comments on the range of `fsm_sending_cycle` (`OpenEye_FPGA.v`, `dense_mapper.py`). On `dev`
+  itself: lint 0 new, Python unit tests 290 pass / 11 old fails, quantizer testbench 2/2, the first 16 of the 162 RTL
+  regression tests PASS/xfail (the run was stopped on request). Vivado and a new cycle baseline were not run.

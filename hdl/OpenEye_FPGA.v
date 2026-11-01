@@ -1110,7 +1110,7 @@ end
   // Key signals driven here:
   //   sending_data               - level flag; high from the first cycle of a send
   //                                phase until current_cycle reaches needed_cycles.
-  //   fsm_sending_cycle          - cycle counter within the send phase [0..wghts_per_pe+2+];
+  //   fsm_sending_cycle          - cycle counter within the send phase [0..wghts_per_pe+1+];
   //                                drives wght_buffer_rd_addr and wght_enable_i_reg.
   //   iact_converter_en_enc_reg  - asserted for all converters on cycle 0 of the send
   //                                phase (start encoding) and on each subsequent
@@ -1211,7 +1211,11 @@ end
               wght_enable_i_reg <= {{CLUSTERS{{NUM_GLB_WGHT{1'b1}}}}};
             end
           end
-          if (fsm_sending_cycle > wghts_per_pe + 2) begin
+          // The weight buffer has two read stages: the words of the N addresses
+          // read at cycles 1..N arrive at cycles 3..N+2, so the send ends there
+          // (upstream 3258813; ending at N+3 sent one extra word and started
+          // the pass one clock later).
+          if (fsm_sending_cycle > wghts_per_pe + 1) begin
             fsm_sending_cycle <= fsm_sending_cycle;
             wght_buffer_en_r  <= 0;
             wght_enable_i_reg <= 0;

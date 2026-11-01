@@ -77,5 +77,5 @@ latency experiment, RTL approval needed).
 * `551cf85` compared in detail with the module of `dev`: `2026-10-31_upstream_551cf85_iact.md`. It is a byte-for-byte
   revert to `f84f064`, brings bug #13 back, fails a Conv with 8 channels and three banks, is not faster. Not taken.
 * The `wghts_per_pe + 1` line of `3258813` tested as an experiment (approved): `2026-10-31_wght_send_end.md`. Correct
-  everywhere, -0.1 % to -0.3 % cycles. Not in `dev` until the user decides.
+  everywhere, -0.1 % to -0.3 % cycles. Taken into `dev` on 2026-11-01 (approved).
 * `up_run.py` got the option `GLBI=<n>` (`NUM_GLB_IACT` of the platform) for these comparisons.

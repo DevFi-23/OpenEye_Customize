@@ -64,7 +64,7 @@ git push origin dev
 | `2dde2db` (26/10) | Unit testbench: bỏ cổng `fc_size_i`, tham số `TRANS_BITWIDTH_WGHT` của `hdl/debug/PE_IO_debug.v` | Fork không chạy các testbench này | Không lấy |
 | `551cf85` (27/10) | `iact_stream_constructor.v` về đúng bản trước `23be043` (giống từng byte `f84f064`, có đường FC riêng) | Sửa #6, #7 như `dev`, nhưng **mang lại lỗi #13** (bộ đếm vòng đọc bị lái từ 2 khối, Vivado giữ 0), sai Conv 8 channel `NUM_GLB_IACT=3`, không nhanh hơn | **Không lấy**, đã so sánh chi tiết (mục dưới) |
 | `c342d04` (27/10), merge `b4b643a` | DAG: `DRAMContents`, tham chiếu, testbench theo tên layer; ca `Residual_Block` | Viết lại `DRAM.py`, `test_utils_main.py`, testbench: xung đột lớn với mô hình DRAM, profiler, đường lượng tử của `dev` | Chưa lấy. **Đáng xem** khi làm mạng có nhánh (residual) |
-| `3258813` (27/10) | Xếp weight conv nhiều channel/thưa: xoá khoá `used_wght_per_PE` lặp; giữ word weight 0 khi nhiều lượt gửi; `OpenEye_FPGA.v` kết thúc gửi weight ở `wghts_per_pe + 1` thay vì `+ 2` | Hai phần đầu = #18 và một phần #22 (đã có trong `dev`) | Hai phần đầu: không cần. Dòng `+ 1`: **đã thử 2026-10-31** (được bạn đồng ý, `doc/experiments/2026-10-31_wght_send_end.md`): đúng ở mọi kiểm tra (162 test, 12 ca mốc, model đã huấn luyện 4 ảnh, Bảng 3 13/16 như `dev`), −0,1 đến −0,3 % chu kỳ (−673 trên model MNIST), 0 tài nguyên. **Chưa đưa vào `dev`, chờ bạn quyết định** |
+| `3258813` (27/10) | Xếp weight conv nhiều channel/thưa: xoá khoá `used_wght_per_PE` lặp; giữ word weight 0 khi nhiều lượt gửi; `OpenEye_FPGA.v` kết thúc gửi weight ở `wghts_per_pe + 1` thay vì `+ 2` | Hai phần đầu = #18 và một phần #22 (đã có trong `dev`) | Hai phần đầu: không cần. Dòng `+ 1`: **đã thử 2026-10-31** (được bạn đồng ý, `doc/experiments/2026-10-31_wght_send_end.md`): đúng ở mọi kiểm tra (162 test, 12 ca mốc, model đã huấn luyện 4 ảnh, Bảng 3 13/16 như `dev`), −0,1 đến −0,3 % chu kỳ (−673 trên model MNIST), 0 tài nguyên. **Đã đưa vào `dev` 2026-11-01** (được bạn đồng ý, mục 9) |
 | `80d6e67` (27/10), `d1da389` (28/10) | Luồng Verilator; `router_iact.v` bỏ đường e12 (cổng 1 → 2) để hết vòng tổ hợp của Verilator | Đổi cách định tuyến; `dev` mô phỏng bằng Icarus, Vivado không báo vòng | Không lấy. Xem lại nếu chuyển sang Verilator |
 | `655a2ae` (28/10) | Nới độ rộng trường/bộ đếm cho mạng lớn (`iact_read/write_limit_*` 18 bit, vòng psum 12/24 bit), CC ≠ 2 | Không sửa lỗi nào của `dev`: không model nào của ta tràn trường (`field_overflow*.py`) | Chưa lấy. **Đáng xem** khi một layer vượt độ rộng trường hiện tại |
 | `57781cd`, `c2bf7a9`, `93f0e82` (28–29/10) | Flatten trong DAG; `make_stream` song song rồi lại tuần tự (bản song song làm mất cập nhật `layer_params`); stream bộ đệm layer | Chỉ cho DAG; `make_stream` của `dev` vẫn tuần tự, có bản sửa `trans_cycles` | Không lấy |
@@ -75,7 +75,7 @@ có dấu trong `OpenEye_FPGA.v`, đã sửa ở `dev` `10bcaf7`): với `551cf8
 **Không commit nào nhắm tới băng thông DMA, độ trễ, hay lượng tử hoá** (`DRAM.py` vẫn `floor(127·w)`, bộ lượng tử RTL vẫn lấy 8 bit thấp).
 
 **Commit đáng xem sau này:** `655a2ae` (mạng lớn hơn MNIST), `c342d04` (mạng residual), `d1da389` (nếu dùng Verilator), ý tưởng của
-`18772d6` (bộ kiểm tra ghi FC sau khi ghi xong). Dòng `+ 1` của `3258813` đã thử (bảng trên), sẵn sàng đưa vào `dev` nếu bạn đồng ý.
+`18772d6` (bộ kiểm tra ghi FC sau khi ghi xong). Dòng `+ 1` của `3258813` đã thử và đã đưa vào `dev` (2026-11-01, bảng trên).
 
 ### Hướng đi của upstream (phân tích 2026-10-24, bổ sung 2026-10-31)
 
@@ -299,7 +299,7 @@ OpenEye_orig/
 ├── hdl/                          RTL (Verilog) của bộ tăng tốc
 │   ├── OpenEye_FPGA.v         ★  Top-level FPGA: cổng DMA, FSM chính (nạp → convert → tính → đọc ra), buffer iact/weight/psum
 │   │                             (★ sửa GET_BIAS, lỗi #3; điều kiện lưu FC, lỗi #19; ghi ngược #25, #26; thanh ghi act_min, #30;
-│   │                             mẫu reset, upstream `e78e5b7`)
+│   │                             mẫu reset, upstream `e78e5b7`; kết thúc gửi weight ở `wghts_per_pe + 1`, dòng của upstream `3258813`)
 │   ├── psum_pipeline.v        ★  FSM psum: nạp bias, thu kết quả, lượng tử hoá, gửi kết quả ra DMA (★ `results_ready`, lỗi #14; kẹp int8, #30)
 │   ├── iact_stream_constructor.v ★ Đọc iact từ buffer và gửi tới các cluster (★ bộ đếm lỗi #13; ghi 1 channel và NUM_GLB_IACT=3, lỗi #6/#7;
 │   │                             bộ đếm cặp FC 12 bit, lỗi #19)
@@ -1202,7 +1202,8 @@ Lưu ý:
 
 ### Kết quả Vivado hiện tại: mốc phần cứng (2026-10-31, sau các bản sửa #13, #6/#7, #14, 3 commit upstream, #19, #26, #25, #30, #31 và upstream `e78e5b7`)
 
-Chi tiết: `doc/synth/2026-10-31_route4ns_e78_zu7ev/SUMMARY.md` (giống từng dòng lần chạy `doc/synth/2026-10-30_route4ns_fix31_zu7ev/`; số liệu dưới đây là của cả hai). Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 4 ns (250 MHz),
+Chi tiết: `doc/synth/2026-10-31_route4ns_e78_zu7ev/SUMMARY.md` (giống từng dòng lần chạy `doc/synth/2026-10-30_route4ns_fix31_zu7ev/`; số liệu dưới đây là của cả hai).
+Từ 2026-11-01 RTL có thêm dòng `wghts_per_pe + 1` (mục 9), **chưa tổng hợp lại**; dòng này chỉ đổi hằng số của một phép so sánh. Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 4 ns (250 MHz),
 cấu hình ở bảng trên, RTL = `dev` có bản sửa #31 (trạng thái `EMPTY_PASS` trong PE; trước đó #30 kẹp int8 trong bộ lượng tử, #25, #26 ở bộ ghi ngược). Bản sửa lỗi #18 chỉ là Python, không đổi phần cứng. Vivado được chạy batch từ WSL
 (`cmd.exe /c ... vivado.bat -mode batch -source synth_ooc.tcl -tclargs xczu7ev-ffvc1156-2-e 4 impl`).
 
@@ -1269,7 +1270,9 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 
 ## 7. Kết quả baseline chính (chi tiết: `doc/perf/baseline_2026-10-24.md`; trước bản sửa #18: `baseline_2026-10-10.md`)
 
-**Baseline hiện tại: `doc/perf/baseline_2026-10-24/`** (12 case, bộ nhớ lý tưởng; thời gian ở 250 MHz = chu kỳ × 4 ns). 9 case một layer giống hệt
+**Baseline hiện tại: `doc/perf/baseline_2026-10-24/`** (12 case, bộ nhớ lý tưởng; thời gian ở 250 MHz = chu kỳ × 4 ns). **Từ 2026-11-01** (dòng
+`wghts_per_pe + 1`, mục 9) RTL nhanh hơn mốc này 0–673 chu kỳ mỗi case (`mnist1` 54.936, `mnist2` 65.304, `mnist3` 20.520, `model_mnist16_c2` 49.930,
+`model_mnist_real_c2` 242.844, `model_mnist_real_c1` 239.998; model đã huấn luyện −673 ở mọi ảnh), đo trong worktree thí nghiệm; mốc mới chưa lưu. 9 case một layer giống hệt
 `baseline_2026-10-15` (sau bản sửa lỗi #18); thêm 3 case cả model có bảng theo layer (mục 6.13): **MNIST thật 1 channel `model_mnist_real_c1` 240.671 chu kỳ
 (963 µs)**, Conv2 chiếm 50 %; `model_mnist_real_c2` 243.517 chu kỳ (974 µs); `model_mnist16_c2` 50.007 chu kỳ (200 µs). So với `baseline_2026-10-22`
 (trước bản sửa #22) các case model giảm 13–579 chu kỳ: weight Conv ngẫu nhiên nay giữ số 0 thật (1–5 %) và PE bỏ qua chúng; số word DMA không đổi.
@@ -1391,7 +1394,7 @@ một layer giống hệt `baseline_2026-10-15`, thêm 3 model):**
 | I | Lỗi #26 (Dense nối tiếp Dense) và #25 (`NUM_GLB_PSUM=2`) | Điều tra (Python trước) | Chặn mạng của paper và mọi model có 2 Dense; Bảng 3 chưa có cấu hình nào tính đúng hết | #26 **đã sửa** (2026-10-24, 1 dòng RTL + Python, mục 9); #25 **đã sửa** (2026-10-26, mục 9) |
 | J | Bảng 3 với activation thưa (giả lập ReLU) | Chỉ Python | Phần xử lý của fork chậm hơn paper 4–5,6 lần; xem bao nhiêu là do activation không thưa | Đề xuất |
 | K | Hàm kích hoạt (#24) + kẹp int8 trong `quantization_unit` | Sửa RTL | Cần cho model thật (mục 8d) | **Xong** (2026-10-28, #30): kẹp với cận dưới theo layer, ReLU gộp vào kẹp (mục 9) |
-| L | Kết thúc gửi weight sớm 1 chu kỳ (`wghts_per_pe + 1`, từ upstream `3258813`) | Sửa RTL 1 dòng | Mỗi lượt có việc gửi weight trên đường găng bớt 1 chu kỳ | **Đã thử 2026-10-31**: đúng ở mọi kiểm tra, −0,1 đến −0,3 % chu kỳ (−673 trên model MNIST), 0 tài nguyên; chờ bạn quyết định đưa vào `dev` (`doc/experiments/2026-10-31_wght_send_end.md`) |
+| L | Kết thúc gửi weight sớm 1 chu kỳ (`wghts_per_pe + 1`, từ upstream `3258813`) | Sửa RTL 1 dòng | Mỗi lượt có việc gửi weight trên đường găng bớt 1 chu kỳ | **Đã thử 2026-10-31**: đúng ở mọi kiểm tra, −0,1 đến −0,3 % chu kỳ (−673 trên model MNIST), 0 tài nguyên; **đã đưa vào `dev` 2026-11-01** (`doc/experiments/2026-10-31_wght_send_end.md`) |
 
 Thứ tự đề xuất: A, B, B2, C2 (kiến trúc MNIST chạy đủ) **đã xong**; tiếp theo là C (bias theo filter: Bảng 3 cho thấy bias chiếm khoảng 54.000–58.000 ns ở mọi
 cấu hình), rồi D (I: #25, #26 đã sửa).
@@ -2454,7 +2457,7 @@ nên xoá dòng này không đổi chức năng.
 | Lint | `fpga` 462 → **461** (bớt đúng 1 `BLKSEQ` của dòng đã xoá), `parallel` 36; baseline đã hạ |
 | Vivado tổng hợp + place & route 4 ns (`doc/synth/2026-10-31_route4ns_e78_zu7ev/`) | **0 ERROR, 0 CRITICAL WARNING**, 410 cảnh báo như cũ; WNS +0,205 / **+0,074 ns** (đạt 250 MHz); mọi báo cáo tài nguyên và timing **giống từng dòng** lần chạy `fix31` (60.840 LUT, 39.796 FF sau route): Vivado vốn đã dựng cùng netlist, commit chỉ làm sạch mẫu reset |
 
-### Thí nghiệm: kết thúc gửi weight ở `wghts_per_pe + 1` (dòng RTL của upstream `3258813`, 2026-10-31, được bạn đồng ý thử; chưa đưa vào `dev`)
+### Thí nghiệm: kết thúc gửi weight ở `wghts_per_pe + 1` (dòng RTL của upstream `3258813`, thử 2026-10-31, đưa vào `dev` 2026-11-01, được bạn đồng ý)
 
 Chi tiết: `doc/experiments/2026-10-31_wght_send_end.md`, bản vá `doc/experiments/2026-10-31_wght_send_end/wght_send_end_plus1.patch`. Chạy trong một
 worktree của `dev` (`5595d15`) chỉ đổi dòng `if (fsm_sending_cycle > wghts_per_pe + 2)` thành `+ 1` (Process 5 của `OpenEye_FPGA.v`).
@@ -2466,7 +2469,12 @@ worktree của `dev` (`5595d15`) chỉ đổi dòng `if (fsm_sending_cycle > wgh
 - **Lợi:** 1 chu kỳ mỗi lượt mà việc gửi weight nằm trên đường găng, **chỉ ở pha compute** (không phải `load_wght`: pha đó là DMA nạp weight vào bộ đệm
   trên chip, không đổi). Model MNIST −673 chu kỳ (−0,28 %, khoảng 2,7 µs ở 250 MHz: Conv2 −448, Conv3 −224), `mnist1`/`mnist2`/`mnist3` −0,2/−0,3/−0,3 %,
   Bảng 3 −0,1 % (CR 8) đến −0,3 % (CR 1), các ca nhỏ 0; số word DMA không đổi; không tốn tài nguyên (chỉ đổi hằng số của một phép so sánh).
-- **Trạng thái:** chờ bạn quyết định có đưa vào `dev` hay không (khi đưa vào thì chạy thêm Vivado).
+- **Trạng thái:** **đã đưa vào `dev` 2026-11-01** (được bạn đồng ý, commit dựa trên kết quả của worktree ở trên, cùng một dòng thay đổi; thêm comment
+  giải thích ở dòng đó và sửa 2 comment mô tả dải đếm `fsm_sending_cycle` trong `OpenEye_FPGA.v` và `dense_mapper.py`). Trên `dev` đã chạy: lint 0 cảnh
+  báo mới, unit test Python 290 pass / 11 fail có từ trước, bộ lượng tử 2/2, 16 test đầu của hồi quy đều PASS/xfail (dừng theo yêu cầu). **Chưa làm:**
+  Vivado (chỉ đổi hằng số của một phép so sánh, dự kiến không đổi tài nguyên/timing; mốc phần cứng `2026-10-31_route4ns_e78_zu7ev` là của RTL ngay
+  trước dòng này) và mốc chu kỳ mới: `run_profile --compare doc/perf/baseline_2026-10-24` nay sẽ báo đúng các mức giảm ở bảng trên (ví dụ
+  `model_mnist_real_c1` 240.671 → 239.998), không phải lỗi.
 
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
@@ -2965,3 +2973,12 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   (`PE.v` #31, `quantization_unit.v` kẹp int8, `onnx2model.py`, `psum_stream_mapper.py`, `layer_parameters.py`, `dense_mapper.py`, `test_conv_const` 36 test,
   `doc/perf`); mục 7: mốc Bảng 3 và số đo model đã huấn luyện; mục 8: danh sách lỗi còn mở (#24 nay chỉ còn hàm khác ReLU), mốc phần cứng, ghi chú upstream ở
   #19b/#23/#27/#28, hàng C2 (model đã huấn luyện chạy trọn mạng), hàng L mới, trạng thái (C)–(G) của model int8; mục 9b: số lint hiện tại.
+
+### 2026-11-01
+
+- **Đưa dòng `wghts_per_pe + 1` vào `dev`** (được bạn đồng ý, RTL, mục 9; dòng của upstream `3258813`, áp bằng tay, không lấy cả commit): Process 5 của
+  `OpenEye_FPGA.v` kết thúc gửi weight ở `fsm_sending_cycle > wghts_per_pe + 1` thay vì `+ 2`, kèm comment giải thích; sửa 2 comment mô tả dải đếm
+  (`OpenEye_FPGA.v`, `dense_mapper.py`). Commit dựa trên kết quả thí nghiệm hôm trước trong worktree với đúng dòng này (hồi quy 162 test như `dev`, 12 ca
+  mốc, model đã huấn luyện 4 ảnh, Bảng 3 13/16, −0,1 đến −0,3 % chu kỳ; `doc/experiments/2026-10-31_wght_send_end.md`). Trên `dev`: lint 0 mới, unit test
+  Python 290 pass / 11 fail có từ trước, bộ lượng tử 2/2, 16/162 test hồi quy đầu PASS/xfail rồi dừng theo yêu cầu. Chưa chạy Vivado, chưa lưu mốc chu kỳ mới
+  (mục 7).
