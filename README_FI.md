@@ -238,9 +238,9 @@ Kiểm tra độc lập một lần chạy Conv (mọi output so với numpy, m�
 ### Đo hiệu suất (profiler)
 
 ```bash
-venv/bin/python tools/run_profile.py --jobs 4 --compare doc/perf/baseline_2026-10-24 --clock-mhz 250   # 12 case mốc, khoảng 15–20 phút
-venv/bin/python tools/run_profile.py -k "not model" --compare doc/perf/baseline_2026-10-24             # 9 case một layer, khoảng 5 phút
-venv/bin/python tools/run_profile.py -k model --compare doc/perf/baseline_2026-10-24 --clock-mhz 250    # 3 model (4, 11, 11 phút)
+venv/bin/python tools/run_profile.py --jobs 4 --compare doc/perf/baseline_2026-11-02 --clock-mhz 250   # 12 case mốc, khoảng 15–20 phút
+venv/bin/python tools/run_profile.py -k "not model" --compare doc/perf/baseline_2026-11-02             # 9 case một layer, khoảng 5 phút
+venv/bin/python tools/run_profile.py -k model --compare doc/perf/baseline_2026-11-02 --clock-mhz 250    # 3 model (4, 11, 11 phút)
 venv/bin/python tools/run_profile.py -k q32 --mem typical                                               # bộ nhớ thực tế hơn (mục 6c)
 venv/bin/python tools/paper_table3.py --run --jobs 6 --save doc/perf/paper_table3_<ngày> --report doc/perf/paper_table3_<ngày>.md   # Bảng 3, khoảng 1 giờ
 venv/bin/python tools/paper_table3.py doc/perf/paper_table3_2026-10-26_fix25                           # in lại Bảng 3 từ profile đã lưu (mốc hiện tại)
@@ -376,7 +376,7 @@ OpenEye_orig/
 │   ├── verify_conv_output.py     Kiểm tra độc lập từng word output của layer Conv (numpy)
 │   └── report/make_progress_report*.py  Tạo báo cáo Word cho giáo viên hướng dẫn (2026-10-10, 2026-10-15, 2026-10-31)
 ├── doc/
-│   ├── perf/                  ★  Số liệu đo chu kỳ: baseline_2026-10-24/ (**mốc hiện tại**, 12 case), paper_table3_2026-10-26_fix25/ (Bảng 3 paper, mốc
+│   ├── perf/                  ★  Số liệu đo chu kỳ: baseline_2026-11-02/ (**mốc hiện tại**, 12 case), baseline_2026-10-24/ (mốc trước), paper_table3_2026-10-26_fix25/ (Bảng 3 paper, mốc
 │   │                             hiện tại; bản 2026-10-24 là trước #25/#26), trained_mnist_2026-10-31/ (model đã huấn luyện, ảnh thật),
 │   │                             baseline_2026-10-22/, baseline_2026-10-15/, baseline_2026-10-10/ (mốc cũ), mem_typical_2026-10-10/, ...
 │   ├── synth/                 ★  Báo cáo Vivado theo từng lần chạy (mỗi thư mục có SUMMARY.md)
@@ -484,7 +484,7 @@ Hiện chỉ tính được cho layer `Convolution_Single`.
 **Baseline** là **phép đo mốc trước khi tối ưu**. Mỗi lần sửa RTL để tối ưu, ta chạy lại đúng các cấu hình đó
 và so sánh với baseline để biết thay đổi tốt hơn hay tệ hơn bao nhiêu. Không có baseline thì không chứng minh được
 tối ưu có tác dụng. Có hai loại baseline:
-- **Chu kỳ và DMA** (mô phỏng): **`doc/perf/baseline_2026-10-24/`** (12 case: 9 một layer + 3 cả model, sau bản sửa lỗi #22). Mốc cũ: `baseline_2026-10-22`
+- **Chu kỳ và DMA** (mô phỏng): **`doc/perf/baseline_2026-11-02/`** (12 case: 9 một layer + 3 cả model, sau dòng `wghts_per_pe + 1`). Mốc cũ: `baseline_2026-10-24` (sau bản sửa lỗi #22), `baseline_2026-10-22`
   (trước #22), `baseline_2026-10-15` (9 case, sau #18; 9 case này không đổi tới nay), `baseline_2026-10-10` (đo khi lỗi #18 còn: weight đọc gấp đôi,
   case > 4 channel tính sai với weight thật), `doc/perf/baseline.md` và `baseline_2026-10-09*`.
 - **Phần cứng** (Vivado): `doc/synth/2026-10-30_route4ns_fix31_zu7ev/` (tài nguyên, fmax 250 MHz). Các thư mục `doc/synth` cũ hơn là lịch sử.
@@ -598,7 +598,7 @@ thì vừa tiết kiệm tài nguyên, vừa giảm DMA, vừa giúp simulation 
 | Bộ chạy | `tools/run_profile.py` | **Lệnh chính.** Chạy các case song song, so sánh, lưu snapshot |
 | Báo cáo | `src/open_eye/profile_report.py` | In bảng từ các `profile.json`; `--compare` để so sánh trước/sau |
 | Mô hình bộ nhớ | `src/open_eye/memory_model.py` | Giả lập DDR + AXI DMA (mục 6c). Bật bằng `--mem` |
-| Baseline | `doc/perf/baseline_2026-10-24/` | Số liệu mốc của 12 case (bộ nhớ lý tưởng), đo sau bản sửa lỗi #22 |
+| Baseline | `doc/perf/baseline_2026-11-02/` | Số liệu mốc của 12 case (bộ nhớ lý tưởng), đo sau dòng `wghts_per_pe + 1` (mốc trước: `baseline_2026-10-24`, sau bản sửa lỗi #22) |
 | Bảng 3 | `tools/paper_table3.py` | Chạy 16 cấu hình của paper, in bảng theo từng layer và từng pha (mục 6.14) |
 | Kiểm tra độc lập | `tools/verify_conv_output.py` | Tính lại layer Conv bằng numpy, kiểm tra từng word output của DUT (cần `OPENEYE_DUMP_VERIFY=1`) |
 
@@ -613,10 +613,10 @@ thì vừa tiết kiệm tài nguyên, vừa giảm DMA, vừa giúp simulation 
 
 ```bash
 # Chạy 6 case nhỏ (khoảng 1–4 phút) và so với baseline:
-venv/bin/python tools/run_profile.py -k "not mnist" --compare doc/perf/baseline_2026-10-24
+venv/bin/python tools/run_profile.py -k "not mnist" --compare doc/perf/baseline_2026-11-02
 
 # Chạy cả 12 case mốc (khoảng 15–20 phút; 3 case kiểu MNIST 4–9 phút, 3 model 4–11 phút mỗi case):
-venv/bin/python tools/run_profile.py --jobs 4 --compare doc/perf/baseline_2026-10-24 --clock-mhz 250
+venv/bin/python tools/run_profile.py --jobs 4 --compare doc/perf/baseline_2026-11-02 --clock-mhz 250
 
 # Chỉ in bảng, không so sánh:
 venv/bin/python tools/run_profile.py -k "8x1_f4_q32"
@@ -631,7 +631,7 @@ Mã thoát khác 0 nếu có case FAIL. 16 case Bảng 3 (`test_profile_paper`) 
 |---|---|---|
 | `-k BIỂU_THỨC` | Chọn case theo tên (cú pháp `-k` của pytest); case Bảng 3 chỉ được chọn khi biểu thức có `paper` | `-k q32`, `-k "not mnist"`, `-k "mnist2 or 32x3"`, `-k model`, `-k paper_cr2_x4_y3` |
 | `--jobs N` | Số case chạy song song (mặc định 3). Máy 12 nhân, 7 GB RAM: tối đa khoảng 4–6 | `--jobs 4` |
-| `--compare DIR` | So với snapshot trong `DIR` (lặp lại được) | `--compare doc/perf/baseline_2026-10-24` |
+| `--compare DIR` | So với snapshot trong `DIR` (lặp lại được) | `--compare doc/perf/baseline_2026-11-02` |
 | `--clock-mhz F` | Đổi chu kỳ ra µs ở clock F (bảng theo layer) | `--clock-mhz 250` |
 | `--save DIR` | Lưu các `profile.json` mới thành `DIR/<case>.json` | `--save doc/perf/bias_fix_2026-10-12` |
 | `--report FILE` | Ghi báo cáo markdown ra file | `--report doc/perf/bias_fix_2026-10-12.md` |
@@ -666,13 +666,13 @@ hiệu suất bus trước → sau. Dòng **TOTAL** là tổng. Bảng **Summary
 
 1. Tạo branch hoặc commit riêng cho thay đổi (RTL hoặc Python).
 2. Kiểm tra đúng sai trước: các test chức năng liên quan (ví dụ `test_conv_const.py`) phải PASS.
-3. Đo: `venv/bin/python tools/run_profile.py --jobs 4 --compare doc/perf/baseline_2026-10-24 --clock-mhz 250`.
+3. Đo: `venv/bin/python tools/run_profile.py --jobs 4 --compare doc/perf/baseline_2026-11-02 --clock-mhz 250`.
    Mô phỏng là tất định, nên **mọi chênh lệch đều do thay đổi của bạn gây ra**.
 4. (Tuỳ chọn) đo thêm với bộ nhớ thực tế hơn: thêm `--mem typical`, và so với `doc/perf/mem_typical_2026-10-10` (đo trước bản sửa lỗi #18; với 5 case `q32` chỉ `32x3_f16` khác, −96 chu kỳ).
 5. Nếu giữ thay đổi: lưu snapshot và báo cáo, rồi commit:
    ```bash
    venv/bin/python tools/run_profile.py --jobs 4 --save doc/perf/<tên>_<ngày> \
-       --report doc/perf/<tên>_<ngày>.md --compare doc/perf/baseline_2026-10-24
+       --report doc/perf/<tên>_<ngày>.md --compare doc/perf/baseline_2026-11-02
    git add -f doc/perf/<tên>_<ngày>/*.json doc/perf/<tên>_<ngày>.md
    ```
    (`-f` vì `.gitignore` của upstream bỏ qua `*.json`/`*.csv`/`*.txt`.)
@@ -726,7 +726,7 @@ Lưu ý: trước bản sửa lỗi #18, các case > 4 channel chỉ "PASS" vì 
 | `model_mnist_real_c2` | `LAYER=MNIST_REAL` = kiến trúc `models/mnist_conv_net.py` (Conv 32, MaxPool, Conv 64, MaxPool, Conv 64, FC 3136→10), đầu vào 2 channel ngẫu nhiên | 64 | ~11 phút |
 | `model_mnist_real_c1` | Như trên với **đầu vào 1 channel (đúng model thật)**; testbench tự đệm thành 2 channel, channel thêm toàn 0 (lỗi #17, mục 9) | 64 | ~11 phút |
 
-`-k "not model"` chỉ chạy 9 case một layer; `-k model` chỉ chạy 3 case model. Mốc gồm cả 12 case: `doc/perf/baseline_2026-10-24/` (mục 6.13; sau bản sửa #22, weight Conv ngẫu nhiên giữ số 0 thật).
+`-k "not model"` chỉ chạy 9 case một layer; `-k model` chỉ chạy 3 case model. Mốc gồm cả 12 case: `doc/perf/baseline_2026-11-02/` (mục 6.13, 7; weight Conv ngẫu nhiên giữ số 0 thật từ bản sửa #22).
 
 ### 6.8 Thêm một case mới
 
@@ -835,8 +835,8 @@ FSM chính **tính toán ngay trong trạng thái 11** `RECEIVE_PSUMS_TO_IACT`, 
 
 ```bash
 venv/bin/python tools/run_profile.py -k model --clock-mhz 250                                     # 3 case model
-venv/bin/python tools/run_profile.py -k model --compare doc/perf/baseline_2026-10-24 --clock-mhz 250
-venv/bin/python -m open_eye.profile_report --clock-mhz 250 doc/perf/baseline_2026-10-24/model_mnist_real_c2.json
+venv/bin/python tools/run_profile.py -k model --compare doc/perf/baseline_2026-11-02 --clock-mhz 250
+venv/bin/python -m open_eye.profile_report --clock-mhz 250 doc/perf/baseline_2026-11-02/model_mnist_real_c2.json
 ```
 
 Khi `--compare`, case có trong mốc được so từng pha và từng layer (`cycles base/new`, `DMA words base/new`); case chưa có trong mốc được in báo cáo đầy đủ
@@ -846,7 +846,7 @@ Khi `--compare`, case có trong mốc được so từng pha và từng layer (`
 `channels`, `filters`, `kernel`, `stride`, `skip_iact`, `send_values_out`, `pad_channels` = số channel 0 thêm cho lỗi #17).
 
 **Kết quả `model_mnist_real_c2` đo ngày 2026-10-22** (kiến trúc MNIST thật, đầu vào 2 channel, bộ nhớ lý tưởng, `OPENEYE_SEED=1`): **244.050 chu kỳ = 976 µs ở 250 MHz**.
-Sau bản sửa #22 (mốc hiện tại `baseline_2026-10-24`, weight ngẫu nhiên giữ số 0 thật): `_c2` 243.517, `_c1` 240.671, `model_mnist16_c2` 50.007 chu kỳ; Conv2
+Sau bản sửa #22 (`baseline_2026-10-24`, weight ngẫu nhiên giữ số 0 thật; mốc hiện tại `baseline_2026-11-02` ít hơn 673 / 673 / 77 chu kỳ): `_c2` 243.517, `_c1` 240.671, `model_mnist16_c2` 50.007 chu kỳ; Conv2
 giảm 355, Conv3 giảm 237 chu kỳ, các layer khác gần như không đổi (mục 7).
 
 | # | Layer | Chu kỳ | Tỉ lệ | µs @250 MHz | load (cấu hình, iact, lượng tử) | load_wght | load_bias | convert | compute | writeback | pooling | DMA vào | bus eff. |
@@ -901,7 +901,7 @@ vẫn tốn phần cố định (nạp, bắt tay lượt, đọc psum của t�
   ngoài FSM psum 1–3 là `writeback`/`wait_psum_idle`, ở đây là `compute` như trước).
 - Unit test: `test/test_profile_phases.py` (quy tắc gán pha, thông tin layer) và `test/test_profile_report.py` (bảng theo layer, so sánh, `--clock-mhz`): 34 test pass.
 - Mốc mới gồm cả 12 case (thêm `model_mnist_real_c1` cùng ngày, sau bản đệm channel #17): `doc/perf/baseline_2026-10-22/`, báo cáo
-  `doc/perf/baseline_2026-10-22.md` (so với `baseline_2026-10-15`, 250 MHz). **Mốc hiện tại là `baseline_2026-10-24`** (sau #22, mục 7).
+  `doc/perf/baseline_2026-10-22.md` (so với `baseline_2026-10-15`, 250 MHz). Mốc sau #22 là `baseline_2026-10-24`; **mốc hiện tại là `baseline_2026-11-02`** (sau dòng `wghts_per_pe + 1`, mục 7).
 
 ### 6.14 Bảng 3 của paper OpenEye, đo bằng profiler theo từng layer (2026-10-24)
 
@@ -1200,22 +1200,26 @@ Lưu ý:
   Kiểm tra danh sách thiết bị trước khi chọn part.
 - Lưu báo cáo vào repo: chép `reports/utilization.txt`, `reports/timing_summary.txt` và `config.json` vào `doc/synth/<ngày>_<cấu hình>/`.
 
-### Kết quả Vivado hiện tại: mốc phần cứng (2026-10-31, sau các bản sửa #13, #6/#7, #14, 3 commit upstream, #19, #26, #25, #30, #31 và upstream `e78e5b7`)
+### Kết quả Vivado hiện tại: mốc phần cứng (2026-11-02, sau các bản sửa #13, #6/#7, #14, 3 commit upstream, #19, #26, #25, #30, #31, upstream `e78e5b7` và dòng `wghts_per_pe + 1`)
 
-Chi tiết: `doc/synth/2026-10-31_route4ns_e78_zu7ev/SUMMARY.md` (giống từng dòng lần chạy `doc/synth/2026-10-30_route4ns_fix31_zu7ev/`; số liệu dưới đây là của cả hai).
-Từ 2026-11-01 RTL có thêm dòng `wghts_per_pe + 1` (mục 9), **chưa tổng hợp lại**; dòng này chỉ đổi hằng số của một phép so sánh. Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 4 ns (250 MHz),
-cấu hình ở bảng trên, RTL = `dev` có bản sửa #31 (trạng thái `EMPTY_PASS` trong PE; trước đó #30 kẹp int8 trong bộ lượng tử, #25, #26 ở bộ ghi ngược). Bản sửa lỗi #18 chỉ là Python, không đổi phần cứng. Vivado được chạy batch từ WSL
+Chi tiết: `doc/synth/2026-11-02_route4ns_wsend_zu7ev/SUMMARY.md` (lần trước: `doc/synth/2026-10-31_route4ns_e78_zu7ev/`, giống từng dòng lần `fix31`). Vivado 2024.2, `xczu7ev-ffvc1156-2-e`, out-of-context, clock 4 ns (250 MHz),
+cấu hình ở bảng trên, RTL = `dev` `659b8d3`: dòng `wghts_per_pe + 1` (mục 9) trên bản sửa #31 (trạng thái `EMPTY_PASS` trong PE; trước đó #30 kẹp int8 trong bộ lượng tử, #25, #26 ở bộ ghi ngược). Bản sửa lỗi #18 chỉ là Python, không đổi phần cứng. Vivado được chạy batch từ WSL
 (`cmd.exe /c ... vivado.bat -mode batch -source synth_ooc.tcl -tclargs xczu7ev-ffvc1156-2-e 4 impl`).
 
 | | Sau tổng hợp | **Sau route** | Tỉ lệ ZU7EV (sau route) |
 |---|---:|---:|---:|
-| WNS ở 4 ns / hold | +0,205 ns | **+0,074 ns** / +0,014 ns | đạt 250 MHz |
-| fmax = 1000 / (4 − WNS) | ~264 MHz | **~255 MHz** | |
-| LUT (logic + LUTRAM/SRL) | 62.785 | 60.840 | 26,4 % |
-| Flip-flop | 39.468 | 39.796 | 8,6 % |
+| WNS ở 4 ns / hold | +0,205 ns | **+0,020 ns** / +0,006 ns | đạt 250 MHz |
+| fmax = 1000 / (4 − WNS) | ~264 MHz | **~251 MHz** | |
+| LUT (logic + LUTRAM/SRL) | 62.525 | 60.641 | 26,3 % |
+| Flip-flop | 39.466 | 39.790 | 8,6 % |
 | Block RAM tile (RAMB36 168 + RAMB18 48) | 192 | 192 | **61,5 %** |
 | URAM / DSP | 8 / 4 | 8 / 4 | 8,3 % / 0,2 % |
 
+- **Dòng `wghts_per_pe + 1` (2026-11-02):** so với lần `e78`: LUT −260 sau tổng hợp / −199 sau route (−91 trong `OpenEye_Parallel`, khối không bị sửa: dao động
+  tối ưu), FF −2 / −6, BRAM/URAM/DSP như cũ. Timing sau tổng hợp không đổi (+0,205 ns); sau route **WNS +0,074 → +0,020 ns**: đường găng nay là
+  `fsm_cycle_reg[0]` → `router_configurator_inst/router_mode_psum_o_reg[19]/CE` (13 tầng logic, chuỗi so sánh của bộ đếm FSM chính khi cấu hình router),
+  đường không chứa phép so sánh vừa sửa và ở lần `e78` không nằm trong 10 đường xấu nhất (≥ +0,104 ns): biên nhỏ đi do placement/routing, không do
+  logic. Vẫn đạt 250 MHz, nhưng là biên nhỏ nhất từ trước tới nay; nếu cần biên, đường này là chỗ nên pipeline (tính trước so sánh của `fsm_cycle`).
 - **Bản sửa #31:** FF +10 mỗi PE (bộ đếm giữ ready 5 bit + thanh ghi trạng thái). LUT **giảm** 3,7k (−5,6 %) nhưng không phải nhờ bản sửa: với 10 trạng thái,
   Vivado tự chuyển cách mã hoá FSM của PE từ `sequential` (4 bit) sang `one-hot` (10 bit), giải mã trạng thái rẻ hơn (khoảng −77 LUT mỗi PE); có thể đạt mức này
   mà không cần bản sửa bằng cách ép `fsm_encoding`, chưa làm.
@@ -1227,8 +1231,9 @@ cấu hình ở bảng trên, RTL = `dev` có bản sửa #31 (trạng thái `EM
   24 RAMB36 (mỗi khối 364 FF sau bản sửa #6/#7); 48 RAMB18 là SPad của 48 PE; 8 URAM là 4 bộ đệm iact và bộ đệm weight.
 - **Đường găng sau route:** lần fix31 là dây từ `psum_pipeline` (`psum_buffer_addr_array`) tới BRAM bộ đệm psum; lần clamp (#30) là bộ đồng bộ reset, dữ liệu weight của PE, và dây từ `psum_pipeline` tới BRAM bộ đệm psum (không qua bộ lượng tử); lần fix25 là dây từ `psum_buffer_addr_array` tới BRAM của bộ đệm psum và đầu ra bộ cộng trong PE; lần fix26 cả 20 đường là dây từ URAM của bộ đệm weight (`wght_buffer`, không có thanh ghi đầu ra) tới đầu vào weight của PE; lần fix19
   là dây từ `psum_pipeline` (`psum_buffer_addr_array`) tới 144 BRAM của bộ đệm psum; lần up3 đa số nằm trong một PE. Đường găng đổi chỗ theo placement,
-  các đường đều sát nhau quanh 4 ns, nên WNS dao động vài chục ps giữa các lần chạy (+0,028 đến +0,117 ns) dù RTL gần như không đổi.
-- **Thời gian thật ở 250 MHz** (bộ nhớ lý tưởng, baseline sau bản sửa #18): `mnist1` 55.048 chu kỳ = 220 µs, `mnist2` 262 µs, `mnist3` 82 µs.
+  các đường đều sát nhau quanh 4 ns, nên WNS dao động vài chục ps giữa các lần chạy (+0,020 đến +0,117 ns) dù RTL gần như không đổi; lần `wsend`
+  (2026-11-02) là chuỗi so sánh `fsm_cycle` → `router_configurator`.
+- **Thời gian thật ở 250 MHz** (bộ nhớ lý tưởng, `baseline_2026-11-02`): `mnist1` 54.936 chu kỳ = 220 µs, `mnist2` 261 µs, `mnist3` 82 µs, `model_mnist_real_c1` 960 µs.
 
 ### Lịch sử các lần chạy Vivado
 
@@ -1246,7 +1251,8 @@ cấu hình ở bảng trên, RTL = `dev` có bản sửa #31 (trạng thái `EM
 | 2026-10-26 | `2026-10-26_route4ns_fix25_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #25 (lần 1 phép kiểm lane chưa được gấp hằng: LUT +92; lần 2 là RTL cuối) | Cảnh báo không đổi; sau tổng hợp LUT +113 (+0,17 %, phần lớn là dao động: các module không đổi cũng lệch ±30), FF −10; WNS +0,084 ns |
 | 2026-10-28 | `2026-10-28_route4ns_clamp_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi thêm kẹp int8 (#30) | Cảnh báo không đổi; LUT +857 (+1,3 %, gần hết ở 8 bộ lượng tử), FF +22; WNS +0,076 ns |
 | 2026-10-30 | `2026-10-30_route4ns_fix31_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi sửa lỗi #31 (chạy ngày 31/10) | Cảnh báo không đổi; FF +478 (+10/PE); LUT −3.726 (FSM của PE được mã hoá one-hot); WNS +0,074 ns |
-| 2026-10-31 | `2026-10-31_route4ns_e78_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi lấy upstream `e78e5b7` | **Mốc hiện tại** (bảng trên). Mọi báo cáo giống từng dòng lần `fix31` (netlist không đổi); 0 CRITICAL, WNS +0,074 ns |
+| 2026-10-31 | `2026-10-31_route4ns_e78_zu7ev` | Tổng hợp + place & route, 4 ns, sau khi lấy upstream `e78e5b7` | Mọi báo cáo giống từng dòng lần `fix31` (netlist không đổi); 0 CRITICAL, WNS +0,074 ns |
+| 2026-11-02 | `2026-11-02_route4ns_wsend_zu7ev` | Tổng hợp + place & route, 4 ns, sau dòng `wghts_per_pe + 1` | **Mốc hiện tại** (bảng trên). 0 CRITICAL, cảnh báo như cũ; LUT −199, FF −6; WNS +0,020 ns (đường găng mới `fsm_cycle` → `router_configurator`, không qua phép so sánh vừa sửa) |
 
 Ước lượng Yosys so với Vivado: LUT logic lệch dưới 1 %, nên Yosys dùng tốt để so sánh LUT tương đối. BRAM, URAM và DSP lệch nhiều (Yosys không dùng URAM
 và đưa bộ nhân vào DSP), nên các số này phải lấy từ Vivado.
@@ -1268,27 +1274,29 @@ Quy trình đề xuất cho mỗi thay đổi RTL:
 
 Độ trễ thật = số chu kỳ ÷ fmax. Một tối ưu giảm 19 % số chu kỳ nhưng làm fmax giảm 25 % thì **chậm hơn**. Vì vậy mọi tối ưu cần cả hai con số.
 
-## 7. Kết quả baseline chính (chi tiết: `doc/perf/baseline_2026-10-24.md`; trước bản sửa #18: `baseline_2026-10-10.md`)
+## 7. Kết quả baseline chính (chi tiết: `doc/perf/baseline_2026-11-02.md`; trước đó `baseline_2026-10-24.md`; trước bản sửa #18: `baseline_2026-10-10.md`)
 
-**Baseline hiện tại: `doc/perf/baseline_2026-10-24/`** (12 case, bộ nhớ lý tưởng; thời gian ở 250 MHz = chu kỳ × 4 ns). **Từ 2026-11-01** (dòng
-`wghts_per_pe + 1`, mục 9) RTL nhanh hơn mốc này 0–673 chu kỳ mỗi case (`mnist1` 54.936, `mnist2` 65.304, `mnist3` 20.520, `model_mnist16_c2` 49.930,
-`model_mnist_real_c2` 242.844, `model_mnist_real_c1` 239.998; model đã huấn luyện −673 ở mọi ảnh), đo trong worktree thí nghiệm; mốc mới chưa lưu. 9 case một layer giống hệt
-`baseline_2026-10-15` (sau bản sửa lỗi #18); thêm 3 case cả model có bảng theo layer (mục 6.13): **MNIST thật 1 channel `model_mnist_real_c1` 240.671 chu kỳ
-(963 µs)**, Conv2 chiếm 50 %; `model_mnist_real_c2` 243.517 chu kỳ (974 µs); `model_mnist16_c2` 50.007 chu kỳ (200 µs). So với `baseline_2026-10-22`
-(trước bản sửa #22) các case model giảm 13–579 chu kỳ: weight Conv ngẫu nhiên nay giữ số 0 thật (1–5 %) và PE bỏ qua chúng; số word DMA không đổi.
+**Baseline hiện tại: `doc/perf/baseline_2026-11-02/`** (12 case, bộ nhớ lý tưởng; thời gian ở 250 MHz = chu kỳ × 4 ns; lưu 2026-11-02 sau dòng
+`wghts_per_pe + 1`, mục 9). So với mốc trước `baseline_2026-10-24`: 12/12 PASS, ít hơn 0–673 chu kỳ mỗi case, chỉ ở pha compute, số word DMA không
+đổi (`doc/perf/baseline_2026-11-02.md` là bảng so sánh này). Thêm 3 case cả model có bảng theo layer (mục 6.13): **MNIST thật 1 channel
+`model_mnist_real_c1` 239.998 chu kỳ (960 µs)**, Conv2 chiếm 50 %; `model_mnist_real_c2` 242.844 chu kỳ (971 µs); `model_mnist16_c2` 49.930 chu kỳ (200 µs).
+Lịch sử: `baseline_2026-10-24` (sau #22: 240.671 / 243.517 / 50.007; so với `baseline_2026-10-22` các case model giảm 13–579 chu kỳ vì weight Conv ngẫu
+nhiên giữ số 0 thật và PE bỏ qua chúng), trong đó 9 case một layer giống hệt `baseline_2026-10-15` (sau bản sửa lỗi #18).
 **Bảng 3 của paper** (mạng Bảng 2, 16 cấu hình cluster/PE, theo từng layer và từng pha): mục 6.14, mốc hiện tại `doc/perf/paper_table3_2026-10-26_fix25.md`
 (13/16 cấu hình đúng cả mạng; bản `paper_table3_2026-10-24.md` là trước #25/#26). **Model MNIST đã huấn luyện với ảnh thật** (2026-10-31, mục 6.13):
-213.040–220.941 chu kỳ (852–884 µs) ở ảnh 0, 1, 2, 7, ít hơn 8,2–11,5 % so với `model_mnist_real_c1` vì activation thật có nhiều số 0 (`doc/perf/trained_mnist_2026-10-31.md`).
+213.040–220.941 chu kỳ (852–884 µs) ở ảnh 0, 1, 2, 7, ít hơn 8,2–11,5 % so với `model_mnist_real_c1` vì activation thật có nhiều số 0 (`doc/perf/trained_mnist_2026-10-31.md`;
+đo trước dòng `wghts_per_pe + 1`, sau đó −673 ở mọi ảnh: 212.367–220.268, đo trong worktree thí nghiệm).
 
 **Layer kiểu MNIST (0.3):**
 
 | Case | Thay cho | Tổng chu kỳ | Compute | Pha không tính toán lớn nhất |
 |---|---|---:|---:|---|
-| `mnist1_28x28_c4_f32` | Conv1 | 55.048 (220 µs) | 42% | **bias 26%** (14.336 word cho 96 byte payload), readout 26% |
-| `mnist2_14x14_c32_f32` | Conv2 | 65.528 (262 µs) | **69%** | weight 12% (hiệu suất 15%), convert 7% |
-| `mnist3_8x8_c32_f32` | Conv3 | 20.584 (82 µs) | 62% | weight 19% (hiệu suất 30%), convert 8% |
+| `mnist1_28x28_c4_f32` | Conv1 | 54.936 (220 µs) | 42% | **bias 26%** (14.336 word cho 96 byte payload), readout 26% |
+| `mnist2_14x14_c32_f32` | Conv2 | 65.304 (261 µs) | **69%** | weight 12% (hiệu suất 15%), convert 7% |
+| `mnist3_8x8_c32_f32` | Conv3 | 20.520 (82 µs) | 62% | weight 19% (hiệu suất 30%), convert 8% |
 
-Trước bản sửa lỗi #18 (`baseline_2026-10-10`): 65.800 / 87.032 / 26.728 chu kỳ. Phần giảm (−16 % / −25 % / −23 %) nằm hết ở `compute`: mỗi lần gửi weight
+Tổng chu kỳ theo `baseline_2026-11-02`; trước dòng `wghts_per_pe + 1` (`baseline_2026-10-15`/`10-24`): 55.048 / 65.528 / 20.584. Trước bản sửa lỗi #18
+(`baseline_2026-10-10`): 65.800 / 87.032 / 26.728 chu kỳ; phần giảm tới `baseline_2026-10-15` (−16 % / −25 % / −23 %) nằm hết ở `compute`: mỗi lần gửi weight
 dài 96 thay vì 192 chu kỳ.
 
 **Layer nhỏ (2026-10-09):**
@@ -1327,9 +1335,9 @@ dài 96 thay vì 192 chu kỳ.
 | **0.2 Mở rộng phạm vi đo**: payload/hiệu suất cho layer Dense (FC) và cho lượt nhiều layer (pha `writeback`), tách số liệu theo từng layer | **Xong** (2026-10-22, mục 6.13): bảng theo layer, tách `compute`/`writeback` ở trạng thái 11, 3 case model |
 | **0.3 Cấu hình gần thực tế hơn**: 3 case kiểu MNIST (mục 6.7), baseline mới `baseline_2026-10-10` | **Xong** (2026-10-10) |
 | Mô hình bộ nhớ ngoài (độ trễ burst, giới hạn băng thông) | **Xong** (2026-10-10, mục 6c); tham số chưa hiệu chỉnh theo board |
-| Mốc phần cứng: tổng hợp + place & route Vivado (`tools/export_vivado.py`) | **Xong** (2026-10-12, cập nhật sau mỗi bản sửa RTL tới 2026-10-31, mục 6d): 250 MHz, 60,8k LUT, 39,8k FF, 192 BRAM tile |
+| Mốc phần cứng: tổng hợp + place & route Vivado (`tools/export_vivado.py`) | **Xong** (2026-10-12, cập nhật sau mỗi bản sửa RTL tới 2026-11-02, mục 6d): 250 MHz, 60,6k LUT, 39,8k FF, 192 BRAM tile |
 | Kiểm tra độc lập từng word + test dữ liệu ngẫu nhiên | **Xong** (2026-10-15, mục 6.12) |
-| Baseline sau các bản sửa | **Xong**: `doc/perf/baseline_2026-10-24/` (12 case) |
+| Baseline sau các bản sửa | **Xong**: `doc/perf/baseline_2026-11-02/` (12 case; trước đó `baseline_2026-10-24`) |
 | Bảng 3 của paper đo bằng profiler (16 cấu hình, theo layer) | **Xong** (2026-10-24, mục 6.14); sau bản sửa #26 và #25: **13/16 cấu hình tính đúng cả mạng**; còn #19b (CR 1 X 4 Y 3) và #28 (CR 1 X 2) |
 
 ### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-10-31)
@@ -1376,8 +1384,9 @@ dài 96 thay vì 192 chu kỳ.
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-10-31)
 
-**Định hướng (mốc phần cứng 2026-10-31 sau bản sửa #31 và `e78e5b7`: 60,8k LUT, 39,8k FF, 192 BRAM tile, đạt 250 MHz sau route; mốc chu kỳ `baseline_2026-10-24`: 9 case
-một layer giống hệt `baseline_2026-10-15`, thêm 3 model):**
+**Định hướng (mốc phần cứng 2026-11-02 sau bản sửa #31, `e78e5b7` và `wghts_per_pe + 1`: 60,6k LUT, 39,8k FF, 192 BRAM tile, đạt 250 MHz sau route
+(WNS +0,020 ns); mốc chu kỳ `baseline_2026-11-02`:
+`baseline_2026-10-24` trừ 0–673 chu kỳ của dòng `wghts_per_pe + 1`):**
 
 | # | Việc | Loại | Vì sao | Trạng thái |
 |---|---|---|---|---|
@@ -1394,13 +1403,13 @@ một layer giống hệt `baseline_2026-10-15`, thêm 3 model):**
 | I | Lỗi #26 (Dense nối tiếp Dense) và #25 (`NUM_GLB_PSUM=2`) | Điều tra (Python trước) | Chặn mạng của paper và mọi model có 2 Dense; Bảng 3 chưa có cấu hình nào tính đúng hết | #26 **đã sửa** (2026-10-24, 1 dòng RTL + Python, mục 9); #25 **đã sửa** (2026-10-26, mục 9) |
 | J | Bảng 3 với activation thưa (giả lập ReLU) | Chỉ Python | Phần xử lý của fork chậm hơn paper 4–5,6 lần; xem bao nhiêu là do activation không thưa | Đề xuất |
 | K | Hàm kích hoạt (#24) + kẹp int8 trong `quantization_unit` | Sửa RTL | Cần cho model thật (mục 8d) | **Xong** (2026-10-28, #30): kẹp với cận dưới theo layer, ReLU gộp vào kẹp (mục 9) |
-| L | Kết thúc gửi weight sớm 1 chu kỳ (`wghts_per_pe + 1`, từ upstream `3258813`) | Sửa RTL 1 dòng | Mỗi lượt có việc gửi weight trên đường găng bớt 1 chu kỳ | **Đã thử 2026-10-31**: đúng ở mọi kiểm tra, −0,1 đến −0,3 % chu kỳ (−673 trên model MNIST), 0 tài nguyên; **đã đưa vào `dev` 2026-11-01** (`doc/experiments/2026-10-31_wght_send_end.md`) |
+| L | Kết thúc gửi weight sớm 1 chu kỳ (`wghts_per_pe + 1`, từ upstream `3258813`) | Sửa RTL 1 dòng | Mỗi lượt có việc gửi weight trên đường găng bớt 1 chu kỳ | **Đã thử 2026-10-31**: đúng ở mọi kiểm tra, −0,1 đến −0,3 % chu kỳ (−673 trên model MNIST), 0 tài nguyên; **đã đưa vào `dev` 2026-11-01** (`doc/experiments/2026-10-31_wght_send_end.md`); mốc chu kỳ `baseline_2026-11-02`, Vivado 2026-11-02 đạt 250 MHz (WNS +0,020 ns) |
 
 Thứ tự đề xuất: A, B, B2, C2 (kiến trúc MNIST chạy đủ) **đã xong**; tiếp theo là C (bias theo filter: Bảng 3 cho thấy bias chiếm khoảng 54.000–58.000 ns ở mọi
 cấu hình), rồi D (I: #25, #26 đã sửa).
 Mỗi thay đổi RTL: test, `run_profile --compare`, Yosys (so sánh nhanh LUT), Vivado ở các mốc quan trọng.
 
-**Kế hoạch theo giai đoạn (số liệu theo `baseline_2026-10-15`; 9 case này không đổi trong `baseline_2026-10-24`):**
+**Kế hoạch theo giai đoạn (số liệu theo `baseline_2026-10-15`; 9 case này không đổi trong `baseline_2026-10-24`, `baseline_2026-11-02` chỉ ít hơn 0–224 chu kỳ):**
 
 1. **Giai đoạn 1.1: gửi bias theo filter** (= hướng C; thiết kế ở dưới). **Cần bạn đồng ý** vì sửa RTL.
 2. **Giai đoạn 1.2: readout INT8.** Lượng tử kết quả trên chip trước khi gửi ra (đường này đã có cho write-back giữa các layer).
@@ -1433,7 +1442,7 @@ Mỗi thay đổi RTL: test, `run_profile --compare`, Yosys (so sánh nhanh LUT)
 - Chi phí ước tính: bảng bias tối đa 32 × 20–32 bit (khoảng 640–1.024 flip-flop, hoặc vài chục LUT nếu dùng LUTRAM), khoảng 4 bộ đếm (khoảng 40 flip-flop),
   logic chọn và ghép word. Đo lại bằng Yosys sau khi làm.
 
-Mỗi bước đều đánh giá bằng `tools/run_profile.py --compare doc/perf/baseline_2026-10-24`, kèm thêm `--mem typical` để thấy lợi ích khi có bộ nhớ thực tế hơn,
+Mỗi bước đều đánh giá bằng `tools/run_profile.py --compare doc/perf/baseline_2026-11-02`, kèm thêm `--mem typical` để thấy lợi ích khi có bộ nhớ thực tế hơn,
 và Bảng 3 (`tools/paper_table3.py`) để thấy tác dụng trên nhiều cấu hình cluster.
 
 ### 8d. Chạy cả một model nhiều layer (phân tích 2026-10-22)
@@ -2471,10 +2480,9 @@ worktree của `dev` (`5595d15`) chỉ đổi dòng `if (fsm_sending_cycle > wgh
   Bảng 3 −0,1 % (CR 8) đến −0,3 % (CR 1), các ca nhỏ 0; số word DMA không đổi; không tốn tài nguyên (chỉ đổi hằng số của một phép so sánh).
 - **Trạng thái:** **đã đưa vào `dev` 2026-11-01** (được bạn đồng ý, commit dựa trên kết quả của worktree ở trên, cùng một dòng thay đổi; thêm comment
   giải thích ở dòng đó và sửa 2 comment mô tả dải đếm `fsm_sending_cycle` trong `OpenEye_FPGA.v` và `dense_mapper.py`). Trên `dev` đã chạy: lint 0 cảnh
-  báo mới, unit test Python 290 pass / 11 fail có từ trước, bộ lượng tử 2/2, 16 test đầu của hồi quy đều PASS/xfail (dừng theo yêu cầu). **Chưa làm:**
-  Vivado (chỉ đổi hằng số của một phép so sánh, dự kiến không đổi tài nguyên/timing; mốc phần cứng `2026-10-31_route4ns_e78_zu7ev` là của RTL ngay
-  trước dòng này) và mốc chu kỳ mới: `run_profile --compare doc/perf/baseline_2026-10-24` nay sẽ báo đúng các mức giảm ở bảng trên (ví dụ
-  `model_mnist_real_c1` 240.671 → 239.998), không phải lỗi.
+  báo mới, unit test Python 290 pass / 11 fail có từ trước, bộ lượng tử 2/2, 16 test đầu của hồi quy đều PASS/xfail (dừng theo yêu cầu). **2026-11-02:**
+  12 ca mốc trên `dev` 12/12 PASS, số chu kỳ trùng đúng worktree, lưu thành mốc mới `doc/perf/baseline_2026-11-02/` (mục 7); Vivado 4 ns 0 CRITICAL,
+  LUT −199, FF −6, WNS +0,020 ns (đường găng mới không qua phép so sánh vừa sửa), mốc phần cứng mới `doc/synth/2026-11-02_route4ns_wsend_zu7ev/` (mục 6d).
 
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
@@ -2982,3 +2990,13 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   mốc, model đã huấn luyện 4 ảnh, Bảng 3 13/16, −0,1 đến −0,3 % chu kỳ; `doc/experiments/2026-10-31_wght_send_end.md`). Trên `dev`: lint 0 mới, unit test
   Python 290 pass / 11 fail có từ trước, bộ lượng tử 2/2, 16/162 test hồi quy đầu PASS/xfail rồi dừng theo yêu cầu. Chưa chạy Vivado, chưa lưu mốc chu kỳ mới
   (mục 7).
+
+### 2026-11-02
+
+- **Mốc mới sau dòng `wghts_per_pe + 1`** (theo yêu cầu, không sửa RTL): `tools/run_profile.py --compare doc/perf/baseline_2026-10-24 --save
+  doc/perf/baseline_2026-11-02 --report doc/perf/baseline_2026-11-02.md`: 12/12 PASS, 0 … −673 chu kỳ mỗi case (`model_mnist_real_c1` 239.998, `_c2` 242.844,
+  `mnist1/2/3` 54.936 / 65.304 / 20.520, `model_mnist16_c2` 49.930), trùng đúng số của worktree thí nghiệm, số word DMA không đổi; **`baseline_2026-11-02` là mốc
+  chu kỳ hiện tại** (mục 7; các lệnh mẫu ở mục 3c và 6 đã đổi sang mốc này). Vivado 4 ns (`doc/synth/2026-11-02_route4ns_wsend_zu7ev/`, **mốc phần cứng mới**):
+  0 ERROR, 0 CRITICAL, cảnh báo như cũ (thêm 1 dòng `DRC 23-814` của chế độ out-of-context); LUT 60.840 → 60.641 sau route, FF 39.796 → 39.790; timing sau tổng
+  hợp không đổi (+0,205 ns); sau route WNS +0,074 → **+0,020 ns** (vẫn đạt 250 MHz, biên nhỏ nhất từ trước tới nay): đường găng mới là chuỗi so sánh của
+  `fsm_cycle` tới `router_configurator`, không chứa phép so sánh vừa sửa, nên là dao động của placement/routing (mục 6d).

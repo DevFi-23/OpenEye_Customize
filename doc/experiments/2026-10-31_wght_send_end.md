@@ -96,4 +96,9 @@ X axis: fewer, larger passes, so fewer weight sends.
 * Taken into `dev` on 2026-11-01 (approved by the user) on the strength of these worktree results: the same line, plus a
   comment at it and two comments on the range of `fsm_sending_cycle` (`OpenEye_FPGA.v`, `dense_mapper.py`). On `dev`
   itself: lint 0 new, Python unit tests 290 pass / 11 old fails, quantizer testbench 2/2, the first 16 of the 162 RTL
-  regression tests PASS/xfail (the run was stopped on request). Vivado and a new cycle baseline were not run.
+  regression tests PASS/xfail (the run was stopped on request).
+* 2026-11-02 on `dev` (`659b8d3`): the 12 baseline cases 12/12 PASS with exactly the cycle counts of section 2.2, saved as
+  the new cycle baseline `doc/perf/baseline_2026-11-02`; Vivado 4 ns (`doc/synth/2026-11-02_route4ns_wsend_zu7ev`): 0
+  critical, LUT -199 / FF -6 after routing, post-synthesis timing unchanged, post-route WNS +0.074 -> +0.020 ns (250 MHz
+  still met). The new worst path (`fsm_cycle` -> `router_configurator`) does not contain the changed comparison: a
+  placement/routing variation.
