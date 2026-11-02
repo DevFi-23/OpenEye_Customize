@@ -11,6 +11,15 @@ MANT_BITS = 8       # the RTL multiplies by 8 bits of the 25-bit mantissa field 
 SHIFT_MAX = 127     # 7-bit shift field
 COMPUTE_OPS = {'ConvInteger', 'QLinearConv', 'MatMulInteger', 'QLinearMatMul', 'QGemm', 'MaxPool'}
 
+# Activations after a QLinearConv / QGemm of a statically quantized graph, as the planned hardware computes them
+# (doc/experiments/2026-11-02_activation_plan.md): "relu" by the quantizer's lower clamp (act_min 0), "leaky_relu"
+# by a second slope for negative sums, "silu" and "hardswish" by a 256-entry int8 -> int8 table after the clamp.
+ACTIVATION_FUNCTIONS = {
+    'leaky_relu': lambda x, alpha: np.where(x >= 0, x, alpha * x),
+    'silu': lambda x, alpha: x / (1.0 + np.exp(-x)),
+    'hardswish': lambda x, alpha: x * np.clip(x + 3.0, 0.0, 6.0) / 6.0,
+}
+
 class TensorShape:
     """Helper class to allow reading shapes via .shape property, similar to TensorFlow."""
     def __init__(self, shape_list):
@@ -57,6 +66,18 @@ class HardwareLayer:
         self.bias_int32 = None
         self.scale = None
         self.zero_point = None
+
+        # Activation after the layer (find_activation): "none", "relu", "leaky_relu", "silu" or "hardswish", its
+        # Leaky ReLU slope, and the scale of its quantized output (the next layer's input scale; for "relu" the
+        # layer's output scale itself). activation_negative_factor: [mant, shift] of the Leaky ReLU slope for negative
+        # sums; activation_table: the 256 outputs of the table for the inputs -128 ... 127 ("silu", "hardswish");
+        # activation_round: round to nearest instead of the quantizer's floor (planned hardware option, off).
+        self.activation = 'none'
+        self.activation_alpha = None
+        self.activation_output_scale = None
+        self.activation_negative_factor = None
+        self.activation_table = None
+        self.activation_round = False
 
     def __repr__(self):
         return f"<HardwareLayer [{self.index}] {self.type} (Name: {self.name})>"
@@ -174,6 +195,132 @@ def check_fused_relu(node, next_node_map):
             break
     return False
 
+def tensor_consumers(onnx_model):
+    """Every node that reads a tensor (next_node_map keeps only the last one; SiLU's conv output feeds two)."""
+    consumers = {}
+    for node in onnx_model.graph.node:
+        for inp in node.input:
+            consumers.setdefault(inp, []).append(node)
+    return consumers
+
+def find_activation(node, consumers, inits):
+    """Activation applied to the int8 output of a QLinearConv / QGemm in a statically quantized graph:
+    (name, Leaky ReLU slope or None, scale of the activation's quantized output or None).
+
+    The patterns ONNX Runtime's static quantization (QOperator) leaves for the PyTorch activations (opset 18):
+      LeakyReLU  QLinearLeakyRelu(X = output, Y_scale)
+      SiLU       QLinearSigmoid(output) and QLinearMul(output, sigmoid) -> C_scale (x * sigmoid(x))
+      Hardswish  DequantizeLinear -> HardSigmoid (alpha 1/6, beta 1/2, float) -> QuantizeLinear, QLinearMul(output,
+                 hard sigmoid) -> C_scale (ONNX Runtime has no quantized HardSwish); a HardSwish node left in float
+                 between DequantizeLinear and QuantizeLinear is taken as well
+      ReLU       DequantizeLinear -> Relu (float): the output scale stays the layer's (check_fused_relu)"""
+    out = node.output[0]
+    readers = consumers.get(out, [])
+
+    def scale(name):
+        return float(np.asarray(inits[name]).ravel()[0])
+
+    def attribute(n, name, default):
+        return next((a.f for a in n.attribute if a.name == name), default)
+
+    def mul_with(other):
+        return next((n for n in readers if n.op_type == 'QLinearMul' and other in (n.input[0], n.input[3])), None)
+
+    for n in readers:
+        if n.op_type == 'QLinearLeakyRelu':
+            return 'leaky_relu', attribute(n, 'alpha', 0.01), scale(n.input[3])
+        if n.op_type == 'QLinearSigmoid' and mul_with(n.output[0]) is not None:
+            return 'silu', None, scale(mul_with(n.output[0]).input[6])
+    for dq in (n for n in readers if n.op_type == 'DequantizeLinear'):
+        for f in consumers.get(dq.output[0], []):
+            if f.op_type == 'Relu':
+                return 'relu', None, None
+            if f.op_type == 'HardSigmoid':
+                if not (abs(attribute(f, 'alpha', 0.2) - 1 / 6) < 1e-6 and abs(attribute(f, 'beta', 0.5) - 0.5) < 1e-6):
+                    continue
+                for q in consumers.get(f.output[0], []):
+                    if q.op_type == 'QuantizeLinear' and mul_with(q.output[0]) is not None:
+                        return 'hardswish', None, scale(mul_with(q.output[0]).input[6])
+            if f.op_type in ('HardSwish', 'LeakyRelu'):
+                for q in consumers.get(f.output[0], []):
+                    if q.op_type == 'QuantizeLinear':
+                        name = 'hardswish' if f.op_type == 'HardSwish' else 'leaky_relu'
+                        return name, attribute(f, 'alpha', 0.01) if name == 'leaky_relu' else None, scale(q.input[1])
+    return 'none', None, None
+
+def activation_table(function, alpha, in_scale, out_scale):
+    """The table of an int8 -> int8 activation: entry i = clamp(round(f((i - 128) * in_scale) / out_scale), -128, 127),
+    rounded half away from zero."""
+    y = ACTIVATION_FUNCTIONS[function](np.arange(-128, 128, dtype=np.float64) * in_scale, alpha) / out_scale
+    return [int(v) for v in np.clip(np.sign(y) * np.floor(np.abs(y) + 0.5), -128, 127)]
+
+def set_activation(layer_obj, node, consumers, inits):
+    """Records the activation of a statically quantized layer (find_activation); finish_activations computes its
+    hardware parameters once the whole pipeline is known."""
+    if consumers is None:
+        return layer_obj
+    name, alpha, out_scale = find_activation(node, consumers, inits)
+    layer_obj.activation = name
+    layer_obj.activation_alpha = alpha
+    layer_obj.activation_output_scale = out_scale
+    return layer_obj
+
+def _nhwc(shape):
+    """A TensorShape that already holds an NHWC (or [batch, features]) list."""
+    t = TensorShape([])
+    t.shape = list(shape)
+    return t
+
+def fill_missing_shapes(pipeline):
+    """Shapes ONNX shape inference leaves unknown: it does not know the com.microsoft ops (QLinearLeakyRelu,
+    QLinearSigmoid, QLinearMul) of a quantized activation, so the tensors after one have no shape. A layer's input is
+    the previous layer's output; a conv or pooling output follows from kernel, padding and stride; a Dense input is
+    the flattened previous output."""
+    previous = None
+    for layer in pipeline:
+        if not isinstance(layer.input.shape, list) and previous is not None:
+            if layer.type == 'dense':
+                n, rest = previous.output.shape[0], previous.output.shape[1:]
+                layer.input = _nhwc([n, int(np.prod(rest))])
+                layer.output = _nhwc([n, layer.filters])
+            else:
+                layer.input = _nhwc(previous.output.shape)
+        if not isinstance(layer.output.shape, list) and isinstance(layer.input.shape, list) and layer.type != 'dense':
+            n, h, w, c = layer.input.shape
+            (kh, kw), (sh, sw) = layer.kernel_size, layer.strides
+            top, left, bottom, right = layer.padding_pads
+            out_h = (h + top + bottom - kh) // sh + 1
+            out_w = (w + left + right - kw) // sw + 1
+            layer.output = _nhwc([n, out_h, out_w, layer.filters if layer.type == 'conv2d' else c])
+        previous = layer
+    return pipeline
+
+def finish_activations(pipeline):
+    """Hardware parameters of the activations (doc/experiments/2026-11-02_activation_plan.md). The hardware writes a
+    layer's activated output straight into the next compute layer's input, so the activation targets that layer's
+    input scale (the activation node's own output scale unless ONNX Runtime requantizes in between, e.g. around a
+    float Flatten before the Dense; the requantization is folded in). Leaky ReLU: the quantizer requantizes straight
+    to the target, quantization_factor ~ s_in * s_w / s_out for sums >= 0 and activation_negative_factor ~
+    alpha * s_in * s_w / s_out for negative sums. SiLU, hard-swish: quantization_factor stays the layer's (int8
+    pre-activation at the layer's output scale), the table maps it to the target scale."""
+    for k, layer_obj in enumerate(pipeline):
+        name = layer_obj.activation
+        if name not in ('leaky_relu', 'silu', 'hardswish'):
+            continue
+        following = next((l for l in pipeline[k + 1:] if l.type in ('conv2d', 'dense')), None)
+        if following is not None and getattr(following, 'input_scale', None):
+            layer_obj.activation_output_scale = following.input_scale
+        out_scale = layer_obj.activation_output_scale
+        m = layer_obj.input_scale * layer_obj.scale
+        if name == 'leaky_relu':
+            layer_obj.quantization_factor = [list(hardware_multiplier(m / out_scale))
+                                             for _ in layer_obj.quantization_factor]
+            layer_obj.activation_negative_factor = list(hardware_multiplier(layer_obj.activation_alpha * m / out_scale))
+        else:
+            layer_obj.activation_table = activation_table(name, layer_obj.activation_alpha, layer_obj.output_scale,
+                                                          out_scale)
+    return pipeline
+
 def extract_conv_params(node, w_arr, attrs):
     """Extracts specific structural hyperparameters for a Convolution."""
     return {
@@ -231,7 +378,7 @@ def process_weights_and_biases(layer_obj, node, inits, input_scale, next_node_ma
         
     return layer_obj
 
-def process_qlinear(layer_obj, node, inits):
+def process_qlinear(layer_obj, node, inits, consumers=None):
     """QLinearConv / QGemm of a statically quantized graph: the int8 weights, the int32 bias (scale input * weight)
     and the input, weight and output scales are inputs of the node. Sets weights[0] (conv [kernel row][kernel column]
     [channel][filter], the order DRAMContents reads for a Keras kernel; dense [out][in]), weights[1] (bias), the
@@ -264,7 +411,7 @@ def process_qlinear(layer_obj, node, inits):
     mant, shift = hardware_multiplier(layer_obj.input_scale * layer_obj.scale / layer_obj.output_scale)
     layer_obj.quantization_factor = [[mant, shift] for _ in range(filters)]
     layer_obj.quantized = True
-    return layer_obj
+    return set_activation(layer_obj, node, consumers, inits)
 
 def build_layer_dict(idx, node, shapes, next_node_map):
     """Instantiates a new HardwareLayer object instead of a raw dictionary."""
@@ -289,6 +436,7 @@ def parse_pipeline(onnx_model, inits, next_node_map, shapes):
     """Iterates through nodes to build the clean object-oriented hardware pipeline."""
     pipeline = []
     input_scale = inits.get('input_scale', 1.0)
+    consumers = tensor_consumers(onnx_model)
     
     for node in onnx_model.graph.node:
         if node.op_type not in COMPUTE_OPS:
@@ -299,7 +447,7 @@ def parse_pipeline(onnx_model, inits, next_node_map, shapes):
         
         if layer.type in ['conv2d', 'dense']:
             if node.op_type in ('QLinearConv', 'QGemm'):        # statically quantized graph (quantize_to_int8_static)
-                layer = process_qlinear(layer, node, inits)
+                layer = process_qlinear(layer, node, inits, consumers)
                 w_input = 3
             else:
                 layer = process_weights_and_biases(layer, node, inits, input_scale, next_node_map)
@@ -334,7 +482,7 @@ def print_summary(pipeline):
     """Prints a structured summary of the custom hardware pipeline."""
     print("\n--- Generated Dynamic Hardware Pipeline (including Tensor Shapes) ---")
     for l in pipeline:
-        print(f"[{l.index}] Type: {l.type:<15} | In: {str(l.input.shape):<22} | Out: {str(l.output.shape):<22} | Fused ReLU: {str(l.has_relu)}")
+        print(f"[{l.index}] Type: {l.type:<15} | In: {str(l.input.shape):<22} | Out: {str(l.output.shape):<22} | Fused ReLU: {str(l.has_relu)} | Activation: {l.activation}")
 
 def get_model(torch_model, calibration_data=None):
     """Main Orchestrator: Controls export, quantization, parsing, and verification.
@@ -351,7 +499,7 @@ def get_model(torch_model, calibration_data=None):
     onnx_model, inits, next_node_map = build_graph_helpers(loaded_model)
     shapes = get_tensor_shapes(onnx_model)
     
-    pipeline = parse_pipeline(onnx_model, inits, next_node_map, shapes)
+    pipeline = finish_activations(fill_missing_shapes(parse_pipeline(onnx_model, inits, next_node_map, shapes)))
     print_summary(pipeline)
     
     for layer_number in range(len(pipeline)):

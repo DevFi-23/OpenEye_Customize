@@ -135,6 +135,8 @@ class ConvMapper(LayerMapper):
         # === REGISTER PACKING ===
         # Pack all layer configuration parameters into hardware register format
         # Uses pack_registers() utility from regmap_pack module
+        from open_eye.layer_parameters import check_rtl_activation
+        check_rtl_activation(layer_params)
         from open_eye.generator import pack_registers
         words = pack_registers({
         "wght_cycles_reg": layer_params.needed_wght_transmissions,

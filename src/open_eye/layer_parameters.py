@@ -44,6 +44,35 @@ def activation_min(layer):
     return 0 if getattr(activation, "__name__", "") == "relu" else -128
 
 
+def activation_config(layer):
+    """The activation of a layer as the planned activation hardware takes it (doc/experiments/
+    2026-11-02_activation_plan.md): (mode, negative factor, table, round).
+
+    mode "none" / "relu": the quantizer alone (act_min); "leaky": a second [mant, shift] for negative sums (the
+    negative factor); "table": a 256-entry int8 -> int8 table applied to the clamped quantizer output (SiLU,
+    hard-swish). round: round to nearest instead of floor. Taken from an onnx2model layer (activation,
+    activation_negative_factor, activation_table, activation_round); every other layer is "none" or "relu".
+    The RTL does not have "leaky" and "table" yet (step B of the plan); the reference computes them already."""
+    name = getattr(layer, "activation", None)
+    rounding = bool(getattr(layer, "activation_round", False))
+    if name == "leaky_relu":
+        return "leaky", list(layer.activation_negative_factor), None, rounding
+    if name in ("silu", "hardswish"):
+        return "table", None, list(layer.activation_table), rounding
+    return ("relu" if activation_min(layer) == 0 else "none"), None, None, rounding
+
+
+def check_rtl_activation(layer_params):
+    """Stop a layer whose activation the RTL cannot compute yet ("leaky", "table": step B of
+    doc/experiments/2026-11-02_activation_plan.md) from being streamed: the RTL would only clamp and the run would
+    differ from the reference without saying why."""
+    mode = getattr(layer_params, "act_mode", "none")
+    if mode not in ("none", "relu") or getattr(layer_params, "act_round", False):
+        raise NotImplementedError(
+            f"activation mode {mode!r} (round {getattr(layer_params, 'act_round', False)}) is not in the RTL yet: "
+            "only the reference computes it (doc/experiments/2026-11-02_activation_plan.md, step B)")
+
+
 class LayerParameters(object):
     """Configuration parameters for a single neural network layer on OpenEye accelerator.
 
@@ -328,6 +357,8 @@ class LayerParameters(object):
         # Lower saturation bound of the quantized outputs (quantization_unit.v): -128 is plain int8
         # saturation, 0 a fused ReLU for activations quantized with zero point 0 (as all of this flow's).
         self.act_min = -128
+        # Activation beyond the clamp (activation_config): mode "none" / "relu" / "leaky" / "table"
+        self.act_mode, self.act_negative, self.act_table, self.act_round = "none", None, None, False
 
         # === Programmable Adress Generation Unit ===
         self.iact_read_limit_0 = 0
@@ -670,6 +701,7 @@ class LayerParameters(object):
                 self.quantize[f][0] = 1
                 self.quantize[f][1] = 7
         self.act_min = activation_min(layer)
+        self.act_mode, self.act_negative, self.act_table, self.act_round = activation_config(layer)
 
         # Store input activation dimensions
         self.iact_size_x = self.input_shape[1]
@@ -1552,6 +1584,7 @@ class LayerParameters(object):
                 self.quantize[f][0] = layer.quantization_factor[f][0]
                 self.quantize[f][1] = layer.quantization_factor[f][1]
         self.act_min = activation_min(layer)
+        self.act_mode, self.act_negative, self.act_table, self.act_round = activation_config(layer)
         if (layer_number != 0): 
             self.skipIact = 1
         self.input_shape = layer.input.shape

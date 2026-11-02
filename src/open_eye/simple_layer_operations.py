@@ -111,9 +111,44 @@ def batchnorm_output(layer_parameters, divide_value, layer_number, dram):
     # The quantizer (quantization_unit.v) saturates to [act_min, 127]: -128 is plain int8 saturation,
     # 0 a fused ReLU. Values that stay inside int8 are unchanged.
     act_min = getattr(layer_parameters, "act_min", -128)
+    mode = getattr(layer_parameters, "act_mode", "none")
 
     def saturate(value):
         return max(act_min, min(127, value))
+
+    rounding = getattr(layer_parameters, "act_round", False)
+    if mode in ("leaky", "table") or rounding:
+        # The activation hardware of doc/experiments/2026-11-02_activation_plan.md (not in the RTL yet):
+        # "leaky" requantizes a negative sum with its own [mant, shift], "table" looks the clamped int8
+        # result up in a 256-entry table; act_round rounds to nearest instead of the floor (every mode).
+        negative = layer_parameters.act_negative
+        table = layer_parameters.act_table
+
+        def requantize(value, mant, shift):
+            product = mant * int(value)
+            if rounding and shift > 0:
+                product += 1 << (shift - 1)
+            return product >> shift
+
+        def activate(value, factor):
+            if mode == "leaky":
+                mant, shift = negative if value < 0 else factor
+                return max(-128, min(127, requantize(value, mant, shift)))
+            if mode == "table":
+                return table[max(-128, min(127, requantize(value, factor[0], factor[1]))) + 128]
+            return saturate(requantize(value, factor[0], factor[1]))
+
+        try:
+            for f in range(len(dram.fmap[1 + layer_number])):
+                for x in range(len(dram.fmap[1 + layer_number][f])):
+                    for y in range(len(dram.fmap[1 + layer_number][f][x])):
+                        dram.fmap[1 + layer_number][f][x][y] = activate(dram.fmap[1 + layer_number][f][x][y],
+                                                                        layer_parameters.quantize[f])
+        except TypeError:
+            # Dense: the hardware uses filter 0's multiplier and shift for every output (bug #12)
+            for f in range(len(dram.fmap[1 + layer_number])):
+                dram.fmap[1 + layer_number][f] = activate(dram.fmap[1 + layer_number][f], layer_parameters.quantize[0])
+        return
 
     #if "Conv" in str(layer_parameters.layer_name):
     try:
@@ -126,4 +161,3 @@ def batchnorm_output(layer_parameters, divide_value, layer_number, dram):
         # Dense: the hardware uses filter 0's multiplier and shift for every output (bug #12)
         for f in range(len(dram.fmap[1 + layer_number])):
             dram.fmap[1 + layer_number][f] = saturate(math.floor((layer_parameters.quantize[0][0]*dram.fmap[1 + layer_number][f])/(2**layer_parameters.quantize[0][1])))
-

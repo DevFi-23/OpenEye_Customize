@@ -198,10 +198,10 @@ Một test cocotb là một tiến trình; máy 12 nhân / 7 GB RAM chạy song 
 venv/bin/python -m pytest -q test/test_*.py
 ```
 
-Hiện tại: **290 pass, 11 fail** (129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8 + 6 test đường model thật so với ONNX Runtime + 22 test thứ tự stream bias của lỗi #32). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
+Hiện tại: **319 pass, 11 fail** (129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8 + 6 test đường model thật so với ONNX Runtime + 22 test thứ tự stream bias của lỗi #32 + 29 test hàm kích hoạt, bước A; 12 trong số đó cần checkpoint của `models/train_mnist.py`, không có thì skip). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
 thay đổi của fork. Các file của fork: `test_profile_report.py`, `test_profile_phases.py`, `test_channel_pad.py`, `test_conv_wght_encoding.py`, `test_paper_table3.py`,
 `test_memory_model.py`, `test_fc_writeback.py`, `test_conv_writeback.py`, `test_int8_clamp.py`, `test_onnx_model_flow.py` (cần `torch`, `onnxruntime`, file `.pth` đã huấn luyện),
-`test_psum_bias_order.py`.
+`test_psum_bias_order.py`, `test_activation.py`.
 
 ### Test mô phỏng RTL (cocotb qua pytest)
 
@@ -317,6 +317,8 @@ OpenEye_orig/
 ├── fpga/
 │   ├── hdl/open_eye_axi_v1_0.v   Wrapper AXI (AXI-Lite + AXI4-Stream) cho Vivado IP; hiện không biên dịch được (lỗi #16)
 │   └── sw/                       Phần mềm chạy trên ARM: runtime AXI DMA (hal_xaxidma.c, openeye_runtime.c)
+├── models/                       Model PyTorch: mnist_conv_net.py (★ tham số activation: relu, leaky_relu, silu, hardswish),
+│                                 ★ train_mnist.py (huấn luyện các biến thể như notebook, checkpoint vào doc/demo_notebooks/, bị .gitignore bỏ qua)
 ├── src/open_eye/                 Thư viện Python (cài kiểu editable vào venv)
 │   ├── open_eye_parameters.py    Cấu hình phần cứng (đọc từ biến môi trường: CLUSTER_ROWS, IACT_RAM_CELLS, ...)
 │   ├── layer_parameters.py    ★  Tính tham số của từng layer (số chu kỳ, giới hạn vòng lặp, ...) (★ ghi ngược #25, #26; act_min #30; model thật)
@@ -325,7 +327,8 @@ OpenEye_orig/
 │   │                             lỗi #32; ★ dense_mapper: ghi ngược FC, lỗi #26)
 │   ├── DRAM.py                ★  Dữ liệu của layer (input, weight, bias); giữ weight Conv bằng 0 thật; nạp weight Conv từ TFLite;
 │   │                             giữ nguyên weight/bias của model đã lượng tử (model thật)
-│   ├── onnx2model.py          ★  Model PyTorch → ONNX → HardwareLayer (★ lượng tử tĩnh cho model đã huấn luyện; MaxPool đúng loại, lỗi #34)
+│   ├── onnx2model.py          ★  Model PyTorch → ONNX → HardwareLayer (★ lượng tử tĩnh cho model đã huấn luyện; MaxPool đúng loại, lỗi #34;
+│   │                             nhận diện Leaky ReLU / SiLU / hard-swish và tính tham số phần cứng, shape sau op com.microsoft)
 │   ├── data_create.py         ★  Model Keras của test (thêm MNIST_REAL, PAPER_MNIST)
 │   ├── generator.py              regmap.yaml → regmap_params.vh, dma_storage.v, đóng gói word cấu hình
 │   ├── vh_file_creator.py        Sinh parameters_FPGA.vh / parameters_PE.vh / parameters_PE_cluster.vh
@@ -364,6 +367,7 @@ OpenEye_orig/
 │   ├── test_int8_clamp.py     ★  Unit test kẹp int8 / ReLU phía Python (#30): 11 test
 │   ├── test_onnx_model_flow.py ★ Đường model thật của toolchain so với ONNX Runtime từng layer, không RTL: 6 test
 │   ├── test_psum_bias_order.py ★ Thứ tự stream bias Conv so với mô hình nạp bias của RTL (lỗi #32): 22 test
+│   ├── test_activation.py     ★  Hàm kích hoạt Leaky ReLU / SiLU / hard-swish trong toolchain và tham chiếu, so với ONNX Runtime (bước A): 29 test
 │   ├── cocotb_quantization/   ★  Testbench riêng của quantization_unit (kẹp int8, #30)
 │   └── .temp/                 ☆  Thư mục chạy của từng test (log, header sinh ra, profile.json)
 ├── tools/                     ★  Công cụ của dự án riêng
@@ -1404,7 +1408,7 @@ dài 96 thay vì 192 chu kỳ.
 | J | Bảng 3 với activation thưa (giả lập ReLU) | Chỉ Python | Phần xử lý của fork chậm hơn paper 4–5,6 lần; xem bao nhiêu là do activation không thưa | Đề xuất |
 | K | Hàm kích hoạt (#24) + kẹp int8 trong `quantization_unit` | Sửa RTL | Cần cho model thật (mục 8d) | **Xong** (2026-10-28, #30): kẹp với cận dưới theo layer, ReLU gộp vào kẹp (mục 9) |
 | L | Kết thúc gửi weight sớm 1 chu kỳ (`wghts_per_pe + 1`, từ upstream `3258813`) | Sửa RTL 1 dòng | Mỗi lượt có việc gửi weight trên đường găng bớt 1 chu kỳ | **Đã thử 2026-10-31**: đúng ở mọi kiểm tra, −0,1 đến −0,3 % chu kỳ (−673 trên model MNIST), 0 tài nguyên; **đã đưa vào `dev` 2026-11-01** (`doc/experiments/2026-10-31_wght_send_end.md`); mốc chu kỳ `baseline_2026-11-02`, Vivado 2026-11-02 đạt 250 MHz (WNS +0,020 ns) |
-| M | Hàm kích hoạt: Leaky ReLU, SiLU, hard-swish (ReLU đã có) + đo bằng profiler | Python (toolchain, tham chiếu) rồi RTL | Model thật dùng các hàm này; hiện chỉ có ReLU (#24) | **Kế hoạch 2026-11-02** (`doc/experiments/2026-11-02_activation_plan.md`): gộp vào bộ lượng tử của pha ghi ngược (0 chu kỳ mỗi giá trị); Leaky = hai độ dốc trong bộ lượng tử (0 word DMA), SiLU/hard-swish = bảng 256 entry trong LUTRAM (32 word DMA mỗi layer dùng bảng, khoảng +400 LUT); profiler thêm pha `load_act` và bộ đếm của khối kích hoạt. Bước A (Python) chưa làm, bước B (RTL) cần bạn đồng ý |
+| M | Hàm kích hoạt: Leaky ReLU, SiLU, hard-swish (ReLU đã có) + đo bằng profiler | Python (toolchain, tham chiếu) rồi RTL | Model thật dùng các hàm này; hiện chỉ có ReLU (#24) | **Kế hoạch 2026-11-02** (`doc/experiments/2026-11-02_activation_plan.md`): gộp vào bộ lượng tử của pha ghi ngược (0 chu kỳ mỗi giá trị); Leaky = hai độ dốc trong bộ lượng tử (0 word DMA), SiLU/hard-swish = bảng 256 entry trong LUTRAM (32 word DMA mỗi layer dùng bảng, khoảng +400 LUT); profiler thêm pha `load_act` và bộ đếm của khối kích hoạt. **Bước A (Python) xong 2026-11-02** (`doc/experiments/2026-11-02_activation.md`): toolchain + tham chiếu tính đủ 4 hàm, 3 model đã huấn luyện, int8 giữ độ chính xác (≤ 0,04 điểm so với float), nhưng mất số 0 nên ước tính compute +7 đến +10,5 %; bit làm tròn cần thiết. Bước B (RTL) cần bạn đồng ý |
 
 Thứ tự đề xuất: A, B, B2, C2 (kiến trúc MNIST chạy đủ) **đã xong**; tiếp theo là C (bias theo filter: Bảng 3 cho thấy bias chiếm khoảng 54.000–58.000 ns ở mọi
 cấu hình), rồi D (I: #25, #26 đã sửa).
@@ -3008,3 +3012,14 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   3 chu kỳ của bộ ghi ngược (chỗ lỗi #25/#26); thêm bit làm tròn để giữ số 0 cho bỏ-qua-số-0. Toolchain: PyTorch xuất `LeakyRelu`, `Sigmoid` + `Mul` (SiLU),
   `HardSwish` (ONNX Runtime không lượng tử op này). Profiler: pha `load_act` (nạp bảng), bộ đếm của khối kích hoạt theo layer (giá trị, chu kỳ bận, số 0 ở
   đầu ra), và chi phí đo bằng `--compare` với chế độ không kích hoạt.
+- **Hàm kích hoạt, bước A** (theo yêu cầu, chỉ Python, không sửa RTL; `doc/experiments/2026-11-02_activation.md`, công cụ
+  `doc/experiments/2026-11-02_activation/`): `SimpleMNISTConvNet(activation=...)` (relu mặc định = model gốc, leaky_relu 0,1, silu, hardswish);
+  `models/train_mnist.py` huấn luyện như notebook (float 99,33 / 99,29 / 99,36 %, ReLU gốc 99,35 %); `onnx2model` nhận ra `QLinearLeakyRelu`,
+  `QLinearSigmoid` + `QLinearMul` (SiLU), `HardSigmoid` + `QLinearMul` (hard-swish, ONNX Runtime không lượng tử `HardSwish`) và tính tham số phần cứng theo
+  scale đầu vào của layer tính kế tiếp (gộp cả bước lượng tử lại quanh `Flatten` float); điền shape mà suy luận ONNX bỏ trống sau op com.microsoft;
+  `LayerParameters` có `act_mode` (none/relu/leaky/table), `act_negative`, `act_table`, `act_round`; tham chiếu `batchnorm_output` tính hai độ dốc, bảng 256 ô
+  và làm tròn (đường ReLU cũ giữ nguyên); mapper từ chối layer dùng chế độ mới (`check_rtl_activation`) cho tới bước B. Test mới `test/test_activation.py`
+  29/29 (so với ONNX Runtime: làm tròn xuống lệch tới 7 ở conv3, làm tròn gần nhất ≤ 4); unit test 319 pass, 11 fail có từ trước; RTL với toolchain mới:
+  `test_real_model` 2/2, `test_int8_clamp` 9/9. 10.000 ảnh test: int8 như phần cứng sẽ tính 99,34 % (Leaky), 99,27 % (SiLU), 99,35 % (hard-swish), so với
+  ReLU 99,35 %; nhưng số 0 ở đầu vào các layer chỉ còn 1–23 % (ReLU 39–83 %), nên ước tính compute +7 đến +10,5 % của model; làm tròn gần nhất (Leaky:
+  từ +10,5 % xuống +7,4 %) và đặt các ô ±1 của bảng về 0 (SiLU/hard-swish: +9 % xuống +7 %, không mất độ chính xác) giúp lấy lại một phần.

@@ -112,7 +112,7 @@ can report:
 
 | Step | Content | RTL? |
 |---|---|---|
-| A | Python: toolchain detection, bit-exact reference with two slopes / table / rounding; three trained MNIST variants; int8 accuracy and zero fraction per layer from the reference (predicts the compute change before any RTL) | no |
+| A | Python: toolchain detection, bit-exact reference with two slopes / table / rounding; three trained MNIST variants; int8 accuracy and zero fraction per layer from the reference (predicts the compute change before any RTL). **Done 2026-11-02: `2026-11-02_activation.md`** | no |
 | B | RTL: modes, table, load state, register fields; unit testbench, system tests, regression, 12 cases (0 change in modes 0/1), Vivado (design A timing) | yes, needs approval |
 | C | Profiler: `load_act`, activation counters, report | Python only (reads RTL signals) |
 | D | Measurement: ReLU / Leaky / SiLU / hard-swish variants of the MNIST model, cycles per layer and phase, accuracy; rounding and zero band | no |
