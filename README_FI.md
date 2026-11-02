@@ -1404,6 +1404,7 @@ dài 96 thay vì 192 chu kỳ.
 | J | Bảng 3 với activation thưa (giả lập ReLU) | Chỉ Python | Phần xử lý của fork chậm hơn paper 4–5,6 lần; xem bao nhiêu là do activation không thưa | Đề xuất |
 | K | Hàm kích hoạt (#24) + kẹp int8 trong `quantization_unit` | Sửa RTL | Cần cho model thật (mục 8d) | **Xong** (2026-10-28, #30): kẹp với cận dưới theo layer, ReLU gộp vào kẹp (mục 9) |
 | L | Kết thúc gửi weight sớm 1 chu kỳ (`wghts_per_pe + 1`, từ upstream `3258813`) | Sửa RTL 1 dòng | Mỗi lượt có việc gửi weight trên đường găng bớt 1 chu kỳ | **Đã thử 2026-10-31**: đúng ở mọi kiểm tra, −0,1 đến −0,3 % chu kỳ (−673 trên model MNIST), 0 tài nguyên; **đã đưa vào `dev` 2026-11-01** (`doc/experiments/2026-10-31_wght_send_end.md`); mốc chu kỳ `baseline_2026-11-02`, Vivado 2026-11-02 đạt 250 MHz (WNS +0,020 ns) |
+| M | Hàm kích hoạt: Leaky ReLU, SiLU, hard-swish (ReLU đã có) + đo bằng profiler | Python (toolchain, tham chiếu) rồi RTL | Model thật dùng các hàm này; hiện chỉ có ReLU (#24) | **Kế hoạch 2026-11-02** (`doc/experiments/2026-11-02_activation_plan.md`): gộp vào bộ lượng tử của pha ghi ngược (0 chu kỳ mỗi giá trị); Leaky = hai độ dốc trong bộ lượng tử (0 word DMA), SiLU/hard-swish = bảng 256 entry trong LUTRAM (32 word DMA mỗi layer dùng bảng, khoảng +400 LUT); profiler thêm pha `load_act` và bộ đếm của khối kích hoạt. Bước A (Python) chưa làm, bước B (RTL) cần bạn đồng ý |
 
 Thứ tự đề xuất: A, B, B2, C2 (kiến trúc MNIST chạy đủ) **đã xong**; tiếp theo là C (bias theo filter: Bảng 3 cho thấy bias chiếm khoảng 54.000–58.000 ns ở mọi
 cấu hình), rồi D (I: #25, #26 đã sửa).
@@ -3000,3 +3001,10 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   0 ERROR, 0 CRITICAL, cảnh báo như cũ (thêm 1 dòng `DRC 23-814` của chế độ out-of-context); LUT 60.840 → 60.641 sau route, FF 39.796 → 39.790; timing sau tổng
   hợp không đổi (+0,205 ns); sau route WNS +0,074 → **+0,020 ns** (vẫn đạt 250 MHz, biên nhỏ nhất từ trước tới nay): đường găng mới là chuỗi so sánh của
   `fsm_cycle` tới `router_configurator`, không chứa phép so sánh vừa sửa, nên là dao động của placement/routing (mục 6d).
+- **Kế hoạch hàm kích hoạt** (theo yêu cầu, chưa sửa gì; `doc/experiments/2026-11-02_activation_plan.md`, mục 8c hàng M): ReLU đã có (cận dưới của bộ kẹp);
+  Leaky ReLU bằng hai độ dốc trong bộ lượng tử (mantissa/shift riêng cho psum âm, dùng chung bộ nhân, 0 chu kỳ, trường mới nằm trong 24 bit trống của word
+  trạng thái cuối nên 0 word DMA); SiLU và hard-swish bằng bảng tra 256 entry int8 → int8 sau bộ kẹp (8 bản LUTRAM cho 8 lane, nạp 32 word ở trạng thái mới
+  `GET_ACTIVATION` = mã 15 còn trống, chỉ khi layer dùng bảng). Giữ độ trễ 3 chu kỳ của bộ lượng tử (đọc LUTRAM không đồng bộ) để không động vào các chuỗi trễ
+  3 chu kỳ của bộ ghi ngược (chỗ lỗi #25/#26); thêm bit làm tròn để giữ số 0 cho bỏ-qua-số-0. Toolchain: PyTorch xuất `LeakyRelu`, `Sigmoid` + `Mul` (SiLU),
+  `HardSwish` (ONNX Runtime không lượng tử op này). Profiler: pha `load_act` (nạp bảng), bộ đếm của khối kích hoạt theo layer (giá trị, chu kỳ bận, số 0 ở
+  đầu ra), và chi phí đo bằng `--compare` với chế độ không kích hoạt.
