@@ -15,6 +15,11 @@ class (7 and 2). Image 0 has an empty pass in conv3 (in the window of the last o
 zero), which stopped the rest of the layer before bug #31 was fixed in PE.v (doc/experiments/2026-10-30_bug31_fix.md);
 image 1 needed the fix of bug #32 (conv3 computes two filters at a time and got the biases of the filter pairs swapped).
 
+test_real_model_activation runs the variants with Leaky ReLU, SiLU and hard-swish (models/train_mnist.py, checkpoints
+doc/demo_notebooks/mnist_<activation>_model.pth, skipped when missing) the same way: the activation hardware
+(doc/experiments/2026-11-02_activation_rtl_design.md) computes them, Leaky ReLU as a second slope, SiLU and hard-swish
+as a 256-entry table loaded per layer, all rounded to nearest; every buffer check and the Dense psums bit-exact.
+
 Usage (from the repository root; about 11 minutes per image):
   venv/bin/python -m pytest -q test/cocotb_fpga/test_real_model.py
 """
@@ -25,18 +30,30 @@ import pytest
 import test_conv_const as conv
 from open_eye import open_eye_dir
 
-CHECKPOINT = os.path.abspath(os.path.join(open_eye_dir, os.pardir, os.pardir, "doc", "demo_notebooks",
-                                          "mnist_unquantized_model.pth"))
-@pytest.mark.parametrize("image", [0, 1])
-def test_real_model(image, request, monkeypatch):
-    if not os.path.exists(CHECKPOINT):
-        pytest.skip("trained checkpoint not available")
+DEMO = os.path.abspath(os.path.join(open_eye_dir, os.pardir, os.pardir, "doc", "demo_notebooks"))
+CHECKPOINT = os.path.join(DEMO, "mnist_unquantized_model.pth")
+
+
+def run_trained(checkpoint, image, request, monkeypatch):
+    if not os.path.exists(checkpoint):
+        pytest.skip(f"trained checkpoint {checkpoint} not available")
     real_run = conv.cocotb_test.simulator.run
 
     def run(**kw):
-        kw["extra_env"] = dict(kw["extra_env"], USE_RANDOM_VALUES="0", OPENEYE_MODEL_WEIGHTS=CHECKPOINT,
+        kw["extra_env"] = dict(kw["extra_env"], USE_RANDOM_VALUES="0", OPENEYE_MODEL_WEIGHTS=checkpoint,
                                OPENEYE_INPUT_IMAGE=str(image), OPENEYE_FAIL_ON_STALL="400000")
         return real_run(**kw)
     monkeypatch.setattr(conv.cocotb_test.simulator, "run", run)
     conv._run_conv_const("MNIST_REAL", 8, 2, num_glb_iact=1, input_channels=1, request=request, input_height=28,
                          quant_amount=64, dma_bitwidth=64, random_data=True, expect_layers=6)
+
+
+@pytest.mark.parametrize("image", [0, 1])
+def test_real_model(image, request, monkeypatch):
+    run_trained(CHECKPOINT, image, request, monkeypatch)
+
+
+@pytest.mark.parametrize("image", [0, 1])
+@pytest.mark.parametrize("activation", ["leaky_relu", "silu", "hardswish"])
+def test_real_model_activation(activation, image, request, monkeypatch):
+    run_trained(os.path.join(DEMO, f"mnist_{activation}_model.pth"), image, request, monkeypatch)

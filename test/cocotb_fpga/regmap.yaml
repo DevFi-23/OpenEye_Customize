@@ -78,6 +78,7 @@ registers:
   - {name: iact_read_inc_1, width: 12}
   - {name: iact_read_inc_2, width: 12}
   - {name: iact_read_inc_3, width: 12}
+  - {name: act_keep_table, width: 1}    # activation table mode: keep the previous layer's table (in a gap)
   - {name: iact_read_inc_4, width: 12}
   - {name: iact_write_limit_0, width: 12}
   - {name: iact_write_limit_1, width: 8}
@@ -88,6 +89,7 @@ registers:
   - {name: pagu_wght_limit, width: 10}
   - {name: psum_pagu_cs_limit_0, width: 4}
   - {name: psum_pagu_cs_limit_1, width: 4}
+  - {name: act_mode, width: 2}          # activation: 0 clamp only (none / ReLU), 1 Leaky ReLU, 2 table (in a gap)
   - {name: psum_pagu_cs_limit_2, width: 4}
   - {name: psum_pagu_cs_limit_3, width: 4}
   - {name: psum_pagu_cs_inc_0, width: 4}
@@ -107,6 +109,13 @@ registers:
   # Lower saturation bound of the quantizers + 128 (0: -128 = plain int8 saturation, 128: 0 = ReLU with
   # zero point 0). Last field: fits into the last status word, so the word count does not change.
   - {name: quant_clamp_low, width: 8}
+  # Activation of the layer (doc/experiments/2026-11-02_activation_rtl_design.md): Leaky ReLU negative slope
+  # act_neg_mant / 2^act_neg_shift; act_round rounds the requantization half up instead of the floor. With
+  # act_mode and act_keep_table (placed in gaps further up) they fill free bits only: the status stream keeps
+  # 28 / 14 / 7 words at DMA 32 / 64 / 128 bit.
+  - {name: act_neg_mant, width: 8}
+  - {name: act_neg_shift, width: 7}
+  - {name: act_round, width: 1}
   
 
 

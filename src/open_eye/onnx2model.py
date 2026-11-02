@@ -71,7 +71,7 @@ class HardwareLayer:
         # Leaky ReLU slope, and the scale of its quantized output (the next layer's input scale; for "relu" the
         # layer's output scale itself). activation_negative_factor: [mant, shift] of the Leaky ReLU slope for negative
         # sums; activation_table: the 256 outputs of the table for the inputs -128 ... 127 ("silu", "hardswish");
-        # activation_round: round to nearest instead of the quantizer's floor (planned hardware option, off).
+        # activation_round: round to nearest instead of the quantizer's floor (on for these three, finish_activations).
         self.activation = 'none'
         self.activation_alpha = None
         self.activation_output_scale = None
@@ -302,7 +302,9 @@ def finish_activations(pipeline):
     float Flatten before the Dense; the requantization is folded in). Leaky ReLU: the quantizer requantizes straight
     to the target, quantization_factor ~ s_in * s_w / s_out for sums >= 0 and activation_negative_factor ~
     alpha * s_in * s_w / s_out for negative sums. SiLU, hard-swish: quantization_factor stays the layer's (int8
-    pre-activation at the layer's output scale), the table maps it to the target scale."""
+    pre-activation at the layer's output scale), the table maps it to the target scale. These three round the
+    requantization to nearest (activation_round; with the floor Leaky ReLU loses its zeros and every variant drifts
+    from ONNX Runtime by -0.5 LSB per layer, doc/experiments/2026-11-02_activation.md); ReLU keeps the floor."""
     for k, layer_obj in enumerate(pipeline):
         name = layer_obj.activation
         if name not in ('leaky_relu', 'silu', 'hardswish'):
@@ -311,6 +313,7 @@ def finish_activations(pipeline):
         if following is not None and getattr(following, 'input_scale', None):
             layer_obj.activation_output_scale = following.input_scale
         out_scale = layer_obj.activation_output_scale
+        layer_obj.activation_round = True
         m = layer_obj.input_scale * layer_obj.scale
         if name == 'leaky_relu':
             layer_obj.quantization_factor = [list(hardware_multiplier(m / out_scale))

@@ -135,8 +135,7 @@ class ConvMapper(LayerMapper):
         # === REGISTER PACKING ===
         # Pack all layer configuration parameters into hardware register format
         # Uses pack_registers() utility from regmap_pack module
-        from open_eye.layer_parameters import check_rtl_activation
-        check_rtl_activation(layer_params)
+        from open_eye.layer_parameters import activation_registers
         from open_eye.generator import pack_registers
         words = pack_registers({
         "wght_cycles_reg": layer_params.needed_wght_transmissions,
@@ -250,6 +249,8 @@ class ConvMapper(LayerMapper):
         "psum_pagu_addr_inc_4" : layer_params.psum_pagu_addr_inc[4],
         # quantizer saturation: lower bound + 128 (0: int8 saturation, 128: ReLU)
         "quant_clamp_low": layer_params.act_min + 128,
+        # activation (Leaky ReLU slope, table mode, rounding)
+        **activation_registers(layer_params),
         "gemm_mode": getattr(layer_params, "gemm_mode", 0)
         })
 
@@ -365,7 +366,9 @@ class ConvMapper(LayerMapper):
                 word = (packed_bitstream << abs(shift_amount)) & ((1 << dma_w) - 1)
                 
             dma_storage.append(word)
-        return dma_storage
+        # Activation table (table mode): its words follow the quantization words (GET_ACTIVATION)
+        from open_eye.layer_parameters import activation_table_words
+        return dma_storage + activation_table_words(params, layer_params)
     
     def write_router_iact(self, params, layer_params):
         """Configure input activation (iact) router settings for all clusters.

@@ -45,32 +45,72 @@ def activation_min(layer):
 
 
 def activation_config(layer):
-    """The activation of a layer as the planned activation hardware takes it (doc/experiments/
-    2026-11-02_activation_plan.md): (mode, negative factor, table, round).
+    """The activation of a layer for the activation hardware (doc/experiments/2026-11-02_activation_rtl_design.md):
+    (mode, negative factor, table, round).
 
     mode "none" / "relu": the quantizer alone (act_min); "leaky": a second [mant, shift] for negative sums (the
     negative factor); "table": a 256-entry int8 -> int8 table applied to the clamped quantizer output (SiLU,
     hard-swish). round: round to nearest instead of floor. Taken from an onnx2model layer (activation,
-    activation_negative_factor, activation_table, activation_round); every other layer is "none" or "relu".
-    The RTL does not have "leaky" and "table" yet (step B of the plan); the reference computes them already."""
-    name = getattr(layer, "activation", None)
+    activation_negative_factor, activation_table, activation_round) or from a layer with openeye_activation (the
+    data_create test hook OPENEYE_ACTIVATION, whose Keras layers keep their own `activation`); every other layer is
+    "none" or "relu"."""
+    name = getattr(layer, "openeye_activation", None) or getattr(layer, "activation", None)
     rounding = bool(getattr(layer, "activation_round", False))
-    if name == "leaky_relu":
+    if name in ("leaky_relu", "leaky"):
         return "leaky", list(layer.activation_negative_factor), None, rounding
-    if name in ("silu", "hardswish"):
+    if name in ("silu", "hardswish", "table"):
         return "table", None, list(layer.activation_table), rounding
     return ("relu" if activation_min(layer) == 0 else "none"), None, None, rounding
 
 
+# Register codes of act_mode (test/cocotb_fpga/regmap.yaml)
+ACT_MODE_CODES = {"none": 0, "relu": 0, "leaky": 1, "table": 2}
+# The rounding constant 2^(shift-1) has to stay positive in the quantizer's product (quantization_unit.v,
+# PROD_WIDTH = 21 + 25 bits for 20-bit psums)
+ACT_ROUND_SHIFT_MAX = 45
+
+
 def check_rtl_activation(layer_params):
-    """Stop a layer whose activation the RTL cannot compute yet ("leaky", "table": step B of
-    doc/experiments/2026-11-02_activation_plan.md) from being streamed: the RTL would only clamp and the run would
-    differ from the reference without saying why."""
+    """Stop a layer whose activation settings the RTL cannot take before it is streamed (the run would differ from
+    the reference without saying why): a negative slope that does not fit 8 + 7 bits, a table that is not 256 int8
+    values, rounding with a shift beyond ACT_ROUND_SHIFT_MAX."""
     mode = getattr(layer_params, "act_mode", "none")
-    if mode not in ("none", "relu") or getattr(layer_params, "act_round", False):
-        raise NotImplementedError(
-            f"activation mode {mode!r} (round {getattr(layer_params, 'act_round', False)}) is not in the RTL yet: "
-            "only the reference computes it (doc/experiments/2026-11-02_activation_plan.md, step B)")
+    if mode not in ACT_MODE_CODES:
+        raise NotImplementedError(f"activation mode {mode!r} is not in the RTL")
+    if mode == "leaky":
+        mant, shift = layer_params.act_negative
+        if not (0 <= mant < 256 and 0 <= shift < 128):
+            raise NotImplementedError(f"Leaky ReLU slope {[mant, shift]} does not fit 8 + 7 bits")
+    if mode == "table":
+        table = list(layer_params.act_table)
+        if len(table) != 256 or not all(-128 <= v <= 127 for v in table):
+            raise NotImplementedError("the activation table needs 256 int8 values")
+    if getattr(layer_params, "act_round", False):
+        shifts = [layer_params.quantize[0][1]] + ([layer_params.act_negative[1]] if mode == "leaky" else [])
+        if max(shifts) > ACT_ROUND_SHIFT_MAX:
+            raise NotImplementedError(f"rounding with shift {max(shifts)} > {ACT_ROUND_SHIFT_MAX}")
+
+
+def activation_registers(layer_params):
+    """The status register fields of a layer's activation (act_mode, act_round, act_neg_mant, act_neg_shift,
+    act_keep_table), checked by check_rtl_activation."""
+    check_rtl_activation(layer_params)
+    mode = getattr(layer_params, "act_mode", "none")
+    negative = layer_params.act_negative if mode == "leaky" else [0, 0]
+    return {"act_mode": ACT_MODE_CODES[mode], "act_round": int(bool(getattr(layer_params, "act_round", False))),
+            "act_neg_mant": negative[0], "act_neg_shift": negative[1],
+            "act_keep_table": int(mode == "table" and bool(getattr(layer_params, "act_keep_table", False)))}
+
+
+def activation_table_words(params, layer_params):
+    """The DMA words of a layer's activation table, sent after its quantization words and taken by the main FSM
+    state GET_ACTIVATION: 256 / E words of E = DMA_BITWIDTH / 8 entries, entry w * E + b in byte b of word w. None
+    unless the layer is in table mode and does not keep the previous table."""
+    if getattr(layer_params, "act_mode", "none") != "table" or getattr(layer_params, "act_keep_table", False):
+        return []
+    entries = params.DMA_BITWIDTH // 8
+    table = layer_params.act_table
+    return [sum((table[w * entries + b] & 0xFF) << (8 * b) for b in range(entries)) for w in range(256 // entries)]
 
 
 class LayerParameters(object):
@@ -359,6 +399,7 @@ class LayerParameters(object):
         self.act_min = -128
         # Activation beyond the clamp (activation_config): mode "none" / "relu" / "leaky" / "table"
         self.act_mode, self.act_negative, self.act_table, self.act_round = "none", None, None, False
+        self.act_keep_table = False
 
         # === Programmable Adress Generation Unit ===
         self.iact_read_limit_0 = 0
@@ -702,6 +743,7 @@ class LayerParameters(object):
                 self.quantize[f][1] = 7
         self.act_min = activation_min(layer)
         self.act_mode, self.act_negative, self.act_table, self.act_round = activation_config(layer)
+        self.act_keep_table = bool(getattr(layer, "activation_keep_table", False))
 
         # Store input activation dimensions
         self.iact_size_x = self.input_shape[1]
@@ -1585,6 +1627,7 @@ class LayerParameters(object):
                 self.quantize[f][1] = layer.quantization_factor[f][1]
         self.act_min = activation_min(layer)
         self.act_mode, self.act_negative, self.act_table, self.act_round = activation_config(layer)
+        self.act_keep_table = bool(getattr(layer, "activation_keep_table", False))
         if (layer_number != 0): 
             self.skipIact = 1
         self.input_shape = layer.input.shape

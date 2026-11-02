@@ -196,7 +196,6 @@
 1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'x_line_counter'
 1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'x_lines_i'
 1	UNUSEDSIGNAL | hdl/iact_stream_constructor.v | Signal is not used: 'y_lines_per_calc'
-1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Bits of signal are not used: 'data_dma_i_reg'[63:40]
 1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Bits of signal are not used: 'psum_cycle_addr_0_next'[13:12]
 1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Bits of signal are not used: 'psum_cycle_addr_1_next'[13:12]
 1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Bits of signal are not used: 'psum_cycle_addr_2_next'[13:12]

@@ -126,10 +126,51 @@ def test_activation_config():
     table = list(range(-128, 128))
     assert lp.activation_config(layer(has_relu=False, activation="silu", activation_table=table,
                                       activation_round=True)) == ("table", None, table, True)
-    lp.check_rtl_activation(layer(act_mode="relu", act_round=False))
-    for mode, rounding in (("leaky", False), ("table", False), ("relu", True)):
+    # openeye_activation (data_create hook) overrides a Keras layer's own `activation`
+    assert lp.activation_config(layer(activation=object(), openeye_activation="leaky",
+                                      activation_negative_factor=[1, 10])) == ("leaky", [1, 10], None, False)
+
+
+def test_check_rtl_activation():
+    def params(**kw):
+        base = dict(act_mode="none", act_negative=None, act_table=None, act_round=False, quantize=[[200, 16]])
+        base.update(kw)
+        return types.SimpleNamespace(**base)
+    for ok in (params(), params(act_mode="relu", act_round=True), params(act_mode="leaky", act_negative=[255, 127]),
+               params(act_mode="table", act_table=[0] * 256, act_round=True)):
+        lp.check_rtl_activation(ok)
+    for bad in (params(act_mode="gelu"), params(act_mode="leaky", act_negative=[256, 3]),
+                params(act_mode="leaky", act_negative=[3, 128]), params(act_mode="table", act_table=[0] * 255),
+                params(act_mode="table", act_table=[200] * 256),
+                params(act_round=True, quantize=[[200, lp.ACT_ROUND_SHIFT_MAX + 1]]),
+                params(act_mode="leaky", act_negative=[5, lp.ACT_ROUND_SHIFT_MAX + 1], act_round=True)):
         with pytest.raises(NotImplementedError):
-            lp.check_rtl_activation(layer(act_mode=mode, act_round=rounding))
+            lp.check_rtl_activation(bad)
+
+
+def test_activation_registers_and_table_words():
+    table = [(i * 37) % 256 - 128 for i in range(256)]
+    leaky = types.SimpleNamespace(act_mode="leaky", act_negative=[164, 17], act_table=None, act_round=True,
+                                  act_keep_table=False, quantize=[[200, 16]])
+    assert lp.activation_registers(leaky) == {"act_mode": 1, "act_round": 1, "act_neg_mant": 164,
+                                              "act_neg_shift": 17, "act_keep_table": 0}
+    tab = types.SimpleNamespace(act_mode="table", act_negative=None, act_table=table, act_round=False,
+                                act_keep_table=False, quantize=[[200, 16]])
+    assert lp.activation_registers(tab)["act_mode"] == 2
+    for width in (32, 64, 128):
+        words = lp.activation_table_words(types.SimpleNamespace(DMA_BITWIDTH=width), tab)
+        entries = width // 8
+        assert len(words) == 256 // entries
+        unpacked = [(words[i // entries] >> (8 * (i % entries))) & 0xFF for i in range(256)]
+        assert unpacked == [v & 0xFF for v in table]
+    tab.act_keep_table = True
+    assert lp.activation_table_words(types.SimpleNamespace(DMA_BITWIDTH=64), tab) == []
+    assert lp.activation_registers(tab)["act_keep_table"] == 1
+    relu = types.SimpleNamespace(act_mode="relu", act_negative=None, act_table=None, act_round=False,
+                                 act_keep_table=False, quantize=[[200, 16]])
+    assert lp.activation_registers(relu) == {"act_mode": 0, "act_round": 0, "act_neg_mant": 0, "act_neg_shift": 0,
+                                             "act_keep_table": 0}
+    assert lp.activation_table_words(types.SimpleNamespace(DMA_BITWIDTH=64), relu) == []
 
 
 @pytest.fixture(scope="module")
@@ -183,8 +224,11 @@ def test_layer_parameters_take_the_activation(untrained, name, monkeypatch):
     for n in (0, 2, 4):
         assert (lps[n].act_negative is not None) == (mode == "leaky")
         assert (lps[n].act_table is not None) == (mode == "table")
-        with pytest.raises(NotImplementedError):
-            lp.check_rtl_activation(lps[n])
+        assert lps[n].act_round                                    # onnx2model rounds these activations
+        registers = lp.activation_registers(lps[n])
+        assert registers["act_mode"] == lp.ACT_MODE_CODES[mode] and registers["act_round"] == 1
+        assert len(lp.activation_table_words(types.SimpleNamespace(DMA_BITWIDTH=64), lps[n])) == (
+            32 if mode == "table" else 0)
 
 
 def activation_outputs(model_proto, image):
@@ -245,13 +289,14 @@ TOLERANCE = {False: (7, 0.82), True: (4, 0.94)}
 @pytest.mark.parametrize("i", [0, 1])
 def test_reference_matches_onnxruntime(trained, i, rounding):
     m, lps = trained.model, trained.layer_parameters
+    before = [lps[n].act_round for n in (0, 2, 4)]
     for n in (0, 2, 4):
         lps[n].act_round = rounding
     try:
         _, ref = flow.reference(m, lps, trained.params, trained.images[i, 0])
     finally:
-        for n in (0, 2, 4):
-            lps[n].act_round = False
+        for n, value in zip((0, 2, 4), before):
+            lps[n].act_round = value
     acts, logits = activation_outputs(trained.graph, trained.images[i, 0])
     order = DRAM.DRAMContents.dense_input_order(lps, 5, m[5])
     ours = [ref[(0, "out")], ref[(2, "out")], ref[(4, "out")]]

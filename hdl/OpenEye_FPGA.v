@@ -448,6 +448,12 @@ reg [1023:0] fst_path;
   wire [8-1:0]psum_pagu_addr_inc_3;
   wire [8-1:0]psum_pagu_addr_inc_4;
   wire [8-1:0]quant_clamp_low;    // Lower saturation bound of the quantizers + 128 (0: int8, 128: ReLU at 0).
+  // Activation of the layer (doc/experiments/2026-11-02_activation_rtl_design.md, psum_pipeline.v):
+  wire [2-1:0]act_mode;           // 0 clamp only (none / ReLU), 1 Leaky ReLU, 2 table (GET_ACTIVATION loads it).
+  wire        act_round;          // Round the requantization half up instead of the floor.
+  wire [8-1:0]act_neg_mant;       // Leaky ReLU: mantissa of the negative slope.
+  wire [7-1:0]act_neg_shift;      // Leaky ReLU: shift of the negative slope.
+  wire        act_keep_table;     // Table mode: keep the previous layer's table (no GET_ACTIVATION).
 
 
   // -----------------------------------------------------------------------
@@ -676,6 +682,7 @@ reg [1023:0] fst_path;
   //                                                          └─► GET_BIAS ──► GET_QUANTIZE
   //                                                                             └─► GET_OFFSET
   //                                                                                  ├─(pooling)─► MAXPOOLING_READ ─► MAXPOOLING_SEND ─► GET_PARAMETERS
+  //                                                                                  ├─(act_mode 2, !act_keep_table)─► GET_ACTIVATION ─► START_CONVERTER
   //                                                                                  └─► START_CONVERTER ─► CONVERT_IACT ─► WAIT_CYCLE
   //                                                                                                                             ├─(send_data_out)─► WAIT_FOR_RESULTS ─► GET_PARAMETERS
   //                                                                                                                             └─► RECEIVE_PSUMS_TO_IACT ─(PSUM_IDLE)─► GET_PARAMETERS
@@ -696,6 +703,9 @@ reg [1023:0] fst_path;
   localparam MAXPOOLING_READ      = 4'd12; // Read 2×2 pixel groups from the iact buffer; accumulate running max in pooling_regs via a 3-stage comparator tree.
   localparam MAXPOOLING_SEND      = 4'd13; // Write max-pooled results from pooling_regs back into the iact buffer cells for subsequent processing.
   localparam MAXPOOLING_WAIT      = 4'd14;
+  localparam GET_ACTIVATION       = 4'd15; // Receive ACT_TABLE_WORDS DMA words of the activation table (act_mode 2) into the activation_table banks.
+  localparam integer ACT_TABLE_WORDS = 2048 / DMA_BITWIDTH; // 256 entries x 8 bit
+  localparam integer ACT_TABLE_ADDR_WIDTH = $clog2(ACT_TABLE_WORDS);
 
   // PSUM FSM State Encoding
   // The PSUM FSM (fsm_psum_current_state) runs concurrently with the main FSM
@@ -2050,6 +2060,12 @@ end
             fsm_last_state        <= GET_QUANTIZE;
             fsm_current_state     <= START_CONVERTER;
             buffer_addr_upper_limit <= initial_upper_limit;
+            // A table activation loads its table next; the words follow the quantization
+            // words in the stream, so the DMA stays ready (no bubble).
+            if (!pooling && (act_mode == 2'd2) && !act_keep_table) begin
+              ready_dma_o         <= 1;
+              fsm_current_state   <= GET_ACTIVATION;
+            end
             if (pooling) begin
               fsm_cycle           <= 2;
               fsm_current_state   <= MAXPOOLING_READ;
@@ -2631,11 +2647,34 @@ end
             fsm_current_state <= MAXPOOLING_READ;
           end
         end
+        // -------------------------------------------------------------------
+        // GET_ACTIVATION
+        // Receives the ACT_TABLE_WORDS words of the activation table of a
+        // table activation (act_mode 2): word fsm_cycle goes to every lane's
+        // activation_table (act_table_we / act_table_addr below, data
+        // data_dma_i_reg). Entered from GET_QUANTIZE, leaves to
+        // START_CONVERTER as GET_QUANTIZE does without a table.
+        // -------------------------------------------------------------------
+        GET_ACTIVATION: begin
+          ready_dma_o <= 1;
+          if (enable_dma_i_reg) begin
+            fsm_cycle <= fsm_cycle + 1;
+            if (fsm_cycle == ACT_TABLE_WORDS - 1) begin
+              ready_dma_o       <= 0;
+              fsm_cycle         <= 0;
+              fsm_last_state    <= GET_ACTIVATION;
+              fsm_current_state <= START_CONVERTER;
+            end
+          end
+        end
         default: begin
         end
       endcase
     end
   end
+  // Activation table writes: every DMA word accepted in GET_ACTIVATION is table word fsm_cycle.
+  wire       act_table_we   = (fsm_current_state == GET_ACTIVATION) & enable_dma_i_reg;
+  wire [ACT_TABLE_ADDR_WIDTH-1:0] act_table_addr = fsm_cycle[ACT_TABLE_ADDR_WIDTH-1:0];
   reg [7:0] storage_cycles;     
   wire [ (8*QUANT_AMOUNT)-1:0] quant_offset_flat;
   wire [ (7*QUANT_AMOUNT)-1:0] quant_exp_flat;
@@ -2708,6 +2747,12 @@ end
       .quant_exp_flat(quant_exp_flat),
       .quant_mant_flat(quant_mant_flat),
       .quant_clamp_low(quant_clamp_low),
+      .act_mode(act_mode),
+      .act_round(act_round),
+      .act_neg_mant(act_neg_mant),
+      .act_neg_shift(act_neg_shift),
+      .act_table_we(act_table_we),
+      .act_table_addr(act_table_addr),
       .fsm_psum_limit(fsm_psum_limit),
       .psum_buffer_en_r(psum_buffer_en_r),
       .psum_buffer_en_w(psum_buffer_en_w),
@@ -2827,6 +2872,12 @@ end
         wire [7:0] quantized_out_trace; 
         assign quantized_out_trace = quantized_value_reg[i_trace]; 
       end
+      // The write-back takes the activated quantizer outputs (quantized_value_reg) into
+      // iact_to_psum_mux_reg in this clock (RECEIVE_PSUMS_TO_IACT); for the profiler.
+      /* verilator lint_off UNUSEDSIGNAL */
+      wire act_capture = (fsm_current_state == RECEIVE_PSUMS_TO_IACT) &
+                         (((fsm_psum_current_state == SEND_PSUM_TO_IACT) & (fsm_psum_cycle >= 7)) | (fsm_cycle != 0));
+      /* verilator lint_on UNUSEDSIGNAL */
       for (i_trace = 0; i_trace < 8; i_trace = i_trace + 1) begin : offset_stage_traces
         wire [7:0] offset_out_trace; 
         assign offset_out_trace = quant_offset[i_trace]; 
@@ -3175,7 +3226,12 @@ end
         .psum_pagu_addr_inc_2(psum_pagu_addr_inc_2),
         .psum_pagu_addr_inc_3(psum_pagu_addr_inc_3),
         .psum_pagu_addr_inc_4(psum_pagu_addr_inc_4),
-        .quant_clamp_low(quant_clamp_low)
+        .quant_clamp_low(quant_clamp_low),
+        .act_mode(act_mode),
+        .act_round(act_round),
+        .act_neg_mant(act_neg_mant),
+        .act_neg_shift(act_neg_shift),
+        .act_keep_table(act_keep_table)
     );
 
 

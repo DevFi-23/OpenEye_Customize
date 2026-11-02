@@ -212,13 +212,17 @@ async def single_layer_test(dut):
         current_dir = Path(__file__).resolve().parent
         target_dir = current_dir.parent.parent / "models"
         sys.path.append(str(target_dir))
-        from mnist_conv_net import SimpleMNISTConvNet, load_simple_mnist_model
+        from mnist_conv_net import SimpleMNISTConvNet
         model = SimpleMNISTConvNet()
         calibration = None
         if os.environ.get("OPENEYE_MODEL_WEIGHTS"):
             # A trained checkpoint (e.g. doc/demo_notebooks/mnist_unquantized_model.pth): onnx2model quantizes it
-            # statically for the hardware, calibrated on MNIST training images preprocessed as in training.
-            load_simple_mnist_model(os.environ["OPENEYE_MODEL_WEIGHTS"], model)
+            # statically for the hardware, calibrated on MNIST training images preprocessed as in training. A
+            # checkpoint of models/train_mnist.py names its activation (Leaky ReLU, SiLU, hard-swish); the
+            # original one is ReLU.
+            from train_mnist import load_activation_model
+            model, checkpoint = load_activation_model(os.environ["OPENEYE_MODEL_WEIGHTS"])
+            logger.info("OPENEYE_MODEL_WEIGHTS: activation %s", checkpoint.get("activation", "relu"))
             calibration, _ = data_create.mnist_images(
                 "train", range(int(os.environ.get("OPENEYE_CALIBRATION_IMAGES", "200"))))
             logger.info("OPENEYE_MODEL_WEIGHTS: %s, static quantization calibrated on %d training images",

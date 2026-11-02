@@ -73,6 +73,16 @@ module psum_pipeline #(
     // Lower saturation bound of the quantizers + 128 (register quant_clamp_low):
     // 0 -> -128 (plain int8 saturation), 128 -> 0 (ReLU with zero point 0).
     input wire [7:0] quant_clamp_low,
+    // Activation of the layer (doc/experiments/2026-11-02_activation_rtl_design.md): mode 0 clamp only
+    // (none / ReLU through quant_clamp_low), 1 Leaky ReLU (act_neg_mant / act_neg_shift for negative
+    // sums), 2 table (activation_table after the quantizer of every write-back lane); act_round rounds
+    // half up instead of the floor. The table is written from data_dma_i_reg in GET_ACTIVATION.
+    input wire [1:0] act_mode,
+    input wire       act_round,
+    input wire [7:0] act_neg_mant,
+    input wire [6:0] act_neg_shift,
+    input wire       act_table_we,
+    input wire [$clog2(2048 / DMA_BITWIDTH)-1:0] act_table_addr,   // table word, 256 entries x 8 bit
     input wire [ 16:0] fsm_psum_limit,
     input wire [ 15:0] output_words,
     input wire [  3:0] psum_cluster_limit_0,
@@ -182,6 +192,7 @@ module psum_pipeline #(
   reg [TRANS_BITWIDTH_PSUM-1:0] pre_quantized_value[TRANS_WORDS-1:0];
   wire [TRANS_BITWIDTH_PSUM*TRANS_WORDS-1:0] pre_quantized_value_flat;
   wire [8-1:0] quant_result[TRANS_WORDS-1:0];
+  wire [8-1:0] quant_unit_out[TRANS_WORDS-1:0];   // quantizer outputs, before the table
   reg [TRANS_BITWIDTH_PSUM*CLUSTERS*NUM_GLB_PSUM-1:0] psum_buffer_data_temp_reg;
   // Convolution emits PSUM_OUTPUT_WORDS tightly packed accumulator values
   // per DMA beat, with unused high DMA bits zero. Advancing by DMA_BITWIDTH
@@ -962,8 +973,30 @@ generate
         .quant_offset   (quant_offset[current_filter]),
         .current_shift  (current_shift),
         .act_min        (quant_act_min),
-        .quantized_value(quant_result[gi])
+        .leaky_en       (act_mode == 2'd1),
+        .neg_mant       (act_neg_mant),
+        .neg_shift      (act_neg_shift),
+        .round_en       (act_round),
+        .quantized_value(quant_unit_out[gi])
     );
+    // Table activation (mode 2) on the lanes the write-back takes; the other lanes and modes 0/1 pass
+    // the quantizer's register straight through, as before.
+    if (gi < WRITEBACK_WORDS) begin : gen_act_table
+      wire [7:0] table_out;
+      activation_table #(
+          .TABLE_WORD_WIDTH(DMA_BITWIDTH)
+      ) u_act_table (
+          .clk_i  (clk_i),
+          .we_i   (act_table_we),
+          .waddr_i(act_table_addr),
+          .wdata_i(data_dma_i_reg),
+          .value_i(quant_unit_out[gi]),
+          .value_o(table_out)
+      );
+      assign quant_result[gi] = (act_mode == 2'd2) ? table_out : quant_unit_out[gi];
+    end else begin : gen_no_table
+      assign quant_result[gi] = quant_unit_out[gi];
+    end
   end
 endgenerate
 endmodule

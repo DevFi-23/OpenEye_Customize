@@ -27,6 +27,34 @@ def mnist_images(split, indices):
     idx = list(indices)
     return ((x[idx].astype(np.float32) / 255.0 - MNIST_MEAN) / MNIST_STD)[:, None], y[idx]
 
+def set_test_activation(layers, spec):
+    """The test hook OPENEYE_ACTIVATION (create_layer): activation settings on Keras layers, read by
+    LayerParameters through openeye_activation / activation_negative_factor / activation_table / activation_round /
+    activation_keep_table (the Keras `activation` of a layer stays as it is)."""
+    import numpy as np
+    items = spec.split(":")
+    rounding = "round" in items
+    keep = "keep" in items
+    items = [i for i in items if i not in ("round", "keep")]
+    table = None
+    if items and items[0] == "table":
+        if items[1:2] == ["random"]:
+            seed = int(os.environ.get("OPENEYE_SEED", "0"))
+            table = [int(v) for v in np.random.default_rng(seed).integers(-128, 128, 256)]
+        else:
+            from open_eye import onnx2model
+            table = onnx2model.activation_table(items[1], 0.1, float(items[2]), float(items[3]))
+    for n, layer in enumerate(layers):
+        layer.activation_round = rounding
+        if items and items[0] == "leaky":
+            layer.openeye_activation = "leaky"
+            layer.activation_negative_factor = [int(items[1]), int(items[2])]
+        elif table is not None:
+            layer.openeye_activation = "table"
+            layer.activation_table = list(table)
+            layer.activation_keep_table = keep and n > 0
+
+
 def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, inputsize_y, strides, channels, outputsize):
     """Create a TensorFlow/Keras neural network layer based on the specified configuration.
 
@@ -58,6 +86,15 @@ def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, i
         Test hook OPENEYE_QUANT_SHIFT=<s>: every Conv2D/Dense quantizes with
         multiplier 1 and shift s (quantization_factor), so a small s drives values
         out of the int8 range and exercises the saturation.
+        Test hook OPENEYE_ACTIVATION (activation hardware, LayerParameters.act_mode;
+        every Conv2D/Dense except the last; items separated by ":"):
+            leaky:<mant>:<shift>          Leaky ReLU, negative sums use [mant, shift]
+            table:random                  a random int8 table (seed OPENEYE_SEED)
+            table:<f>:<s_in>:<s_out>      the table of f = silu / hardswish / leaky_relu
+                                          from the int8 scale s_in to s_out
+            round                         alone or as an extra item: round to nearest
+            keep                          extra item of a table: the layers after the
+                                          first keep its table (same table, no reload)
         filters (int): Number of output filters/channels for convolution layers
         kernelsize (int): Size of the convolution kernel (assumes square kernel)
         inputsize_x (int): Width of the input tensor
@@ -271,6 +308,8 @@ def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, i
         for layer in weighted:
             outputs = layer.units if isinstance(layer, tf.keras.layers.Dense) else layer.filters
             layer.quantization_factor = [[1, int(shift)] for _ in range(outputs)]
+    if os.environ.get("OPENEYE_ACTIVATION"):
+        set_test_activation(weighted[:-1], os.environ["OPENEYE_ACTIVATION"])
 
     # Compile the model
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
