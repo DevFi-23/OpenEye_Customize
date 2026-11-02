@@ -62,6 +62,53 @@ Profiler of step C (`doc/experiments/2026-11-02_activation_profiler.md`) on the 
 * Conv1's input has 50 % zeros in every model: the zero channel added for bug #17 (the image channel has none, its
   background is -19).
 
+## The same weights for every activation
+
+The four trained models above have their own weights (each trained with its activation). To separate the activation
+from the weights, the trained **ReLU** weights ran with each activation in place of ReLU (the toolchain calibrates the
+new graph as usual; the weights were not trained for it, but the DUT still gives class 7 on image 0):
+`same_weights_<activation>_img0.json`, from `doc/experiments/2026-11-02_activation/run_same_weights.py <activation> 0`.
+All three PASS, bit-exact.
+
+| model | total cycles | vs ReLU | load_act | writeback | compute | other phases vs ReLU |
+|---|---:|---:|---:|---:|---:|---:|
+| trained_relu_img0 | 218,925 | +0 (+0.0%) | 0 | 11,948 | 125,648 | +0 |
+| same_weights_leaky_relu_img0 | 238,786 | +19,861 (+9.1%) | 0 | 11,948 | 145,509 | +0 |
+| same_weights_silu_img0 | 240,728 | +21,803 (+10.0%) | 96 | 11,948 | 147,355 | +0 |
+| same_weights_hardswish_img0 | 240,560 | +21,635 (+9.9%) | 96 | 11,948 | 147,187 | +0 |
+
+| model | layer | mode | input zeros | input neg | compute | compute vs ReLU | writeback | act clocks | load_act |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| trained_relu_img0 | Conv1 | relu | 50.0% | 43.4% | 9,582 | +0 (+0.0%) | 7,236 | 7,174 | 0 |
+| trained_relu_img0 | Pool1 | none | 54.1% | 0.0% | 0 | +0 | 0 | 0 | 0 |
+| trained_relu_img0 | Conv2 | relu | 43.5% | 0.0% | 81,042 | +0 (+0.0%) | 3,700 | 3,590 | 0 |
+| trained_relu_img0 | Pool2 | none | 94.4% | 0.0% | 0 | +0 | 0 | 0 | 0 |
+| trained_relu_img0 | Conv3 | relu | 87.3% | 0.0% | 31,578 | +0 (+0.0%) | 1,012 | 902 | 0 |
+| trained_relu_img0 | Dense | none | 74.3% | 0.0% | 3,446 | +0 (+0.0%) | 0 | 0 | 0 |
+| same_weights_leaky_relu_img0 | Conv1 | leaky+round | 50.0% | 43.4% | 9,582 | +0 (+0.0%) | 7,236 | 7,174 | 0 |
+| same_weights_leaky_relu_img0 | Pool1 | none | 8.2% | 41.2% | 0 | +0 | 0 | 0 | 0 |
+| same_weights_leaky_relu_img0 | Conv2 | leaky+round | 7.5% | 30.8% | 89,202 | +8,160 (+10.1%) | 3,700 | 3,590 | 0 |
+| same_weights_leaky_relu_img0 | Pool2 | none | 12.1% | 81.5% | 0 | +0 | 0 | 0 | 0 |
+| same_weights_leaky_relu_img0 | Conv3 | leaky+round | 19.5% | 66.2% | 42,434 | +10,856 (+34.4%) | 1,012 | 902 | 0 |
+| same_weights_leaky_relu_img0 | Dense | none | 13.7% | 46.0% | 4,291 | +845 (+24.5%) | 0 | 0 | 0 |
+| same_weights_silu_img0 | Conv1 | table+round | 50.0% | 43.4% | 9,582 | +0 (+0.0%) | 7,236 | 7,174 | 32 |
+| same_weights_silu_img0 | Pool1 | none | 5.1% | 48.3% | 0 | +0 | 0 | 0 | 0 |
+| same_weights_silu_img0 | Conv2 | table+round | 5.1% | 37.5% | 89,743 | +8,701 (+10.7%) | 3,700 | 3,590 | 32 |
+| same_weights_silu_img0 | Pool2 | none | 5.5% | 78.3% | 0 | +0 | 0 | 0 | 0 |
+| same_weights_silu_img0 | Conv3 | table+round | 7.8% | 61.3% | 43,682 | +12,104 (+38.3%) | 1,012 | 902 | 32 |
+| same_weights_silu_img0 | Dense | none | 7.3% | 52.0% | 4,348 | +902 (+26.2%) | 0 | 0 | 0 |
+| same_weights_hardswish_img0 | Conv1 | table+round | 50.0% | 43.4% | 9,582 | +0 (+0.0%) | 7,236 | 7,174 | 32 |
+| same_weights_hardswish_img0 | Pool1 | none | 5.2% | 48.2% | 0 | +0 | 0 | 0 | 0 |
+| same_weights_hardswish_img0 | Conv2 | table+round | 5.3% | 37.3% | 89,743 | +8,701 (+10.7%) | 3,700 | 3,590 | 32 |
+| same_weights_hardswish_img0 | Pool2 | none | 8.9% | 73.4% | 0 | +0 | 0 | 0 | 0 |
+| same_weights_hardswish_img0 | Conv3 | table+round | 13.8% | 53.1% | 43,554 | +11,976 (+37.9%) | 1,012 | 902 | 32 |
+| same_weights_hardswish_img0 | Dense | none | 14.0% | 45.2% | 4,308 | +862 (+25.0%) | 0 | 0 | 0 |
+
+* Nearly the same costs as with the models' own weights: +9.1 % (Leaky ReLU), +10.0 % (SiLU), +9.9 % (hard-swish)
+  against +8.7 / +9.7 / +9.8 %. The cost belongs to the activation (it keeps the negative values that ReLU sets to 0),
+  not to the weights.
+* Again `writeback` 11,948 and every phase but `compute` and `load_act` identical.
+
 ## Reports
 
 

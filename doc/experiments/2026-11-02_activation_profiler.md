@@ -44,7 +44,7 @@ and per layer (`profile_report --compare`, or the table of `doc/perf/activation_
 | Trained models, image 0 (`doc/perf/activation_2026-11-02.md`) | `writeback` and the activation clocks identical in all four functions (11,948 cycles; 7,174 / 3,590 / 902 clocks); every phase but `compute` and `load_act` 0 cycles of difference; `load_act` 96 for SiLU and hard-swish (3 x 32), 0 for ReLU and Leaky |
 | ReLU input zeros against the earlier measurement (`doc/perf/trained_mnist_2026-10-31.md`) | Conv2 / Conv3 / Dense 43.5 / 87.3 / 74.3 % (then 44 / 87 / 74 %); the ReLU run is 673 cycles shorter than on 2026-10-31, exactly the change of the `wghts_per_pe + 1` line (`baseline_2026-11-02`) |
 | Zero fractions against step A (10,000 images, `2026-11-02_activation/eval_10000.md`) | within 2 points for every function and layer |
-| All 7 runs | PASS, every buffer check bit-exact |
+| All 7 runs, and the 3 same-weight runs of section 4b | PASS, every buffer check bit-exact |
 | 12 baseline cases (`run_profile --compare doc/perf/baseline_2026-11-02`) | **12/12 PASS, 0 cycles and 0 DMA words of change** (section 5) |
 
 ## 4. Results: the cost of each activation (trained MNIST model, image 0, 250 MHz)
@@ -69,6 +69,24 @@ and per layer (`profile_report --compare`, or the table of `doc/perf/activation_
    +9.2 / +9.0 % (average over 10,000 images, linear in the zero fractions); image 0 measures +8.7 / +9.7 / +9.8 %.
 3. **Latency knobs from here** (not done): the table's +-1 entries set to 0 (`band1`, step A: zeros 20-27 %, about
    2 points of the model back, no accuracy loss); fewer passes whose fixed cost does not depend on the zeros.
+
+## 4b. The same weights for every activation
+
+Each trained model of section 4 has its own weights. To see the activation alone, the trained ReLU weights ran with
+each activation in place of ReLU (`2026-11-02_activation/run_same_weights.py <activation> 0`: the ReLU checkpoint with
+another `activation`; the toolchain calibrates the new graph as usual). Same weights, same input, same platform; the
+weights were not trained for these activations, but every buffer check is bit-exact and the DUT still gives class 7.
+
+| | ReLU | Leaky ReLU | SiLU | hard-swish |
+|---|---:|---:|---:|---:|
+| Total cycles | 218,925 | 238,786 | 240,728 | 240,560 |
+| vs ReLU | | +19,861 (+9.1 %) | +21,803 (+10.0 %) | +21,635 (+9.9 %) |
+| `load_act` / other phases incl. `writeback` | 0 / 0 | 0 / 0 | 96 / 0 | 96 / 0 |
+| Zeros in the input of Conv2 / Conv3 / Dense | 43.5 / 87.3 / 74.3 % | 7.5 / 19.5 / 13.7 % | 5.1 / 7.8 / 7.3 % | 5.3 / 13.8 / 14.0 % |
+| Time at 250 MHz | 875.7 us | 955.1 us | 962.9 us | 962.2 us |
+
+Within 0.4 points of section 4: the cost is the activation's (it keeps the negative values that ReLU turns into 0),
+not the weights'. Profiles `doc/perf/activation_2026-11-02/same_weights_<activation>_img0.json`.
 
 ## 5. The 12 baseline cases
 
