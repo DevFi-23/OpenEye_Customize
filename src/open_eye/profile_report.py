@@ -40,7 +40,7 @@ import os
 import re
 import sys
 
-PHASE_ORDER = ["load_config", "load_iact", "load_wght", "load_bias", "load_quant",
+PHASE_ORDER = ["load_config", "load_iact", "load_wght", "load_bias", "load_quant", "load_act",
                "convert_iact", "compute", "writeback", "pooling", "readout"]
 
 # OFFSET_WIDTH + EXPONENT_WIDTH + MANTISSA_WIDTH in OpenEye_FPGA.v
@@ -112,6 +112,8 @@ def layer_payload_bytes(info, config, last):
     c -= info.get("pad_channels") or 0
     psum_bytes = math.ceil(int(config["DATA_PSUM_BITWIDTH"]) / 8)
     quant = math.ceil(f * QUANT_ENTRY_BITS / 8)
+    act = info.get("activation") or {}
+    table = {"load_act": 256} if act.get("mode") == "table" and not act.get("keep_table") else {}   # 256 x int8
     if name == "Convolution2D":
         kernel = info.get("kernel") or []
         if len(kernel) < 2:
@@ -119,20 +121,21 @@ def layer_payload_bytes(info, config, last):
         stride = info.get("stride") or 1
         payload = {"load_iact": 0 if info.get("skip_iact") else x * y * c,
                    "load_wght": f * c * kernel[0] * kernel[1],
-                   "load_bias": f * psum_bytes, "load_quant": quant}
+                   "load_bias": f * psum_bytes, "load_quant": quant, **table}
         if last:
             payload["readout"] = math.ceil(x / stride) * math.ceil(y / stride) * f * psum_bytes
         return payload
     if name == "Dense":               # iact_size_x = inputs (K), filters = outputs (N)
         payload = {"load_iact": 0 if info.get("skip_iact") else x,
-                   "load_wght": x * f, "load_bias": f * psum_bytes, "load_quant": quant}
+                   "load_wght": x * f, "load_bias": f * psum_bytes, "load_quant": quant, **table}
         if last:
             payload["readout"] = f * psum_bytes
         return payload
     return {}
 
 
-LOAD_PHASES = ("load_config", "load_iact", "load_quant")   # the "load" column of the layer table
+# the "load" column of the layer table (load_act: the table of a table activation, GET_ACTIVATION)
+LOAD_PHASES = ("load_config", "load_iact", "load_quant", "load_act")
 
 
 def summarise_layers(profile):
@@ -177,6 +180,49 @@ def print_layer_table(rows, clock_ns, clock_label):
         print(f"| {r['index']} | {r['label']} | {r['cycles']} | {r['share']:.1%} | {us:.1f} | {load} | "
               + " | ".join(str(v) for v in cells)
               + f" | {r['in_words']} | {r['out_words']} | {_eff(r['efficiency'])} |")
+
+
+def summarise_activations(profile):
+    """One row per layer with what the activation hardware did (doc/experiments/2026-11-02_activation_rtl.md): its
+    mode, the table load (load_act cycles and DMA words), the clocks in which the write-back took activated values
+    (inside the writeback phase, not additional), and the zeros / negatives of the layer's input (the activated
+    output of the layer before, after pooling; what zero skipping skips). [] for profiles without these fields."""
+    layers = profile.get("layers") or []
+    if not any((layer.get("info") or {}).get("input") or "activation_cycles" in layer for layer in layers):
+        return []
+    rows = []
+    for layer in layers:
+        info = layer.get("info") or {}
+        act = info.get("activation") or {}
+        load = layer.get("phases", {}).get("load_act", {})
+        data = info.get("input") or {}
+        values = data.get("values") or 0
+        rows.append({
+            "index": layer["index"],
+            "label": layer_label(info, layer["index"]),
+            "mode": act.get("mode", "?") + (" + round" if act.get("round") else "")
+                    + (" (keep table)" if act.get("keep_table") and act.get("mode") == "table" else ""),
+            "load_act_cycles": load.get("cycles", 0),
+            "load_act_words": load.get("in_accepted", 0),
+            "writeback_cycles": layer.get("phases", {}).get("writeback", {}).get("cycles", 0),
+            "activation_cycles": layer.get("activation_cycles", 0),
+            "input_zeros": data["zeros"] / values if values else None,
+            "input_negatives": data["negatives"] / values if values else None,
+        })
+    return rows
+
+
+def print_activation_table(rows):
+    """Markdown table of summarise_activations."""
+    def pct(v):
+        return f"{v:.1%}" if v is not None else ""
+    print("\n| # | layer | activation | load_act cycles | load_act DMA words | writeback cycles | activation clocks "
+          "(in writeback) | input zeros | input negatives |")
+    print("|---:|---|---|---:|---:|---:|---:|---:|---:|")
+    for r in rows:
+        print(f"| {r['index']} | {r['label']} | {r['mode']} | {r['load_act_cycles']} | {r['load_act_words']} | "
+              f"{r['writeback_cycles']} | {r['activation_cycles']} | {pct(r['input_zeros'])} | "
+              f"{pct(r['input_negatives'])} |")
 
 
 def summarise(profile):
@@ -291,6 +337,9 @@ def print_report(case, profile, rows):
               f"{r['out_words']} | {r['mem_stall']} | {need} | {eff} |")
     if len(layer_rows) > 1:
         print_layer_table(layer_rows, *report_clock(config))
+    activation_rows = summarise_activations(profile)
+    if activation_rows:
+        print_activation_table(activation_rows)
 
 
 # Configuration keys that must agree for two profiles to be comparable

@@ -213,3 +213,48 @@ def test_comparison_reports_new_case(capsys):
 def test_case_name_of_model_sim_dir():
     path = "test/.temp/test_cocotb_fpga_test_profile.py_test_profile_model_model_mnist16_c2_/profile.json"
     assert profile_report.case_name(path) == "model_mnist16_c2"
+
+
+def make_activation_profile():
+    """The model profile with what the activation hardware did: a table activation on the conv (its table loaded in
+    load_act), the Dense input taken from the testbench reference."""
+    profile = make_model_profile()
+    conv, pool, dense = profile["layers"]
+    conv["info"] = dict(conv["info"], activation={"mode": "table", "round": True, "keep_table": False},
+                        input={"values": 64, "zeros": 16, "negatives": 0})
+    conv["phases"]["load_act"] = counters(32, 32)
+    conv["activation_cycles"] = 12
+    pool["info"] = dict(pool["info"], activation={"mode": "none", "round": False, "keep_table": False},
+                        input={"values": 128, "zeros": 32, "negatives": 40})
+    dense["info"] = dict(dense["info"], activation={"mode": "none", "round": False, "keep_table": False},
+                         input={"values": 32, "zeros": 4, "negatives": 9})
+    total = profile["phases"].setdefault("load_act", counters(0))
+    for key in total:
+        total[key] += conv["phases"]["load_act"][key]
+    profile["total_cycles"] += 32
+    return profile
+
+
+def test_activation_rows():
+    rows = profile_report.summarise_activations(make_activation_profile())
+    assert [r["mode"] for r in rows] == ["table + round", "none", "none"]
+    assert (rows[0]["load_act_cycles"], rows[0]["load_act_words"]) == (32, 32)
+    assert (rows[0]["writeback_cycles"], rows[0]["activation_cycles"]) == (14, 12)
+    assert rows[0]["input_zeros"] == pytest.approx(0.25) and rows[2]["input_negatives"] == pytest.approx(9 / 32)
+    assert profile_report.summarise_activations(make_model_profile()) == []      # older profiles: no table
+
+
+def test_table_activation_payload_and_load_column(capsys):
+    profile = make_activation_profile()
+    config = profile["config"]
+    conv = profile["layers"][0]["info"]
+    assert profile_report.layer_payload_bytes(conv, config, last=False)["load_act"] == 256
+    keep = dict(conv, activation={"mode": "table", "round": True, "keep_table": True})
+    assert "load_act" not in profile_report.layer_payload_bytes(keep, config, last=False)
+    rows = profile_report.summarise(profile)
+    assert [r["phase"] for r in rows].index("load_act") == [r["phase"] for r in rows].index("load_bias") + 1
+    profile_report.print_report("m", profile, rows)
+    out = capsys.readouterr().out
+    # the layer table's "load" column includes load_act (8 load_iact + 32 load_act)
+    assert "| 0 | Conv 8x4x2->4 k3x3 | 132 |" in out and "| 40 | 12 | 16 |" in out
+    assert "| 0 | Conv 8x4x2->4 k3x3 | table + round | 32 | 32 | 14 | 12 | 25.0% | 0.0% |" in out

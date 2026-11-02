@@ -198,7 +198,7 @@ Một test cocotb là một tiến trình; máy 12 nhân / 7 GB RAM chạy song 
 venv/bin/python -m pytest -q test/test_*.py
 ```
 
-Hiện tại: **319 pass, 11 fail** (129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8 + 6 test đường model thật so với ONNX Runtime + 22 test thứ tự stream bias của lỗi #32 + 29 test hàm kích hoạt, bước A; 12 trong số đó cần checkpoint của `models/train_mnist.py`, không có thì skip). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
+Hiện tại: **324 pass, 11 fail** (129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8 + 6 test đường model thật so với ONNX Runtime + 22 test thứ tự stream bias của lỗi #32 + 31 test hàm kích hoạt, bước A và B + 3 test profiler hàm kích hoạt, bước C; 12 trong số đó cần checkpoint của `models/train_mnist.py`, không có thì skip). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
 thay đổi của fork. Các file của fork: `test_profile_report.py`, `test_profile_phases.py`, `test_channel_pad.py`, `test_conv_wght_encoding.py`, `test_paper_table3.py`,
 `test_memory_model.py`, `test_fc_writeback.py`, `test_conv_writeback.py`, `test_int8_clamp.py`, `test_onnx_model_flow.py` (cần `torch`, `onnxruntime`, file `.pth` đã huấn luyện),
 `test_psum_bias_order.py`, `test_activation.py`.
@@ -246,10 +246,12 @@ venv/bin/python tools/run_profile.py -k model --compare doc/perf/baseline_2026-1
 venv/bin/python tools/run_profile.py -k q32 --mem typical                                               # bộ nhớ thực tế hơn (mục 6c)
 venv/bin/python tools/paper_table3.py --run --jobs 6 --save doc/perf/paper_table3_<ngày> --report doc/perf/paper_table3_<ngày>.md   # Bảng 3, khoảng 1 giờ
 venv/bin/python tools/paper_table3.py doc/perf/paper_table3_2026-11-02                                 # in lại Bảng 3 từ profile đã lưu (mốc hiện tại)
+OPENEYE_PROFILE=1 venv/bin/python -m pytest -q "test/cocotb_fpga/test_real_model.py::test_real_model_activation[silu-0]"   # đo một hàm kích hoạt (mục 6.15)
+venv/bin/python -m open_eye.profile_report --clock-mhz 250 doc/perf/activation_2026-11-02/*.json        # in lại các profile hàm kích hoạt đã lưu
 ```
 
 `run_profile.py` mặc định **không** chạy 16 case Bảng 3; chỉ chạy khi biểu thức `-k` có chữ `paper` (ví dụ `-k paper_cr2_x4_y3` để chạy một cấu hình).
-Chi tiết: mục 6 (profiler), 6.13 (model nhiều layer), 6.14 (Bảng 3).
+Chi tiết: mục 6 (profiler), 6.13 (model nhiều layer), 6.14 (Bảng 3), 6.15 (hàm kích hoạt).
 
 ### Tái hiện các lỗi và thí nghiệm
 
@@ -364,8 +366,8 @@ OpenEye_orig/
 │   │   └── regmap.yaml           Định nghĩa các thanh ghi cấu hình gửi qua DMA (nguồn của dma_storage.v)
 │   ├── cocotb_parallel/          Test của OpenEye_Parallel (SERIAL=0), đã cũ (mục 5.7)
 │   ├── test_memory_model.py   ★  16 unit test của mô hình bộ nhớ
-│   ├── test_profile_report.py ★  Unit test của công cụ báo cáo
-│   ├── test_profile_phases.py ★  Unit test quy tắc gán pha của profiler
+│   ├── test_profile_report.py ★  Unit test của công cụ báo cáo (kể cả bảng hàm kích hoạt, bước C)
+│   ├── test_profile_phases.py ★  Unit test quy tắc gán pha của profiler (kể cả `load_act`, input của layer)
 │   ├── test_channel_pad.py    ★  Unit test đệm channel (lỗi #17)
 │   ├── test_conv_wght_encoding.py ★ Unit test mã hóa weight Conv có số 0 (lỗi #22)
 │   ├── test_paper_table3.py   ★  Unit test của công cụ Bảng 3
@@ -374,7 +376,7 @@ OpenEye_orig/
 │   ├── test_int8_clamp.py     ★  Unit test kẹp int8 / ReLU phía Python (#30): 11 test
 │   ├── test_onnx_model_flow.py ★ Đường model thật của toolchain so với ONNX Runtime từng layer, không RTL: 6 test
 │   ├── test_psum_bias_order.py ★ Thứ tự stream bias Conv so với mô hình nạp bias của RTL (lỗi #32): 22 test
-│   ├── test_activation.py     ★  Hàm kích hoạt Leaky ReLU / SiLU / hard-swish trong toolchain và tham chiếu, so với ONNX Runtime (bước A): 29 test
+│   ├── test_activation.py     ★  Hàm kích hoạt Leaky ReLU / SiLU / hard-swish trong toolchain và tham chiếu, so với ONNX Runtime (bước A), trường và word bảng gửi cho RTL (bước B): 31 test
 │   ├── cocotb_quantization/   ★  Testbench riêng của quantization_unit (kẹp int8, #30; Leaky ReLU, làm tròn)
 │   ├── cocotb_activation_table/ ★ Testbench riêng của activation_table
 │   └── .temp/                 ☆  Thư mục chạy của từng test (log, header sinh ra, profile.json)
@@ -390,10 +392,11 @@ OpenEye_orig/
 ├── doc/
 │   ├── perf/                  ★  Số liệu đo chu kỳ: baseline_2026-11-02/ (**mốc hiện tại**, 12 case), baseline_2026-10-24/ (mốc trước), paper_table3_2026-11-02/ (Bảng 3 paper, mốc
 │   │                             hiện tại; fix25 là trước dòng wghts_per_pe + 1, 2026-10-24 trước #25/#26), trained_mnist_2026-10-31/ (model đã huấn luyện, ảnh thật),
+│   │                             activation_2026-11-02/ (4 hàm kích hoạt trên model đã huấn luyện + 3 ca bảng, mục 6.15),
 │   │                             baseline_2026-10-22/, baseline_2026-10-15/, baseline_2026-10-10/ (mốc cũ), mem_typical_2026-10-10/, ...
 │   ├── synth/                 ★  Báo cáo Vivado theo từng lần chạy (mỗi thư mục có SUMMARY.md)
 │   ├── experiments/           ★  Báo cáo thí nghiệm và điều tra lỗi (#13, #6/#7, #18, #14, #19, cherry-pick upstream, model nhiều layer,
-│   │                             #17 đệm channel, #22 mã hoá weight, #26 Dense nối tiếp Dense, #25 NUM_GLB_PSUM=2, int8/kẹp/ReLU #30 + bộ giả lập model int8, #31 lượt rỗng, #32 thứ tự bias + #35, đường model thật của toolchain, rà soát upstream 2026-10-31) kèm script probe/lockstep để chạy lại
+│   │                             #17 đệm channel, #22 mã hoá weight, #26 Dense nối tiếp Dense, #25 NUM_GLB_PSUM=2, int8/kẹp/ReLU #30 + bộ giả lập model int8, #31 lượt rỗng, #32 thứ tự bias + #35, đường model thật của toolchain, rà soát upstream 2026-10-31, hàm kích hoạt A/B/C 2026-11-02) kèm script probe/lockstep để chạy lại
 │   ├── lint/                  ★  Output lint gốc
 │   ├── reports/               ★  Báo cáo tiến độ (Word): BaoCao_TienDo_OpenEye_2026-10-10.docx, BaoCao_TienDo_OpenEye_2026-10-15.docx,
 │   │                             BaoCao_TienDo_OpenEye_2026-10-31.docx (+ 5 hình PNG)
@@ -421,6 +424,7 @@ Profiler gom các trạng thái như sau (`PROFILE_PHASES` trong `rtl_test_utils
 | `load_wght` | `GET_WGHT` (4) | Nhận weight |
 | `load_bias` | `GET_BIAS` (5) | Nhận bias (giá trị psum ban đầu) |
 | `load_quant` | `GET_QUANTIZE` (6) | Nhận bảng lượng tử hoá |
+| `load_act` | `GET_ACTIVATION` (15) | Nhận bảng 256 ô của hàm kích hoạt dạng bảng (SiLU, hard-swish; từ 2026-11-02, mục 6.15); không có ở layer khác |
 | `convert_iact` | `START_CONVERTER` (7), `CONVERT_IACT` (8), `WAIT_CYCLE` (9) | Sắp xếp iact cho các PE, không dùng DMA |
 | `compute` | `WAIT_FOR_RESULTS` (10) | Mảng PE tính toán |
 | `writeback` | `RECEIVE_PSUMS_TO_IACT` (11) | Ghi kết quả đã lượng tử làm input cho layer sau |
@@ -437,10 +441,11 @@ không có trạng thái riêng cho việc này: FSM chính vẫn ở `WAIT_FOR_
 - `pooling` (`MAXPOOLING_*`): layer max-pooling chạy trên chip. FSM đi `GET_ROUTER_CONFIG → GET_QUANTIZE → MAXPOOLING_READ ⇄ MAXPOOLING_SEND/WAIT`.
 Profiler định nghĩa đủ các pha để đo được cả những layer này (việc 0.2).
 
-**Các trạng thái của FSM chính** (`OpenEye_FPGA.v`, 15 giá trị 0–14): 0 `IDLE` (không dùng: sau reset FSM vào thẳng 1), 1 `GET_PARAMETERS`
+**Các trạng thái của FSM chính** (`OpenEye_FPGA.v`, 16 giá trị 0–15): 0 `IDLE` (không dùng: sau reset FSM vào thẳng 1), 1 `GET_PARAMETERS`
 (TRANSMISSIONS word cấu hình + mask PE), 2 `GET_ROUTER_CONFIG`, 3 `GET_IACT`, 4 `GET_WGHT`, 5 `GET_BIAS` (bỏ qua nếu `skipPsum`), 6 `GET_QUANTIZE`,
 7 `START_CONVERTER`, 8 `CONVERT_IACT`, 9 `WAIT_CYCLE` (64 chu kỳ, phát lệnh gửi weight), 10 `WAIT_FOR_RESULTS` (mảng PE tính, FSM psum đọc kết quả ra;
-rời trạng thái khi word cuối `last_data_o` được nhận), 11 `RECEIVE_PSUMS_TO_IACT`, 12 `MAXPOOLING_READ`, 13 `MAXPOOLING_SEND`, 14 `MAXPOOLING_WAIT`.
+rời trạng thái khi word cuối `last_data_o` được nhận), 11 `RECEIVE_PSUMS_TO_IACT`, 12 `MAXPOOLING_READ`, 13 `MAXPOOLING_SEND`, 14 `MAXPOOLING_WAIT`, 15 `GET_ACTIVATION` (từ 2026-11-02: nạp bảng hàm kích hoạt sau
+`GET_QUANTIZE`).
 FSM psum (`psum_pipeline.v`): 0 `PSUM_IDLE`, 1 `WAIT_TO_SEND_READY_SIGNAL`, 2 `CALCULATE_PSUM` (đưa bias/psum cũ vào PE), 3 `PSUM_GET_RESULTS`,
 4 `WAIT_FOR_SENDING_RESULTS`, 5 `PSUM_SEND_RESULTS` (gửi ra DMA), 6 `SEND_PSUM_TO_IACT` (lượng tử, ghi lại làm iact).
 
@@ -484,6 +489,7 @@ Ký hiệu: X×Y là kích thước ảnh vào, C là số channel vào, F là s
 | `load_wght` | `F × C × Kx × Ky` byte | Mỗi weight INT8 = 1 byte |
 | `load_bias` | `F × ceil(psum_bit / 8)` byte | Mỗi filter chỉ cần một bias |
 | `load_quant` | `F × 40 bit` | Mỗi filter một entry lượng tử: offset 8 + exponent 7 + mantissa 25 bit |
+| `load_act` | `256` byte | Bảng hàm kích hoạt (256 ô int8), chỉ layer dùng bảng và không giữ bảng cũ |
 | `readout` | `số output × ceil(psum_bit / 8)` byte | Mỗi output một psum |
 
 **Hiệu suất bus** = payload tối thiểu ÷ (số beat × `DMA_BITWIDTH`/8).
@@ -766,6 +772,8 @@ Coroutine cocotb lấy mẫu **mỗi cạnh lên của clock**. Với mỗi chu 
 `out_words` (`enable_dma_o & ready_dma_i`), `in_stall` (pha nạp, DUT sẵn sàng nhưng không có word), `out_stall` (có kết quả nhưng
 `ready_dma_i` thấp). Cửa sổ đo bắt đầu từ word vào đầu tiên được nhận và kết thúc ở word ra cuối cùng. File `profile.json` được ghi lại
 mỗi khi đổi pha và sau mỗi word ra, nên vẫn còn khi test FAIL hoặc treo.
+Từ 2026-11-02 (mục 6.15) coroutine còn đọc dây trace `UNPACKED_TRACES.act_capture` mỗi chu kỳ (`activation_cycles` của layer), và testbench ghi số 0 / số âm
+ở input của từng layer từ tham chiếu (`profile_set_layer_input`).
 
 Cùng các bộ đếm đó được giữ **theo từng layer** (`layers` trong `profile.json`, mục 6.13). Payload và hiệu suất bus: cho `Convolution_Single` ở bảng pha,
 và cho từng layer Conv/Dense của một model ở bảng layer. Từ 2026-10-22 đo được cả model MNIST (3 case `test_profile_model`), từ 2026-10-24 cả mạng
@@ -897,7 +905,7 @@ pooling 7.952 (3,6 %). Mọi pha trừ tính toán giống hệt dữ liệu ng�
 vẫn tốn phần cố định (nạp, bắt tay lượt, đọc psum của từng lượt): ứng viên tối ưu độ trễ.
 
 **Cách đọc:**
-- `load` = `load_config + load_iact + load_quant`. Chỉ layer đầu nạp iact (196 chu kỳ); các layer sau đọc iact từ bộ đệm (`skip_iact`).
+- `load` = `load_config + load_iact + load_quant` (+ `load_act` từ 2026-11-02). Chỉ layer đầu nạp iact (196 chu kỳ); các layer sau đọc iact từ bộ đệm (`skip_iact`).
 - Layer cuối (Dense) không ở trạng thái 11 mà ở trạng thái 10 (chờ kết quả) nên `writeback = 0`, và chỉ layer cuối có `readout`.
 - `bus eff.` thấp ở Conv1 (2 %) vì 14.336 word bias chỉ chứa 32 giá trị khác nhau: đúng chỗ tối ưu "bias theo filter" (mục 8c) có lợi nhất.
 - Ở layer pooling, FSM vẫn ở pha nạp bảng lượng tử 40 chu kỳ (`QUANT_AMOUNT=64`; 20 với 32) nhưng **không nhận word nào** (driver đưa 40 word, chip
@@ -934,7 +942,7 @@ venv/bin/python tools/paper_table3.py doc/perf/paper_table3_2026-10-24        # 
 
 Kết quả: `doc/perf/paper_table3_2026-10-24.md` (7 bảng theo layer: hàng = cấu hình, cột = 10 pha của profiler; bảng tổng kèm số của paper).
 
-**Tổng cả mạng so với paper** (ns ở 200 MHz; "nạp" = load_config + load_iact + load_wght + load_bias + load_quant; "xử lý" = phần còn lại):
+**Tổng cả mạng so với paper** (ns ở 200 MHz; "nạp" = load_config + load_iact + load_wght + load_bias + load_quant (+ load_act nếu có bảng kích hoạt); "xử lý" = phần còn lại):
 
 | CR | X | Y | Tổng (fork) | Nạp | Xử lý | Tỉ lệ nạp | Paper Total | Paper Data Send | Tỉ lệ Data Send (paper) | Tổng / paper |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -969,11 +977,54 @@ layer 5 (Dense nối tiếp Dense) không ghi kết quả vào bộ đệm (lỗ
 layer 0 và 2, conv → pooling, thật ra **không được làm** vì testbench không có bố cục cho input của pooling, xem mục 9). Thời gian của các layer đó vẫn đo được (số word mỗi pha không phụ thuộc giá trị), nhưng đánh dấu FAIL trong bảng.
 
 **Sau bản sửa #25 (2026-10-26, `doc/perf/paper_table3_2026-10-26_fix25.md`):** 13/16 cấu hình PASS cả 7 layer (sửa 31/10: trước đây ghi nhầm 14/16; 7 + 6 = 13, `status.json` có 3 cấu hình FAIL); X = 2 với CR 2/4/8 nay đúng và chậm hơn số đo cũ
-4,4–7,8 % (pha ghi ngược Conv trước đây bị cắt nửa chừng); X = 4 không đổi; còn CR 1 X 4 Y 3 (#19b) và CR 1 X 2 (#28). **Mốc Bảng 3 hiện tại: `paper_table3_2026-10-26_fix25`.**
+4,4–7,8 % (pha ghi ngược Conv trước đây bị cắt nửa chừng); X = 4 không đổi; còn CR 1 X 4 Y 3 (#19b) và CR 1 X 2 (#28). Mốc Bảng 3 lúc đó: `paper_table3_2026-10-26_fix25`.
+
+**Sau dòng `wghts_per_pe + 1` và bước B của hàm kích hoạt (2026-11-02, `doc/perf/paper_table3_2026-11-02.md`):** 13/16 như trước, chu kỳ đúng bằng
+số của thí nghiệm `+1` ở cả 16 cấu hình (bước B: 0 lệch). **Mốc Bảng 3 hiện tại: `paper_table3_2026-11-02`.** Từ bước C, bảng tổng chỉ có thêm cột
+`load_act` khi có cấu hình dùng bảng kích hoạt (các bảng cũ in lại y như trước).
 
 **Sau bản sửa #26 (2026-10-24, `doc/perf/paper_table3_2026-10-24_fix26.md`):** 7/8 cấu hình X = 4 **PASS cả 7 layer** (bộ đệm sau mỗi layer và kết quả cuối);
 CR 1 X 4 Y 3 còn sai ở Dense 1568→32 (lỗi tính #19b); X = 2 vẫn như cũ (#25). Chu kỳ: layer 0–4 giữ nguyên, pha ghi ngược của layer 5 dài thêm 15–21 chu kỳ,
 cả mạng +15 đến +28 chu kỳ (≤ 0,03 %); các bảng thời gian ở trên hầu như không đổi.
+
+### 6.15 Đo hàm kích hoạt bằng profiler (bước C, 2026-11-02)
+
+Chi tiết: `doc/experiments/2026-11-02_activation_profiler.md`; số đo và báo cáo: `doc/perf/activation_2026-11-02.md` (file `activation_2026-11-02/*.json`).
+Chỉ Python (testbench và báo cáo); RTL là của bước B, dây trace `act_capture` đã có sẵn từ bước B cho việc này.
+
+**Profiler đo gì:**
+
+| Đại lượng | Lấy từ đâu | Ý nghĩa |
+|---|---|---|
+| Pha `load_act` (chu kỳ, word DMA) | FSM chính ở trạng thái 15 `GET_ACTIVATION` | Chi phí nạp bảng: 2048 / `DMA_BITWIDTH` word mỗi layer dùng bảng (32 ở DMA 64 bit), 0 nếu `act_keep_table` |
+| `activation_cycles` của layer | dây `UNPACKED_TRACES.act_capture` đọc mỗi chu kỳ: pha ghi ngược lấy 4 giá trị lane đã qua hàm kích hoạt | Số chu kỳ khối kích hoạt làm việc; **nằm trong `writeback`**, không phải chu kỳ thêm |
+| `info.activation` (mode, round, keep_table) | `LayerParameters` | Layer dùng hàm gì |
+| `info.input` (values, zeros, negatives) | tham chiếu của testbench sau `batchnorm_output` (= đúng thứ RTL tính, các kiểm tra bộ đệm khớp từng bit) | Số 0 ở input = thứ mà bỏ-qua-số-0 bỏ qua: chi phí gián tiếp của hàm kích hoạt |
+| Payload 256 byte | `layer_payload_bytes` | Hiệu suất bus của bảng trong bảng layer |
+
+`profile_report` in thêm **bảng hàm kích hoạt** (mỗi layer: hàm, `load_act` chu kỳ / word, chu kỳ ghi ngược, chu kỳ kích hoạt, % số 0 và số âm ở input);
+cột `load` của bảng layer gồm cả `load_act`; `--compare` so từng pha và từng layer (ví dụ SiLU so với ReLU, đặt 2 profile cùng tên case ở 2 thư mục).
+
+**Kết quả (model MNIST đã huấn luyện, ảnh 0, 250 MHz):**
+
+| | ReLU | Leaky ReLU | SiLU | hard-swish |
+|---|---:|---:|---:|---:|
+| Tổng chu kỳ | 218.925 (875,7 µs) | 238.049 (952,2 µs) | 240.229 (960,9 µs) | 240.293 (961,2 µs) |
+| So với ReLU | | +19.124 (+8,7 %) | +21.304 (+9,7 %) | +21.368 (+9,8 %) |
+| trong đó `load_act` | 0 | 0 | +96 (3 layer × 32) | +96 |
+| trong đó `compute` | | +19.124 | +21.208 | +21.272 |
+| Các pha khác (kể cả `writeback` 11.948) | | 0 | 0 | 0 |
+| Số 0 ở input Conv2 / Conv3 / Dense | 43,5 / 87,3 / 74,3 % | 24,3 / 14,7 / 18,1 % | 11,0 / 7,2 / 6,6 % | 5,9 / 14,3 / 13,2 % |
+| Compute Conv2 / Conv3 / Dense so với ReLU | | +8,5 / +36,1 / +23,9 % | +10,1 / +38,4 / +26,4 % | +10,4 / +37,8 / +25,5 % |
+
+- **Khối kích hoạt không tốn thời gian:** ghi ngược giống nhau từng chu kỳ ở cả 4 hàm (chu kỳ kích hoạt 7.174 / 3.590 / 902 ở Conv1/2/3), bảng chỉ tốn 32 chu kỳ
+  và 32 word mỗi layer (0,04 % của model). Mục tiêu thiết kế của bước B đạt trên model thật.
+- **Chi phí thật là mất số 0:** 99,5–100 % chu kỳ thêm nằm ở `compute`; Conv3 bị nặng nhất (+36–38 %) vì ReLU để lại 87 % số 0 ở input của nó, các hàm khác
+  7–15 %. Bước A dự đoán +7,4 / +9,2 / +9,0 % (trung bình 10.000 ảnh); ảnh 0 đo được +8,7 / +9,7 / +9,8 %; tỉ lệ số 0 khớp bước A trong 2 điểm.
+- Conv1 có 50 % số 0 ở input ở mọi model: channel 0 thêm cho lỗi #17 (channel ảnh không có số 0, nền là −19).
+- Kiểm chứng thêm: `load_act` = 32 / 32 ở layer có bảng, **0** ở layer giữ bảng (`table_keep_mlp`), **64** ở DMA 32 bit (`table_conv_stack_dma32`), 32 ở
+  4 layer Conv/Dense có bảng của mạng paper; 7/7 lần chạy PASS; ReLU ít hơn số ngày 31/10 đúng 673 chu kỳ (dòng `wghts_per_pe + 1`); unit test profiler 41/41;
+  12 ca mốc với profiler mới: 12/12 PASS, 0 chu kỳ và 0 word DMA lệch so với `baseline_2026-11-02` (profiler chỉ quan sát).
 
 ## 6b. Đo trên mô phỏng so với chạy trên FPGA thật
 
@@ -1420,7 +1471,7 @@ dài 96 thay vì 192 chu kỳ.
 | J | Bảng 3 với activation thưa (giả lập ReLU) | Chỉ Python | Phần xử lý của fork chậm hơn paper 4–5,6 lần; xem bao nhiêu là do activation không thưa | Đề xuất |
 | K | Hàm kích hoạt (#24) + kẹp int8 trong `quantization_unit` | Sửa RTL | Cần cho model thật (mục 8d) | **Xong** (2026-10-28, #30): kẹp với cận dưới theo layer, ReLU gộp vào kẹp (mục 9) |
 | L | Kết thúc gửi weight sớm 1 chu kỳ (`wghts_per_pe + 1`, từ upstream `3258813`) | Sửa RTL 1 dòng | Mỗi lượt có việc gửi weight trên đường găng bớt 1 chu kỳ | **Đã thử 2026-10-31**: đúng ở mọi kiểm tra, −0,1 đến −0,3 % chu kỳ (−673 trên model MNIST), 0 tài nguyên; **đã đưa vào `dev` 2026-11-01** (`doc/experiments/2026-10-31_wght_send_end.md`); mốc chu kỳ `baseline_2026-11-02`, Vivado 2026-11-02 đạt 250 MHz (WNS +0,020 ns) |
-| M | Hàm kích hoạt: Leaky ReLU, SiLU, hard-swish (ReLU đã có) + đo bằng profiler | Python (toolchain, tham chiếu) rồi RTL | Model thật dùng các hàm này; hiện chỉ có ReLU (#24) | **Kế hoạch 2026-11-02** (`doc/experiments/2026-11-02_activation_plan.md`): gộp vào bộ lượng tử của pha ghi ngược (0 chu kỳ mỗi giá trị); Leaky = hai độ dốc trong bộ lượng tử (0 word DMA), SiLU/hard-swish = bảng 256 entry trong LUTRAM (32 word DMA mỗi layer dùng bảng, khoảng +400 LUT); profiler thêm pha `load_act` và bộ đếm của khối kích hoạt. **Bước A (Python) xong 2026-11-02** (`doc/experiments/2026-11-02_activation.md`): toolchain + tham chiếu tính đủ 4 hàm, 3 model đã huấn luyện, int8 giữ độ chính xác (≤ 0,04 điểm so với float), nhưng mất số 0 nên ước tính compute +7 đến +10,5 %; bit làm tròn cần thiết. **Bước B (RTL) xong 2026-11-02** (được bạn đồng ý; thiết kế `doc/experiments/2026-11-02_activation_rtl_design.md`, kết quả `doc/experiments/2026-11-02_activation_rtl.md`): 180 test 175 PASS + 5 xfail đã biết, 3 model đã huấn luyện khớp từng bit trên RTL, 0 chu kỳ lệch ở chế độ 0 (12 ca mốc, Bảng 3), Vivado đạt 250 MHz, khoảng +550 LUT. Bước C (profiler) tiếp theo |
+| M | Hàm kích hoạt: Leaky ReLU, SiLU, hard-swish (ReLU đã có) + đo bằng profiler | Python (toolchain, tham chiếu) rồi RTL | Model thật dùng các hàm này; hiện chỉ có ReLU (#24) | **Kế hoạch 2026-11-02** (`doc/experiments/2026-11-02_activation_plan.md`): gộp vào bộ lượng tử của pha ghi ngược (0 chu kỳ mỗi giá trị); Leaky = hai độ dốc trong bộ lượng tử (0 word DMA), SiLU/hard-swish = bảng 256 entry trong LUTRAM (32 word DMA mỗi layer dùng bảng, khoảng +400 LUT); profiler thêm pha `load_act` và bộ đếm của khối kích hoạt. **Bước A (Python) xong 2026-11-02** (`doc/experiments/2026-11-02_activation.md`): toolchain + tham chiếu tính đủ 4 hàm, 3 model đã huấn luyện, int8 giữ độ chính xác (≤ 0,04 điểm so với float), nhưng mất số 0 nên ước tính compute +7 đến +10,5 %; bit làm tròn cần thiết. **Bước B (RTL) xong 2026-11-02** (được bạn đồng ý; thiết kế `doc/experiments/2026-11-02_activation_rtl_design.md`, kết quả `doc/experiments/2026-11-02_activation_rtl.md`): 180 test 175 PASS + 5 xfail đã biết, 3 model đã huấn luyện khớp từng bit trên RTL, 0 chu kỳ lệch ở chế độ 0 (12 ca mốc, Bảng 3), Vivado đạt 250 MHz, khoảng +550 LUT. **Bước C (profiler) xong 2026-11-02** (chỉ Python, mục 6.15, `doc/experiments/2026-11-02_activation_profiler.md`): pha `load_act`, chu kỳ khối kích hoạt, số 0 ở input từng layer; model đã huấn luyện ảnh 0: khối kích hoạt 0 chu kỳ mỗi giá trị, bảng 32 chu kỳ mỗi layer, nhưng cả model +8,7 % (Leaky), +9,7 % (SiLU), +9,8 % (hard-swish) vì mất số 0 (gần như toàn bộ ở `compute`). Hướng giảm tiếp: bảng `band1` (đặt ô ±1 về 0) |
 
 Thứ tự đề xuất: A, B, B2, C2 (kiến trúc MNIST chạy đủ) **đã xong**; tiếp theo là C (bias theo filter: Bảng 3 cho thấy bias chiếm khoảng 54.000–58.000 ns ở mọi
 cấu hình), rồi D (I: #25, #26 đã sửa).
@@ -2532,6 +2583,7 @@ trong bộ lượng tử của pha ghi ngược, khớp từng bit với tham ch
 | Vivado 4 ns (`doc/synth/2026-11-02_route4ns_act_zu7ev/`) | 0 CRITICAL, WNS +0,045 ns (đạt 250 MHz), LUT +778 (do bước B khoảng +550), FF +59, 0 BRAM/URAM/DSP thêm |
 
 Chi phí khi chạy: 0 chu kỳ mỗi giá trị ở mọi chế độ; chế độ bảng nạp 32 word (DMA 64 bit) mỗi layer, 0 nếu giữ bảng cũ; 0 word trạng thái thêm.
+Đo bằng profiler trên model đã huấn luyện (bước C): mục 6.15.
 
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
@@ -3080,3 +3132,9 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   `cocotb_activation_table/`, mở rộng testbench bộ lượng tử, `test_real_model_activation`. Hồi quy 180 test 175 PASS + 5 xfail, 0 FAIL; 3 model đã huấn luyện
   khớp từng bit trên RTL; 12 ca mốc và Bảng 3 0 chu kỳ lệch (Bảng 3 lưu thành mốc mới `paper_table3_2026-11-02`); lint `fpga` 460; Vivado 0 CRITICAL, WNS
   +0,045 ns, LUT +778 (+1,3 %), mốc phần cứng mới `doc/synth/2026-11-02_route4ns_act_zu7ev/`.
+- **Hàm kích hoạt, bước C: profiler** (theo yêu cầu, chỉ Python, không sửa RTL; mục 6.15, `doc/experiments/2026-11-02_activation_profiler.md`, số đo
+  `doc/perf/activation_2026-11-02.md`): pha `load_act` (trạng thái 15), `activation_cycles` theo layer từ dây trace `act_capture`, hàm kích hoạt và số 0 / số
+  âm ở input của từng layer (từ tham chiếu của testbench, `profile_set_layer_input`), bảng hàm kích hoạt trong `profile_report`, cột `load_act` trong
+  `paper_table3.py` khi có (bảng cũ không đổi). Model đã huấn luyện, ảnh 0: ReLU 218.925, Leaky ReLU 238.049 (+8,7 %), SiLU 240.229 (+9,7 %), hard-swish
+  240.293 chu kỳ (+9,8 %); ghi ngược giống nhau từng chu kỳ (0 chu kỳ mỗi giá trị), bảng 3 × 32 chu kỳ, còn lại là `compute` vì số 0 ở input Conv2 / Conv3 /
+  Dense giảm từ 43,5 / 87,3 / 74,3 % (ReLU) xuống 6–24 / 7–15 / 7–18 %. 7/7 lần chạy PASS; 12 ca mốc 0 lệch; unit test 324 pass, 11 fail có từ trước.

@@ -52,6 +52,7 @@ def test_tables(tmp_path):
     assert "| 2 | 4 | 3 | PASS pad | 200 | 300 | **500** | 40% |" in text    # 40 + 60 cycles x 5 ns
     assert "| 1 | 2 | 3 | FAIL (hang) | - |" in text                          # layer 1 missing in the hung run
     assert "| 2 | 4 | 3 | PASS | 0 | 0 | 300 | 0 | 0 | 0 | 300 | 0 | 0 | 150 | **750** | 83.680 | 70.325 | 154.005 | 0.00 |" in text
+    assert "load_act" not in text                                            # no table activation: no column
     assert t3.tables(runs, 250.0).count("| **600** |") == 1                   # 150 cycles x 4 ns
 
 

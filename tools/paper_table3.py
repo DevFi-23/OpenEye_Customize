@@ -30,9 +30,9 @@ sys.path.insert(0, HERE)
 import run_profile as rp  # noqa: E402
 from open_eye import profile_report  # noqa: E402
 
-PHASES = ["load_config", "load_iact", "load_wght", "load_bias", "load_quant",
+PHASES = ["load_config", "load_iact", "load_wght", "load_bias", "load_quant", "load_act",
           "convert_iact", "compute", "writeback", "pooling", "readout"]
-LOAD_PHASES = PHASES[:5]
+LOAD_PHASES = PHASES[:6]
 # Table 3 of the paper, (CLUSTER ROWS, PEs X, PEs Y): (Data Send, Proc. Time, Total) in ns at 200 MHz
 PAPER = {
     (1, 2, 3): (70680, 228635, 299315), (2, 2, 3): (106720, 124545, 231265),
@@ -146,8 +146,11 @@ def tables(runs, clock_mhz):
                        + f" | **{fmt(total * ns)}** | {load / total:.0%} |")
     # whole network
     out.append("\n## Whole network (sum of the layers) and the paper's Table 3\n")
-    out.append("| CR | X | Y | status | " + " | ".join(PHASES) + " | total | paper Data Send | paper Proc. | paper Total | total / paper |")
-    out.append("|---:|---:|---:|---|" + "---:|" * (len(PHASES) + 5))
+    # load_act only when some configuration has a table activation (the columns of earlier runs unchanged)
+    net_cols = [p for p in PHASES
+                if p != "load_act" or any(runs[cfg][1]["phases"].get(p, {}).get("cycles") for cfg in configs)]
+    out.append("| CR | X | Y | status | " + " | ".join(net_cols) + " | total | paper Data Send | paper Proc. | paper Total | total / paper |")
+    out.append("|---:|---:|---:|---|" + "---:|" * (len(net_cols) + 5))
     for cfg in configs:
         case, prof, status = runs[cfg]
         phases = {k: v["cycles"] for k, v in prof["phases"].items()}
@@ -155,7 +158,7 @@ def tables(runs, clock_mhz):
         paper = PAPER.get(cfg)
         ratio = f"{total * ns / paper[2]:.2f}" if paper and len(prof.get("layers") or []) == n_layers else ""
         out.append(f"| {cfg[0]} | {cfg[1]} | {cfg[2]} | {status} | "
-                   + " | ".join(fmt(phases.get(p, 0) * ns) for p in PHASES)
+                   + " | ".join(fmt(phases.get(p, 0) * ns) for p in net_cols)
                    + f" | **{fmt(total * ns)}** | {fmt(paper[0]) if paper else ''} | {fmt(paper[1]) if paper else ''} | "
                    f"{fmt(paper[2]) if paper else ''} | {ratio} |")
     return "\n".join(out) + "\n"

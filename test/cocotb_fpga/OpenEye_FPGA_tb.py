@@ -490,6 +490,8 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
         logger.info("OPENEYE_ZERO_BLOCK: layer-0 input %s = %d..%d set to 0", axis, first, last - 1)
     # After the debug hooks above, which fill every channel
     channel_pad.fill_padding_channels(model, dram)
+    if os.environ.get("OPENEYE_PROFILE"):
+        rtl_test_utils.profile_set_layer_input(0, dram.fmap[0])
     # OPENEYE_KEEP_GOING: a failed iact buffer check between chained layers is
     # logged and the model runs on, so the profiler times every layer (the
     # later layers then compute on wrong inputs); the test still fails at the end.
@@ -570,6 +572,9 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
                             dram.fmap[1 + layer_number] = tum.fill_dram_with_ref(calculated_results, dram.fmap[1 + layer_number], layer_parameters[layer_number], layer_parameters[layer_number+1])
                         if (layer_parameters[layer_number].layer_name != "Pooling") :
                             slo.batchnorm_output(layer_parameters[layer_number], 1, layer_number, dram)
+                        if os.environ.get("OPENEYE_PROFILE") and layer_number != max_layers - 1:
+                            # the activated output = the next layer's input (zeros, for zero skipping)
+                            rtl_test_utils.profile_set_layer_input(layer_number + 1, dram.fmap[1 + layer_number])
                         if (layer_number != max_layers - 1) :
                             logger.info("Iact check context: layer %d, repetition %d of %d",
                                         layer_number, layer_repetition,

@@ -956,6 +956,7 @@ PROFILE_PHASES = {
     5: "load_bias", 6: "load_quant", 7: "convert_iact", 8: "convert_iact",
     9: "convert_iact", 10: "compute", 11: "writeback", 12: "pooling",
     13: "pooling", 14: "pooling",
+    15: "load_act",     # GET_ACTIVATION: the table of a table activation (doc/experiments/2026-11-02_activation_rtl.md)
 }
 PSUM_SEND_RESULTS_STATE = 5  # psum_pipeline.v: streaming results to data_dma_o
 # Main state RECEIVE_PSUMS_TO_IACT: a layer whose results stay on chip (the next
@@ -1012,8 +1013,31 @@ def profile_set_layer_info(layer_parameters):
             "skip_iact": _plain_int(getattr(lpar, "skipIact", None), 0),
             "send_values_out": _plain_int(getattr(lpar, "send_values_out", None), 0),
             "pad_channels": _plain_int(getattr(lpar, "pad_channels", None), 0),   # bug #17 workaround
+            # activation hardware (doc/experiments/2026-11-02_activation_rtl.md): none / relu / leaky / table
+            "activation": {"mode": str(getattr(lpar, "act_mode", "none")),
+                           "round": bool(getattr(lpar, "act_round", False)),
+                           "keep_table": bool(getattr(lpar, "act_keep_table", False))},
         })
     _PROFILE_LAYER_INFO[:] = info
+
+
+def profile_set_layer_input(index, values):
+    """Zeros and negatives of layer <index>'s input, from the testbench reference (exactly what the RTL computes, as
+    the buffer checks show): the zeros are what zero skipping skips, and the input of a layer is the activated output
+    of the layer before (after pooling). Written into the layer's description in profile.json."""
+    if index >= len(_PROFILE_LAYER_INFO):
+        return
+    flat = []
+
+    def walk(v):
+        if isinstance(v, (list, tuple)):
+            for item in v:
+                walk(item)
+        else:
+            flat.append(int(v))
+    walk(_plain(values))
+    _PROFILE_LAYER_INFO[index]["input"] = {"values": len(flat), "zeros": sum(v == 0 for v in flat),
+                                           "negatives": sum(v < 0 for v in flat)}
 
 
 async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
@@ -1045,6 +1069,12 @@ async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
         psum_state_sig = dut.psum_pipeline_inst.fsm_psum_current_state
     except AttributeError:
         psum_state_sig = dut.fsm_psum_current_state
+    # Clocks in which the write-back takes the activated quantizer outputs (trace wire of OpenEye_FPGA.v; absent in
+    # older RTL or without UNPACKED_TRACES): the activation hardware's working clocks, inside the writeback phase.
+    try:
+        act_capture_sig = dut.UNPACKED_TRACES.act_capture
+    except AttributeError:
+        act_capture_sig = None
 
     def bit(sig):
         try:
@@ -1123,6 +1153,8 @@ async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
             layers.append({"index": len(layers), "start_cycle": cycle, "phases": {}})
         last_main = main
 
+        if act_capture_sig is not None and bit(act_capture_sig):
+            layers[-1]["activation_cycles"] = layers[-1].get("activation_cycles", 0) + 1
         step = {"cycles": 1, "in_offered": offered, "in_accepted": accepted, "out_words": out_word,
                 "in_stall": dut_ready_idle if phase.startswith("load_") else 0, "out_stall": out_waiting}
         add(pending.setdefault(phase, empty()), step)
