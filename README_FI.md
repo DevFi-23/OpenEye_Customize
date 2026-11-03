@@ -2634,6 +2634,80 @@ Ví dụ Conv1 của các model đã huấn luyện, psum = 5000 / −5000: ReLU
 → T = 12 / −8; hard-swish (157, 16) → q = 12 / −12 → T = 11 / −8. Cả 4 hàm qua cùng 3 tầng của bộ lượng tử (3 chu kỳ, 4 lane mỗi chu kỳ); bảng chỉ thêm
 một lần đọc LUTRAM trong cùng chu kỳ, nên 0 chu kỳ mỗi giá trị.
 
+#### Bảng của SiLU / hard-swish, vì sao Leaky ReLU không cần bảng, 3 tầng của bộ lượng tử (giải thích 2026-11-03)
+
+**96 chu kỳ của SiLU / hard-swish nằm ở pha `load_act`** (trạng thái `GET_ACTIVATION` = 15), không phải `load_iact`: 32 chu kỳ × 3 layer có hàm kích hoạt
+(Conv1, Conv2, Conv3; Dense cuối không có).
+
+**Bảng gửi vào accelerator.** Sau bộ lượng tử, giá trị của layer là int8, chỉ có 256 khả năng (−128 … 127). `onnx2model.activation_table` tính sẵn kết quả
+của hàm cho từng khả năng, mỗi layer một bảng (scale mỗi layer khác nhau):
+
+```
+T[x + 128] = làm_tròn( f(x · s_out) / s_next ),  kẹp về [−128, 127],  x = −128 … 127
+  f(x) = x · sigmoid(x)               (SiLU)
+  f(x) = x · clip(x + 3, 0, 6) / 6    (hard-swish)
+```
+
+`activation_table_words` xếp 8 ô vào mỗi word DMA 64 bit (ô 8w + b ở byte b của word w): 256 ô = 32 word, gửi ngay sau các word lượng tử của layer. Ví dụ
+bảng SiLU của Conv1 của model đã huấn luyện (s_out = 0,0374, s_next = 0,0228):
+
+| Word | x | 8 ô | Word gửi đi |
+|---:|---|---|---|
+| 0 | −128 … −121 | −2 −2 −2 −2 −2 −2 −2 −2 | `0xFEFEFEFEFEFEFEFE` |
+| 14 | −16 … −9 | −9 −9 −9 −8 −8 −7 −7 −6 | `0xFAF9F9F8F8F7F7F7` |
+| 15 | −8 … −1 | −6 −5 −4 −4 −3 −2 −2 −1 | `0xFFFEFEFDFCFCFBFA` |
+| 16 | 0 … 7 | 0 1 2 3 4 4 5 7 | `0x0705040403020100` |
+| 31 | 120 … 127 | 127 (cả 8 ô) | `0x7F7F7F7F7F7F7F7F` |
+
+Trên accelerator: sau `GET_QUANTIZE`, FSM chính vào `GET_ACTIVATION`, nhận 1 word mỗi chu kỳ (32 chu kỳ; 64 ở DMA 32 bit). Mỗi word được ghi cùng lúc vào cả
+4 bảng (`activation_table.v`, một bảng cho mỗi lane ghi ngược), mỗi bảng 8 bank LUTRAM: byte b vào bank b ở địa chỉ w. Layer sau dùng đúng bảng cũ thì
+`act_keep_table` bỏ qua bước này; ở model MNIST 3 layer có scale khác nhau nên nạp 3 bảng.
+
+Bảng giải thích luôn vì sao các hàm này mất số 0: bảng SiLU chỉ có **một** ô bằng 0 (x = 0), mọi giá trị âm thành số âm khác 0; bảng hard-swish đưa
+x ≤ −78 (số thực ≤ −3) về 0 nên còn giữ khoảng 14 % số 0 ở input Conv3; ReLU đưa mọi số âm về 0.
+
+**Vì sao Leaky ReLU không cần bảng.** Bộ lượng tử vốn đã nhân: đầu ra ≈ psum × M (M = s_in·s_w / s_next = mant / 2^shift). Leaky ReLU là hai đoạn thẳng
+(f(x) = x khi x ≥ 0, 0,1·x khi x < 0), nên psum ≥ 0 dùng psum × M, cặp (135, 15) ở Conv1, và psum < 0 dùng psum × 0,1·M, cặp (215, 19): vẫn chỉ là
+một phép nhân, khác hệ số. Phần cứng chỉ cần **cặp hệ số thứ hai** `act_neg_mant` (8 bit) và `act_neg_shift` (7 bit), nằm trong các bit trống của word cấu
+hình: 0 word DMA, 0 chu kỳ. SiLU và hard-swish là **đường cong** (sigmoid cần hàm mũ và phép chia; hard-swish kẹp rồi nhân với chính x), không viết được
+thành "psum × hằng số" cho mỗi dấu; tính thật cần nhiều DSP và nhiều tầng, còn input chỉ có 256 giá trị nên tra bảng cho kết quả chính xác và rẻ hơn.
+
+**3 tầng của bộ lượng tử** (`hdl/quantization_unit.v`; 4 bộ chạy song song = 4 lane ghi ngược, `WRITEBACK_WORDS`). Mỗi chu kỳ FSM psum
+(`SEND_PSUM_TO_IACT`) đọc 4 psum từ bộ đệm vào `pre_quantized_value`, rồi mỗi psum đi qua 3 tầng thanh ghi:
+
+```
+psum (20 bit)
+  │
+  ▼  TẦNG 1  (thanh ghi sum_s1, mant_s1, shift_s1, round_s1)
+  │    sum = psum + offset (offset = 0)
+  │    Leaky: bit dấu của sum chọn (neg_mant, neg_shift) hay (mant, shift)    ← bộ chọn 2:1
+  ▼  TẦNG 2  (thanh ghi prod_s2)
+  │    prod = mant × sum + hằng_số_làm_tròn, hằng số = 2^(shift−1) nếu act_round   ← 1 DSP: nhân + cộng
+  ▼  TẦNG 3  (thanh ghi quantized_value)
+  │    q = kẹp(prod >>> shift, act_min, 127)        (ReLU: act_min = 0)
+  ▼
+  [chế độ bảng] T[q + 128]: chỉ số = q với bit dấu đảo, đọc LUTRAM không cần clock, trong cùng chu kỳ (psum_pipeline.v: quant_result)
+  ▼
+FSM chính chép vào iact_to_psum_mux_reg ở cạnh clock kế tiếp → đóng gói → bộ đệm iact của layer sau
+```
+
+Cùng psum = −5000 ở Conv1:
+
+| | Tầng 1 | Tầng 2 | Tầng 3 | Bảng | Ra |
+|---|---|---|---|---|---:|
+| ReLU | (216, 16), không làm tròn | 216·(−5000) = −1.080.000 | >>16 = −16,48 → −17 → kẹp ở 0 | — | **0** |
+| Leaky | dấu âm → (215, 19), làm tròn | −1.075.000 + 2^18 = −812.856 | >>19 = −1,55 → −2 | — | **−2** |
+| SiLU | (151, 16), làm tròn | −755.000 + 2^15 = −722.232 | >>16 = −11,02 → −12 | ô 116: bank 4, địa chỉ 14 = −8 | **−8** |
+
+**Vì sao hàm kích hoạt không tốn thêm chu kỳ ở pha ghi ngược:**
+1. **Pipeline:** mỗi tầng là một thanh ghi; mỗi chu kỳ 4 psum mới vào tầng 1, trong khi 4 psum trước ở tầng 2 và 4 psum trước nữa ở tầng 3. Mỗi giá trị luôn
+   mất đúng 3 chu kỳ nhưng vẫn ra 4 giá trị mỗi chu kỳ, dù mỗi tầng làm nhiều hay ít việc. FSM chính đã chờ đúng 3 chu kỳ này từ trước khi có hàm kích hoạt.
+2. **Hàm kích hoạt chen vào các tầng có sẵn, không thêm tầng:** bộ chọn độ dốc của Leaky nằm trước thanh ghi tầng 1 (bit dấu có ngay trong chu kỳ đó);
+   phép cộng làm tròn dùng bộ cộng của DSP ở tầng 2; tra bảng là đọc LUTRAM không clock giữa thanh ghi tầng 3 và thanh ghi nhận của FSM chính. Vẫn 3 chu kỳ
+   trễ, 4 giá trị mỗi chu kỳ, nên pha ghi ngược giữ nguyên 11.948 chu kỳ (mục 6.15).
+3. **Điều kiện:** logic thêm phải chạy kịp trong một chu kỳ 4 ns. Vivado xác nhận kịp (WNS +0,045 ns, các đường của hàm kích hoạt không nằm trong nhóm đường
+   chậm nhất). Nếu không kịp thì phải thêm tầng thứ 4 (phương án dự phòng trong thiết kế), và mỗi lượt ghi ngược sẽ chậm thêm 1 chu kỳ.
+
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
 **Số liệu mục này là của ngày 2026-10-10.** Hiện tại (baseline lint `tools/lint_baseline/`, sau các bản sửa #14, #19, #30, upstream `e78e5b7` và bước B của hàm kích hoạt): `fpga` **460**, `parallel` **36** (bước B: `data_dma_i_reg` nay dùng hết nên bớt 1 `UNUSEDSIGNAL`; `e78e5b7` bớt 1 `BLKSEQ` trong `OpenEye_FPGA.v`; #30 xoá cảnh báo
@@ -3197,3 +3271,11 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   cứng `2026-11-02_route4ns_act_zu7ev` thay cho `fix31`), 6.5 (bảng layer, bảng hàm kích hoạt), 6d (bảng Vivado hiện tại là lần `act`, kèm cột `wsend`),
   7 (ảnh 0 đo lại trên `dev`, kết quả hàm kích hoạt), 8 và 8c (mốc phần cứng 61,4k LUT, WNS +0,045 ns; việc đo hàm kích hoạt; thứ tự đề xuất), 9b (lint
   `fpga` 461 → 460 sau bước B). Upstream kiểm tra lại: vẫn `93f0e82`, mục 2 còn đúng.
+
+### 2026-11-03
+
+- **Giải thích hàm kích hoạt trên phần cứng** (theo yêu cầu, chỉ tài liệu): mục 9, phần "Bảng của SiLU / hard-swish, vì sao Leaky ReLU không cần bảng,
+  3 tầng của bộ lượng tử": nội dung bảng 256 ô và cách đóng gói thành 32 word DMA (ví dụ bảng SiLU của Conv1), nạp ở `GET_ACTIVATION` (96 chu kỳ = 3 × 32
+  ở pha `load_act`, không phải `load_iact`); Leaky ReLU chỉ cần cặp hệ số thứ hai vì là hai đoạn thẳng; 3 tầng của `quantization_unit.v` và chỗ mỗi hàm chen
+  vào (bộ chọn độ dốc ở tầng 1, cộng làm tròn ở tầng 2, tra bảng sau tầng 3 trong cùng chu kỳ), ví dụ psum = −5000 qua từng tầng; vì sao pha ghi ngược
+  không dài thêm.
