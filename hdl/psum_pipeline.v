@@ -193,7 +193,13 @@ module psum_pipeline #(
   wire [TRANS_BITWIDTH_PSUM*TRANS_WORDS-1:0] pre_quantized_value_flat;
   wire [8-1:0] quant_result[TRANS_WORDS-1:0];
   wire [8-1:0] quant_unit_out[TRANS_WORDS-1:0];   // quantizer outputs, before the table
-  reg [TRANS_BITWIDTH_PSUM*CLUSTERS*NUM_GLB_PSUM-1:0] psum_buffer_data_temp_reg;
+  // Read-out registers: the psum bus, or CLUSTER_COLUMNS DMA words when that is wider. A fully-connected layer puts
+  // cluster column cc's result at bit cc*DMA_BITWIDTH (psum_readout_src below); with the bus width alone (80 bits at
+  // CLUSTER_ROWS 1, NUM_GLB_PSUM 2) column 1's result did not fit and was read out as 0 (bug #36,
+  // doc/experiments/2026-11-03_table3_cr1.md). Every other configuration keeps the old width.
+  localparam PSUM_BUS_WIDTH = TRANS_BITWIDTH_PSUM*CLUSTERS*NUM_GLB_PSUM;
+  localparam READOUT_WIDTH  = (CLUSTER_COLUMNS*DMA_BITWIDTH > PSUM_BUS_WIDTH) ? CLUSTER_COLUMNS*DMA_BITWIDTH : PSUM_BUS_WIDTH;
+  reg [READOUT_WIDTH-1:0] psum_buffer_data_temp_reg;
   // Convolution emits PSUM_OUTPUT_WORDS tightly packed accumulator values
   // per DMA beat, with unused high DMA bits zero. Advancing by DMA_BITWIDTH
   // drops bits whenever the accumulator width is less than a DMA slot.
@@ -211,14 +217,15 @@ module psum_pipeline #(
   // carry cluster column cc's GLB-0 psum. Shifting the raw buffer bus
   // instead emitted cluster (0,0)'s unused GLB 2/3 slot as every second word
   // and never reached cluster column 1.
-  reg [TRANS_BITWIDTH_PSUM*CLUSTERS*NUM_GLB_PSUM-1:0] psum_readout_src;
+  reg [READOUT_WIDTH-1:0] psum_readout_src;
   integer cc_fc;
   always @(*) begin
-    psum_readout_src = psum_buffer_data_r;
+    psum_readout_src = 0;
+    psum_readout_src[PSUM_BUS_WIDTH-1:0] = psum_buffer_data_r;
     if (fully_connected_layer) begin
       psum_readout_src = 0;
       for (cc_fc = 0; cc_fc < CLUSTER_COLUMNS; cc_fc = cc_fc + 1) begin
-        if (cc_fc*DMA_BITWIDTH + TRANS_BITWIDTH_PSUM <= TRANS_BITWIDTH_PSUM*CLUSTERS*NUM_GLB_PSUM) begin
+        if (cc_fc*DMA_BITWIDTH + TRANS_BITWIDTH_PSUM <= READOUT_WIDTH) begin
           psum_readout_src[cc_fc*DMA_BITWIDTH+:TRANS_BITWIDTH_PSUM] =
             psum_buffer_data_r[cc_fc*TRANS_BITWIDTH_PSUM*NUM_GLB_PSUM+:TRANS_BITWIDTH_PSUM];
         end
@@ -246,7 +253,15 @@ module psum_pipeline #(
           localparam integer MODE = rr_cc*NUM_GLB_PSUM*ROUTER_MODES_PSUM + rr_cr*CLUSTER_COLUMNS*NUM_GLB_PSUM*ROUTER_MODES_PSUM
                                   + rr_g*ROUTER_MODES_PSUM*2 + 2;
           wire not_chain_start = (router_mode_psum[MODE] == 0) & (CLUSTER_ROWS != 1);
-          assign chain_ready_terms[TERM]  = psum_ready_o_reg[GLB] | not_chain_start;
+          // At CLUSTER_ROWS == 1 every PE column starts a chain, the odd GLB of a pair too. Waiting for the even
+          // one only let the collection start while the odd column still computed; when it finished 3 or more
+          // cycles late, its PE rows handed their psums up out of step and one output pixel came out wrong
+          // (bug #28, data dependent through zero skipping; doc/experiments/2026-11-03_table3_cr1.md).
+          if ((CLUSTER_ROWS == 1) && (rr_g*2 + 1 < NUM_GLB_PSUM)) begin : gen_pair_ready
+            assign chain_ready_terms[TERM] = psum_ready_o_reg[GLB] & psum_ready_o_reg[GLB+1];
+          end else begin : gen_even_ready
+            assign chain_ready_terms[TERM] = psum_ready_o_reg[GLB] | not_chain_start;
+          end
           assign chain_enable_terms[TERM] = psum_enable_o[GLB]    | not_chain_start;
         end
       end

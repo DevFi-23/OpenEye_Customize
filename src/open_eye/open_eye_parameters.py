@@ -191,11 +191,14 @@ class OpenEyeParameters(object):
         except:
             self.BUFFER_WIDTH = 10
 
-        # Width of WGHT GLBs
+        # Width of WGHT GLBs: depth 2^BUFFER_WIDTH_WGHT rows of the weight staging buffer of OpenEye_FPGA.v. A Dense layer
+        # stores the weights of all its K passes at once; with 12 bit (4,096 rows) Dense 1568 -> 32 at CLUSTER_ROWS 1,
+        # NUM_GLB_WGHT 3 (4,224 rows) and Dense 3136 -> 32 at the MNIST platform overflowed (bug #29,
+        # doc/experiments/2026-11-03_table3_cr1.md); layer_parameters.check_wght_buffer refuses a layer that does not fit.
         try:
             self.BUFFER_WIDTH_WGHT = int(os.getenv("BUFFER_WIDTH_WGHT"))
         except:
-            self.BUFFER_WIDTH_WGHT = 12
+            self.BUFFER_WIDTH_WGHT = 13
             
         # Width of PSUM GLBs
         try:

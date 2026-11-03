@@ -70,7 +70,11 @@ module RAM_SP_generic #(
     parameter AddrWidth = 12,
     parameter DataWidth = 8,
     parameter Pipelined = 0,
-    parameter WriteMaskWidth = 1
+    parameter WriteMaskWidth = 1,
+    // Vivado RAM_STYLE of the array ("auto", "block", "ultra", ...); ignored by simulators and Verilator
+    /* verilator lint_off UNUSEDPARAM */
+    parameter RamStyle = "auto"
+    /* verilator lint_on UNUSEDPARAM */
 ) (
     input  wire                 clk,
     input  wire                 cen,
@@ -83,7 +87,7 @@ module RAM_SP_generic #(
   localparam Depth = 2 ** AddrWidth;
   localparam MaskWordWidth = DataWidth / WriteMaskWidth;
 
-  reg [DataWidth-1:0] mem    [0:Depth-1];
+  (* ram_style = RamStyle *) reg [DataWidth-1:0] mem    [0:Depth-1];
   reg [DataWidth-1:0] memout;
 
   generate

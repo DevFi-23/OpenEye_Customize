@@ -91,6 +91,28 @@ def check_rtl_activation(layer_params):
             raise NotImplementedError(f"rounding with shift {max(shifts)} > {ACT_ROUND_SHIFT_MAX}")
 
 
+def wght_buffer_rows(params, wght_words):
+    """Rows of the weight staging buffer of OpenEye_FPGA.v that a layer's weight stream fills: GET_WGHT assembles one
+    row from every WGHT_ONE_WORD_ALL_RAM = ceil(Clusters * WGHT_Trans_Bitwidth * NUM_GLB_WGHT / DMA_BITWIDTH) DMA
+    words (3 at 2 clusters, NUM_GLB_WGHT 3, DMA 64 bit)."""
+    words_per_row = math.ceil(params.Clusters * params.WGHT_Trans_Bitwidth * params.NUM_GLB_WGHT / params.DMA_BITWIDTH)
+    return math.ceil(wght_words / words_per_row)
+
+
+def check_wght_buffer(params, wght_words, layer_name=""):
+    """Stop a layer whose weights do not fit the weight staging buffer (2^BUFFER_WIDTH_WGHT rows). Its write pointer
+    wraps without any sign, so the last rows overwrote the first ones and the layer computed slightly wrong: bug #29
+    (Dense 1568 -> 32 at CLUSTER_ROWS 1, NUM_GLB_WGHT 3 and Dense 3136 -> 32 at the MNIST platform need 4,224 rows,
+    more than the 4,096 of the former 12-bit buffer; doc/experiments/2026-11-03_table3_cr1.md). Returns the rows."""
+    rows = wght_buffer_rows(params, wght_words)
+    capacity = 1 << params.BUFFER_WIDTH_WGHT
+    if rows > capacity:
+        raise NotImplementedError(
+            f"{layer_name} weights need {rows} rows of the weight buffer ({wght_words} DMA words), it has {capacity} "
+            f"(BUFFER_WIDTH_WGHT={params.BUFFER_WIDTH_WGHT}); raise BUFFER_WIDTH_WGHT or split the layer")
+    return rows
+
+
 def activation_registers(layer_params):
     """The status register fields of a layer's activation (act_mode, act_round, act_neg_mant, act_neg_shift,
     act_keep_table), checked by check_rtl_activation."""

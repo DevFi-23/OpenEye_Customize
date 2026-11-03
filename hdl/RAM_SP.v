@@ -84,8 +84,9 @@ module RAM_SP
     parameter Pipelined = 0,
     // One mask bit per equal-sized subword. With the default value of 1,
     // writes remain unmasked and wr_mask_i may be left unconnected.
-    parameter WriteMaskWidth = 1
-    
+    parameter WriteMaskWidth = 1,
+    // Vivado RAM_STYLE of the array ("auto" = Vivado decides; "ultra" = URAM); ignored by simulators
+    parameter RamStyle = "auto"
 ) (
     input   wire                        clk_i,
     // We deliberately leave out a reset here so that it is obvious 
@@ -133,7 +134,8 @@ module RAM_SP
             .AddrWidth          (AddrWidth),
             .DataWidth          (DataWidth),
             .Pipelined          (Pipelined),
-            .WriteMaskWidth     (WriteMaskWidth)
+            .WriteMaskWidth     (WriteMaskWidth),
+            .RamStyle           (RamStyle)
         ) impl (
             .clk                (clk),
             .cen                (cen),

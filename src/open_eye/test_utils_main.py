@@ -131,6 +131,18 @@ def write_stream_layer_mp(params, layer_params, dram_layer_content, return_dict,
     Each layer type uses a specialized mapper class to generate appropriate
     test streams that match the hardware's expected data format and timing.
     """
+    try:
+        _write_stream_layer(params, layer_params, dram_layer_content, return_dict, layer_repetition, sparse_iacts,
+                            sparse_wghts)
+    except Exception as exc:
+        # A mapper that refuses a layer (check_wght_buffer, check_rtl_activation) runs in this child process; its
+        # message used to be lost and the parent only saw the missing stream (KeyError). write_stream re-raises it.
+        return_dict[("error", layer_repetition)] = "%s: %s" % (type(exc).__name__, exc)
+        raise
+
+
+def _write_stream_layer(params, layer_params, dram_layer_content, return_dict, layer_repetition, sparse_iacts,
+                        sparse_wghts):
     if "Depthwise" in str(layer_params.layer_name):
         LayerStreamGenerator = DWMapper(params, layer_params, layer_repetition, dram_layer_content, sparse_iacts, sparse_wghts)
         LayerStreamGenerator.make_stream()
@@ -188,7 +200,9 @@ def write_stream(params, layer_params, dram_layer_content, sparse_iacts, sparse_
                   return_dict, layer_repetition,
                   sparse_iacts, sparse_wghts)),
         layer_params.needed_total_transmissions)
-        
+    errors = [return_dict[key] for key in return_dict.keys() if isinstance(key, tuple) and key[0] == "error"]
+    if errors:
+        raise RuntimeError("stream generation of %s failed: %s" % (layer_params.layer_name, errors[0]))
     return return_dict
 
 # Reference Generation

@@ -51,6 +51,7 @@ BASELINE = {
     "TRANS_WORDS": 8,
     "BRANCHES": 1,
     "BUFFER_WIDTH": 12,
+    "BUFFER_WIDTH_WGHT": 13,   # weight staging buffer 8,192 rows (bug #29); open_eye_parameters' default, written out for config.json
     "QUANT_AMOUNT": 32,
     "DMA_BITWIDTH": 64,
     "RAM_CELLS": 32,

@@ -115,7 +115,7 @@ module OpenEye_FPGA #(
       parameter BRANCHES      = 1,
       parameter BUFFER_WIDTH  = 10,
       parameter BUFFER_WIDTH_PSUM = 14,
-      parameter BUFFER_WIDTH_WGHT = 12,
+      parameter BUFFER_WIDTH_WGHT = 13,   // weight staging buffer depth 2^13 rows (12 overflowed for large Dense layers, bug #29)
       parameter QUANT_AMOUNT  = 32,
       parameter DATA_PSUM_BITWIDTH = 32,
       parameter CLUSTER_COLUMNS = 2,
@@ -3040,7 +3040,10 @@ end
     RAM_SP #(
         .DataWidth(TRANS_BITWIDTH_WGHT * CLUSTERS * NUM_GLB_WGHT),
         .AddrWidth(BUFFER_WIDTH_WGHT),
-        .Pipelined(1)
+        .Pipelined(1),
+        // URAM: at 2^13 rows (bug #29) Vivado chose 64 RAMB36 + 845 LUT of read multiplexers (BRAM 61 % -> 82 %);
+        // in URAM the buffer takes 8 blocks with the cascade built in, as the 2^12 one took 4.
+        .RamStyle("ultra")
     ) wght_buffer (
         .clk_i  (clk_i),
         .rd_en_i(wght_buffer_en_r & !wght_buffer_en_w),
