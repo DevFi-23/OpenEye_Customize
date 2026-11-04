@@ -98,11 +98,14 @@ def test_pad_first_layer(monkeypatch):
     wide = types.SimpleNamespace(layer_name="Convolution2D", channels=1, iact_x_line_repetitions=2)
     narrow = types.SimpleNamespace(layer_name="Convolution2D", channels=1, iact_x_line_repetitions=1)
     dense = types.SimpleNamespace(layer_name="Dense", channels=1, iact_x_line_repetitions=2)
+    monkeypatch.delenv(channel_pad.PAD_CHANNELS_ENV, raising=False)
+    assert channel_pad.pad_first_layer(model, [wide]) == (model, False)   # off by default since the RTL fix of #17
+    monkeypatch.setenv(channel_pad.PAD_CHANNELS_ENV, "1")
     padded, done = channel_pad.pad_first_layer(model, [wide])
     assert done and isinstance(padded[0], channel_pad.ChannelPaddedConv2D) and padded[1] == "next layer"
     assert channel_pad.pad_first_layer(model, [narrow]) == (model, False)
     assert channel_pad.pad_first_layer(model, [dense]) == (model, False)
-    monkeypatch.setenv(channel_pad.PAD_CHANNELS_ENV, "0")      # reproduce bug #17
+    monkeypatch.setenv(channel_pad.PAD_CHANNELS_ENV, "0")
     assert channel_pad.pad_first_layer(model, [wide]) == (model, False)
 
 
@@ -118,3 +121,17 @@ def test_fill_padding_channels():
     assert dram.weights[0][1] == [[[1] * 3] * 3] * 2           # non-zero: all-zero kernels fail (bug #22)
     assert dram.fmap[1] == "layer 1"
     assert channel_pad.fill_padding_channels([conv_layer(4)], dram) == 0          # not padded: unchanged
+
+
+@pytest.mark.parametrize("width,channels,filters", [
+    (28, 1, 32), (28, 1, 64), (8, 1, 64), (14, 1, 64),     # one channel: the cases of bug #39
+    (28, 2, 32), (14, 4, 64), (14, 32, 64), (8, 8, 64),    # several channels: unchanged by the fix
+])
+def test_weight_sets_cover_every_pass(width, channels, filters, monkeypatch):
+    # Bug #39: the weight stream carries one set per filter group and channel batch, the sets the RTL reads in
+    # needed_wght_cycles passes. One channel with more than 16 filters per calculation got a single set, so the RTL
+    # computed the second filter group with the first group's weights (MNIST Conv1 once it was no longer padded).
+    for key, value in dict(PLATFORM, QUANT_AMOUNT="64").items():   # one quantization entry per filter
+        monkeypatch.setenv(key, value)
+    p = lp.LayerParameters([0], conv_layer(width, channels=channels, filters=filters), oep.get_oep(1), 0, 1)
+    assert p.needed_wght_transmissions == p.needed_wght_cycles * p.iact_transmissions_pe

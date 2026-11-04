@@ -44,7 +44,7 @@
 1	UNUSEDPARAM | hdl/router_configurator.v | Parameter is not used: 'FSM_CEIL_PSUM_RTR_CCLS'
 1	UNUSEDPARAM | hdl/router_configurator.v | Parameter is not used: 'PSUM_CHOOSE_REP_2'
 1	UNUSEDPARAM | hdl/router_configurator.v | Parameter is not used: 'PSUM_CHOOSE_REP_4'
-1	UNUSEDSIGNAL | <generated>/dma_storage.v | Bits of signal are not used: 'pipe_chain_reg'[895:883]
+1	UNUSEDSIGNAL | <generated>/dma_storage.v | Bits of signal are not used: 'pipe_chain_reg'[895:891]
 1	UNUSEDSIGNAL | hdl/GLB_cluster.v | Signal is not used: 'data_write_enable_i'
 1	UNUSEDSIGNAL | hdl/GLB_cluster.v | Signal is not used: 'data_write_enable_iact_i'
 1	UNUSEDSIGNAL | hdl/GLB_cluster.v | Signal is not used: 'ext_mem_iact_addr_i'
@@ -292,26 +292,14 @@
 1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator LT expects 17 bits on the RHS, but RHS's VARREF 'filters_w' generates 7 bits.
 3	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator SUB expects 32 or 17 bits on the RHS, but RHS's VARREF 'filters_w' generates 7 bits.
 1	WIDTHEXPAND | hdl/data_pipeline_wght.v | Operator SUB expects 32 or 17 bits on the RHS, but RHS's VARREF 'over_ending' generates 1 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ADD expects 13 bits on the LHS, but LHS's REPLICATE generates 4 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ADD expects 13 bits on the RHS, but RHS's VARREF 'single_output_half' generates 1 bits.
 1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ADD expects 32 or 12 bits on the RHS, but RHS's VARREF 'wght_size_x' generates 6 bits.
 2	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ADD expects 32 or 8 bits on the RHS, but RHS's VARREF 'ram_inc_counter_offset' generates 1 bits.
 1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ADD expects 8 bits on the RHS, but RHS's SEL generates 4 bits.
 1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ADD expects 8 bits on the RHS, but RHS's VARREF 'fsm_row_offset' generates 4 bits.
 3	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 12 bits on the Assign RHS, but Assign RHS's VARREF 'x_start' generates 8 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'rd_addr_3' generates 12 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'rd_addr_inc_0_next' generates 12 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'rd_addr_inc_1_next' generates 12 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'rd_addr_inc_2_next' generates 12 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'rd_addr_inc_3_next' generates 12 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'rd_addr_inc_4_next' generates 12 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'wr_addr_0' generates 12 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'wr_addr_1' generates 12 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 13 bits on the Assign RHS, but Assign RHS's VARREF 'wr_addr_2' generates 12 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator COND expects 13 bits on the Conditional False, but Conditional False's VARREF 'rd_addr_inc_4' generates 12 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 12 bits on the LHS, but LHS's VARREF 'wr_cycle_loop_cnt_0' generates 8 bits.
 1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 12 bits on the RHS, but RHS's VARREF 'iact_words_per_compute' generates 8 bits.
-1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 16 bits on the RHS, but RHS's VARREF 'needed_iact_buffer_words_i' generates 12 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 13 bits on the LHS, but LHS's VARREF 'wr_cycle_loop_cnt_0' generates 8 bits.
+1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 16 bits on the RHS, but RHS's VARREF 'needed_iact_buffer_words_i' generates 13 bits.
 1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'router_cycle' generates 2 bits.
 1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator NEQ expects 16 bits on the RHS, but RHS's REPLICATE generates 15 bits.
 1	WIDTHEXPAND | hdl/iact_stream_constructor.v | Operator SUB expects 32 or 12 bits on the RHS, but RHS's VARREF 'stride_x_i' generates 3 bits.
@@ -366,7 +354,6 @@
 1	WIDTHTRUNC | hdl/data_pipeline_wght.v | Operator ASSIGNW expects 4 bits on the Assign RHS, but Assign RHS's SEL generates 16 bits.
 1	WIDTHTRUNC | hdl/data_pipeline_wght.v | Operator ASSIGNW expects 7 bits on the Assign RHS, but Assign RHS's COND generates 32 or 8 bits.
 1	WIDTHTRUNC | hdl/iact_stream_constructor.v | Operator ASSIGNDLY expects 2 bits on the Assign RHS, but Assign RHS's SUB generates 4 bits.
-1	WIDTHTRUNC | hdl/iact_stream_constructor.v | Operator ASSIGNW expects 12 bits on the Assign RHS, but Assign RHS's ADD generates 13 bits.
 3	WIDTHTRUNC | hdl/psum_pipeline.v | Bit extraction of array[31:0] requires 5 bit index, not 8 bits.
 1	WIDTHTRUNC | hdl/psum_pipeline.v | Operator ASSIGNDLY expects 12 bits on the Assign RHS, but Assign RHS's VARREF 'psum_cycle_addr_0_next' generates 14 bits.
 2	WIDTHTRUNC | hdl/psum_pipeline.v | Operator ASSIGNDLY expects 12 bits on the Assign RHS, but Assign RHS's VARREF 'psum_cycle_addr_1_next' generates 14 bits.

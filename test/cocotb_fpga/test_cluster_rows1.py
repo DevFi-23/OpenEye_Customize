@@ -10,6 +10,9 @@
      (zero skipping). The paper network shows it in conv2 (pixel x = 7, y = 1 with seed 1).
 #36  the read-out of a final Dense layer dropped the results of cluster column 1 at CLUSTER_ROWS 1, NUM_GLB_PSUM 2 (the
      read-out register was 80 bits, column 1 needs bits 64-83): Dense 32 -> 10 read 0 for outputs 6-9.
+#37  the iact buffer fields (words per write, address increments) were 12 bits: conv 14 x 14 x 32 -> 32 at
+     CLUSTER_ROWS 1, CLUSTER_COLUMNS 2 writes 4,096 words per pass, which arrived as 0, and every output was the bias.
+     13 bits since the fix (IACT_BUFFER_ADDR_WIDTH), the toolchain refuses more (layer_parameters.check_iact_buffer).
 
 Usage (from the repository root):
   venv/bin/python -m pytest -q test/cocotb_fpga/test_cluster_rows1.py
@@ -18,22 +21,24 @@ import pytest
 
 import test_conv_const as conv
 
-# case: (LAYER, layers, input width, input height, NUM_GLB_PSUM, NUM_GLB_WGHT)
+# case: (LAYER, layers, input width, input height, NUM_GLB_PSUM, NUM_GLB_WGHT[, input channels, filters])
 CASES = {
     "dense32_10_x2":        ("DENSE_CHAIN_32_10", 1, 8, 1, 2, 3),          # #36 alone, about 20 s
     "dense1568_32_10_x4":   ("DENSE_CHAIN_1568_32_10", 2, 8, 1, 4, 3),     # #29: 4,224 weight rows
     "dense1568_32_10_x2":   ("DENSE_CHAIN_1568_32_10", 2, 8, 1, 2, 3),     # #29 and #36
     "paper_x2_y3":          ("PAPER_MNIST", 7, 8, 28, 2, 3),               # #28, #29, #36: Table 3 row CR 1 X 2 Y 3
+    "conv14_c32_x2":        ("Convolution_Single", 1, 14, 14, 2, 3, 32, 32),   # #37: 4,096 iact buffer words per pass
 }
 
 
 @pytest.mark.parametrize("case", list(CASES))
 def test_cluster_rows1(case, request, monkeypatch):
-    layer, layers, width, height, glb_psum, glb_wght = CASES[case]
+    layer, layers, width, height, glb_psum, glb_wght, channels, filters = (CASES[case] + (1, conv.NUM_FILTERS))[:8]
     monkeypatch.setenv("OPENEYE_SEED", "1")
     monkeypatch.setenv("OPENEYE_FAIL_ON_STALL", "400000")
     monkeypatch.setattr(conv, "NUM_GLB_PSUM", glb_psum)
     monkeypatch.setattr(conv, "NUM_GLB_WGHT", glb_wght)
     monkeypatch.setattr(conv, "INPUT_SIZE_X", width)
-    conv._run_conv_const(layer, 8, 1, num_glb_iact=1, input_channels=1, request=request, input_height=height,
+    monkeypatch.setattr(conv, "NUM_FILTERS", filters)
+    conv._run_conv_const(layer, 8, 1, num_glb_iact=1, input_channels=channels, request=request, input_height=height,
                          quant_amount=32, dma_bitwidth=64, random_data=True, expect_layers=layers)

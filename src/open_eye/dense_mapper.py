@@ -125,10 +125,12 @@ class DenseMapper(LayerMapper):
         # === REGISTER PACKING ===
         # Pack all layer configuration parameters into hardware register format
         # Uses pack_registers() utility from regmap_pack module
-            from open_eye.layer_parameters import activation_registers, check_wght_buffer
+            from open_eye.layer_parameters import activation_registers, check_iact_buffer, check_wght_buffer
             from open_eye.generator import pack_registers
-            # the weights of this layer must fit the weight staging buffer (bug #29): all K passes are stored at once
+            # the weights of this layer must fit the weight staging buffer (bug #29): all K passes are stored at once;
+            # a pass of activations the iact buffer (bug #37)
             check_wght_buffer(params, len(self.WghtStreamCreator.get_wght_stream()), str(layer_params.layer_name))
+            check_iact_buffer(layer_params)
             words = pack_registers({
             "wght_cycles_reg": 1,
             "stride_x": layer_params.strideX,

@@ -1,6 +1,11 @@
 # This file is part of the OpenEye project.
 # SPDX-License-Identifier: SHL-2.1
-"""Pad a one-channel convolution input to two channels (Python workaround for RTL bug #17).
+"""Pad a one-channel convolution input to two channels (former Python workaround for RTL bug #17).
+
+Bug #17 is fixed in the RTL since 2026-11-04 (as upstream 36395dd: a one-channel
+pixel is a word of its own, no row-pair packing), so the padding is OFF by
+default; OPENEYE_PAD_CHANNELS=1 turns it on again, for comparisons with the
+measurements made before the fix. The description below is the bug as it was.
 
 The one-channel writer of hdl/iact_stream_constructor.v computes its RAM
 address from row and column only and ignores the x passes of an image wider
@@ -18,8 +23,8 @@ harmless next to zero activations. The cost is the second channel on the DMA
 input stream, in the converter and in the weight stream; the zero activations
 are skipped by the sparse PE datapath.
 
-Used by the testbench (OpenEye_FPGA_tb.py): on by default, OPENEYE_PAD_CHANNELS=0
-turns it off to reproduce bug #17. Only layer 0 is padded, the only layer
+Used by the testbench (OpenEye_FPGA_tb.py) when OPENEYE_PAD_CHANNELS=1 (was on
+by default until the bug #17 fix). Only layer 0 is padded, the only layer
 whose activations come from the DMA stream through the converter.
 """
 
@@ -34,8 +39,8 @@ PAD_WEIGHT = 1      # weight of the padding channel: any non-zero value (bug #22
 
 
 def padding_enabled():
-    """False when OPENEYE_PAD_CHANNELS is set to 0 (reproduce bug #17)."""
-    return os.environ.get(PAD_CHANNELS_ENV, "1") != "0"
+    """True when OPENEYE_PAD_CHANNELS is set to 1 (off by default since the RTL fix of bug #17)."""
+    return os.environ.get(PAD_CHANNELS_ENV, "0") == "1"
 
 
 def needs_padding(layer_params):

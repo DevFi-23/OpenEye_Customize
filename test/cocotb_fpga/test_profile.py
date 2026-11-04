@@ -68,15 +68,15 @@ def test_profile_conv(case, request, monkeypatch):
 
 
 # Whole models: id -> (LAYER of data_create.create_layer, input channels, QUANT_AMOUNT).
-# The 64-filter layers of MNIST_REAL need QUANT_AMOUNT >= 64. One channel on
-# 28-pixel rows hits bug #17; the testbench pads it to 2 channels, the second
-# with zero activations (open_eye.channel_pad), so _c1 is the real one-channel model.
+# The 64-filter layers of MNIST_REAL need QUANT_AMOUNT >= 64. _c1 is the real
+# one-channel model: until the RTL fix of bug #17 (2026-11-04) the testbench padded
+# it to 2 channels, the second with zero activations (open_eye.channel_pad).
 MODEL_CASES = {
     #   Conv 28x28x2->16, MaxPool, Conv 16->16, MaxPool, Conv 7x7 16->16, Dense 784->10 (about 5 min)
     "model_mnist16_c2": ("MNIST", 2, 32),
     #   models/mnist_conv_net.py: Conv 32, MaxPool, Conv 64, MaxPool, Conv 64, FC 3136->10 (about 11 min)
     "model_mnist_real_c2": ("MNIST_REAL", 2, 64),
-    #   the same with its real one-channel input, padded to 2 channels (about 11 min)
+    #   the same with its real one-channel input (padded to 2 channels before the #17 fix) (about 11 min)
     "model_mnist_real_c1": ("MNIST_REAL", 1, 64),
 }
 

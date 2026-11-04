@@ -4,9 +4,10 @@
 
 1. test_iact_channel_mapping: one small Conv layer (8x4, ramp activations,
    asymmetric kernel) for 1/2/4/8 input channels and NUM_GLB_IACT 1 and 3.
-   Guards the two iact_stream_constructor fixes of 2026-10-14:
-     - one input channel: the RAM is written at the row-pair address
-       ram_wr_addr_q (bug #6, output was the bias only);
+   Guards the iact_stream_constructor fixes:
+     - one input channel (bug #6, output was the bias only; fixed 2026-10-14
+       with a row-pair address, since the bug #17 fix of 2026-11-04 every
+       pixel is a word of its own on the multi-channel address loops);
      - NUM_GLB_IACT=3: a convolution broadcasts every word to all iact banks
        instead of the Dense-style bank rotation (bug #7).
    Three input channels still fail: the Python stream packs three bytes per
@@ -17,16 +18,17 @@
    quantisation entry per filter). Known failures are marked
    xfail(strict) so that a fix shows up as XPASS and the mark has to be
    removed. Conv2 passes since the bug #18 fix (2026-10-15); Conv1 passes
-   since 2026-10-22 with its input padded to two channels (open_eye.channel_pad,
-   Python workaround for bug #17), test_mnist_conv1_without_padding keeps the
-   RTL bug visible; Conv3 computes every value correctly but fails the stream
+   with its one channel since the RTL fix of bug #17 (2026-11-04; from
+   2026-10-22 on with its input padded to two channels, open_eye.channel_pad,
+   which test_mnist_conv1_with_padding still runs); Conv3 computes every value correctly but fails the stream
    check of bug #9. The FC layer (3136 -> 10) is not included: Dense layers with 10
    outputs fail with the open bug #5 (test_gemm_layer.py::test_dense_ten_outputs).
 
 3. test_random_data: random activations and weights (the constant-weight
    hooks hid bug #18), each followed by tools/verify_conv_output.py, an
    independent numpy recomputation that checks every DMA output word. The
-   one-channel layers wider than 16 are padded to two channels (bug #17).
+   one-channel layers wider than one x pass run as one channel since the RTL
+   fix of bug #17 (2026-11-04; they were padded to two channels before).
    Random conv weights keep their zeros since 2026-10-24 (bug #22).
 
 4. test_trained_mnist_conv: the three convolution layers with the weights of
@@ -66,7 +68,7 @@ def test_iact_channel_mapping(num_glb_iact, channels, request, monkeypatch):
 
 # id: (width, height, input channels, filters, QUANT_AMOUNT)
 MNIST_LAYERS = {
-    "conv1_28x28_c1_f32": (28, 28, 1, 32, 32),          # padded to 2 channels (bug #17)
+    "conv1_28x28_c1_f32": (28, 28, 1, 32, 32),          # one channel, 2 x passes (bug #17, fixed)
     "conv2_14x14_c32_f64": (14, 14, 32, 64, 64),
     "conv3_7x7_c64_f64": pytest.param(
         (7, 7, 64, 64, 64), marks=pytest.mark.xfail(
@@ -101,10 +103,11 @@ def test_mnist_conv(layer, request, monkeypatch):
     _verify_independently(request)
 
 
-@pytest.mark.xfail(strict=True, reason="bug #17: one-channel packing ignores the x passes of images wider than one pass")
-def test_mnist_conv1_without_padding(request, monkeypatch):
-    """MNIST Conv1 as the RTL gets it without the Python workaround: XPASS once bug #17 is fixed in the RTL."""
-    monkeypatch.setenv("OPENEYE_PAD_CHANNELS", "0")
+def test_mnist_conv1_with_padding(request, monkeypatch):
+    """MNIST Conv1 with the former bug #17 workaround (input padded to two channels, OPENEYE_PAD_CHANNELS=1): the
+    same results as the one-channel run. It was test_mnist_conv1_without_padding, xfail(strict) until the RTL fix of
+    2026-11-04 made it XPASS; since then test_mnist_conv runs Conv1 without padding."""
+    monkeypatch.setenv("OPENEYE_PAD_CHANNELS", "1")
     test_mnist_conv(MNIST_LAYERS["conv1_28x28_c1_f32"], request, monkeypatch)
 
 
@@ -118,10 +121,12 @@ RANDOM_LAYERS = {
     "8x4_c64_f64": (8, 4, 64, 64, 64),
     "14x14_c32_f32": (14, 14, 32, 32, 32),
     "mnist_conv2_14x14_c32_f64": (14, 14, 32, 64, 64),
-    # One channel, two and three x passes: padded to 2 channels (bug #17)
+    # One channel, two and three x passes (bug #17, fixed in the RTL 2026-11-04; padded to 2 channels before)
     "20x8_c1_f8": (20, 8, 1, 8, 32),
     "28x28_c1_f32": (28, 28, 1, 32, 32),
     "40x8_c1_f8": (40, 8, 1, 8, 32),
+    # One channel, 64 filters: two weight passes (bug #39, the second filter group got the first group's weights)
+    "8x4_c1_f64": (8, 4, 1, 64, 64),
 }
 
 

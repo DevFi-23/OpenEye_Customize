@@ -118,6 +118,8 @@ class PoolingMapper(LayerMapper):
         # Pack all layer configuration parameters into hardware register format
         # Uses pack_registers() utility from regmap_pack module
         from open_eye.generator import pack_registers
+        from open_eye.layer_parameters import check_iact_buffer
+        check_iact_buffer(layer_params)   # a pass must fit the iact buffer (bug #37)
         words = pack_registers({
         "wght_cycles_reg": layer_params.needed_wght_transmissions,
         "stride_x": layer_params.strideX,

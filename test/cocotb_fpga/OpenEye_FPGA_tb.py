@@ -332,14 +332,14 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
         return list(reversed(layer_parameters))
 
     layer_parameters = build_layer_parameters(model)
-    # Bug #17 workaround (no RTL change): a one-channel first layer wider than
-    # one x pass gets a second input channel with zero activations
-    # (open_eye.channel_pad).
+    # Former bug #17 workaround, off by default since the RTL fix (OPENEYE_PAD_CHANNELS=1
+    # turns it on): a one-channel first layer wider than one x pass gets a second
+    # input channel with zero activations (open_eye.channel_pad).
     model, padded = channel_pad.pad_first_layer(model, layer_parameters)
     if padded:
         layer_parameters = build_layer_parameters(model)
         layer_parameters[0].pad_channels = model[0].pad_channels
-        logger.info("%s: layer 0 input padded from %d to %d channels (bug #17; %s=0 turns this off)",
+        logger.info("%s: layer 0 input padded from %d to %d channels (former bug #17 workaround, %s=1)",
                     channel_pad.PAD_CHANNELS_ENV, model[0].original_channels, layer_parameters[0].channels,
                     channel_pad.PAD_CHANNELS_ENV)
     if os.environ.get("DUMP_LAYER_PARAMS"):

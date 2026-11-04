@@ -99,6 +99,27 @@ def wght_buffer_rows(params, wght_words):
     return math.ceil(wght_words / words_per_row)
 
 
+# Address width of the iact layer buffer of every iact_stream_constructor (8,192 words): IACT_BUFFER_ADDR_WIDTH of
+# OpenEye_FPGA.v, and the width of the status fields that address it (regmap.yaml iact_buffer_words_per_write,
+# iact_read_inc_*, iact_write_limit_0, iact_write_inc_*).
+IACT_BUFFER_ADDR_WIDTH = 13
+
+
+def check_iact_buffer(layer_params):
+    """Stop a layer whose iact buffer write does not fit the 13-bit fields: the constructor writes
+    iact_buffer_words_per_write words per pass and stops at that count, so a value that wraps in its field writes
+    nothing or too little and the layer computes with missing activations. Until the fields grew from 12 to 13 bits,
+    conv 14 x 14 x 32 at CLUSTER_ROWS 1, CLUSTER_COLUMNS 2 (4,096 words) got 0 and output the bias (bug #37,
+    doc/experiments/2026-11-03_table3_cr1.md). Returns the words."""
+    words = layer_params.iact_buffer_words_per_write
+    limit = (1 << IACT_BUFFER_ADDR_WIDTH) - 1
+    if words > limit:
+        raise NotImplementedError(
+            f"{layer_params.layer_name} writes {words} words per pass into the iact buffer, its fields hold at most "
+            f"{limit} (IACT_BUFFER_ADDR_WIDTH={IACT_BUFFER_ADDR_WIDTH}); split the layer")
+    return words
+
+
 def check_wght_buffer(params, wght_words, layer_name=""):
     """Stop a layer whose weights do not fit the weight staging buffer (2^BUFFER_WIDTH_WGHT rows). Its write pointer
     wraps without any sign, so the last rows overwrote the first ones and the layer computed slightly wrong: bug #29
@@ -1003,9 +1024,15 @@ class LayerParameters(object):
                 self.used_psum_per_PE = math.ceil(self.filters/self.different_kernels_per_calculation)
                 self.wght_transmissions_pe = math.ceil(self.channels/(self.used_channels*self.kernel_per_pe_cluster))
             else :
-                # Many filters: limit to 16 psums per PE, double weight transmissions
+                # Many filters: limit to 16 psums per PE. The stream carries one weight set per filter group of
+                # 16 psums per PE and channel batch, the sets the RTL reads in needed_wght_cycles passes. It was
+                # ceil(channels / channel_div_trans), right only by coincidence (2 channels and 2 filter groups,
+                # or 4+ channels): with one input channel it was 1, the second filter group was never sent and the
+                # RTL computed filters 16 ... 31 with the weights of 0 ... 15 (bug #39, found when the RTL fix of
+                # #17 stopped padding MNIST Conv1 to two channels; upstream 36395dd has the same formula).
                 self.used_psum_per_PE = 16
-                self.wght_transmissions_pe = math.ceil(self.channels/self.channel_div_trans)
+                self.wght_transmissions_pe = math.ceil(self.channels/(self.used_channels*self.kernel_per_pe_cluster)) * \
+                    math.ceil(self.filters/(self.used_psum_per_PE*self.different_kernels_per_calculation))
             # Weights per PE = psums * activations
             self.used_wght_per_PE = self.used_psum_per_PE*self.used_iact_per_PE
         else:

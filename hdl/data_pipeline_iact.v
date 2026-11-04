@@ -38,18 +38,17 @@
 //   (Currently the SPARSITY_EN parameter is present but the always block
 //   does not gate the writes on it — future extension.)
 //
-// Uneven-ending handling:
-//   When the input feature-map width is not a multiple of the word packing
-//   factor (i.e. first_spad_max_i < 4), the last input word of each line
-//   contains fewer valid activation bytes than a full SECOND_SPAD_DATA-wide
-//   slot.  The module tracks this via uneven_ending / uneven_counter /
-//   uneven_ending_storage and pre-loads cycle_counter to the correct offset
-//   so the very next enable_i cycle resumes at the right sub-word position.
+// One input channel (first_spad_max_i == 1):
+//   Every input word carries a single activation in sub-word 0, so
+//   cycle_counter restarts after every sub-word. Until bug #17 was fixed
+//   (as upstream 36395dd) one-channel words held two image rows and an
+//   "uneven ending" bookkeeping (uneven_ending / uneven_counter /
+//   uneven_ending_storage) resumed every other line at sub-word 1.
 //
 // Clock / Reset:
 //   Single clock domain (clk_i).  Asynchronous active-low reset (rst_ni).
 //   compute_i is a synchronous per-PE clear that resets all address and
-//   data state but preserves and advances the uneven-ending bookkeeping.
+//   data state.
 //
 // =============================================================================
 
@@ -109,8 +108,7 @@
 //  clk_i              - System clock.
 //  rst_ni             - Asynchronous active-low reset.  Clears all state.
 //  compute_i          - Synchronous per-computation clear pulse.  Resets SPAD
-//                       addresses, data buffers, counters.  Also advances the
-//                       uneven-line bookkeeping (uneven_counter).
+//                       addresses, data buffers, counters.
 //
 //  data_i[DATA_WIDTH-1:0]
 //                     - Wide raw iact input word.  On cycle_counter == 0 the
@@ -124,8 +122,9 @@
 //
 //  iact_x_line_repetitions_i[3:0]
 //                     - Number of times each iact x-line is reused across
-//                       cluster columns.  Used to determine when uneven_counter
-//                       should wrap and toggle uneven_ending_storage.
+//                       cluster columns.  Unused since the bug #17 fix (it
+//                       paced the uneven-ending bookkeeping); kept so that
+//                       the PE interface does not change.
 //
 //  first_spad_words_o[$clog2(FIRST_SPAD_ADDR+1)-1:0]
 //                     - Number of valid entries written to the first SPAD.
@@ -189,7 +188,9 @@ module data_pipeline_iact #(
 
     input      [                DATA_WIDTH-1 : 0] data_i,
     input                                         enable_i,
-    input     [                            3 : 0] iact_x_line_repetitions_i,
+    /* verilator lint_off UNUSEDSIGNAL */
+    input     [                            3 : 0] iact_x_line_repetitions_i,   // unused since the bug #17 fix
+    /* verilator lint_on UNUSEDSIGNAL */
 
     output reg [ $clog2(FIRST_SPAD_ADDR+1)-1 : 0] first_spad_words_o,
     input      [   $clog2(FIRST_SPAD_ADDR)-1 : 0] first_spad_max_i,
@@ -230,8 +231,7 @@ module data_pipeline_iact #(
   //   Counts 0 .. SECOND_SPAD_DATA_CYCLE-1, then wraps.
   //   cycle_counter == 0: first sub-word; data is taken directly from data_i.
   //   cycle_counter != 0: subsequent sub-words; data taken from current_data.
-  //   Seeded to a non-zero value by the uneven-ending logic when an input line
-  //   does not end on a full-word boundary.
+  //   Restarts after every sub-word with one input channel (first_spad_max_i == 1).
   reg  [$clog2(FIRST_SPAD_DATA_CYCLE) : 0] cycle_counter;
 
   // transmission_counter: global sub-word position counter (does not wrap).
@@ -271,23 +271,6 @@ module data_pipeline_iact #(
   //   On the next enable_i cycle after compute_i, ensures second_spad_words_o
   //   is cleared (handles the case where enable_i and compute_i coincide).
   reg                                      compute_sent;
-
-  // uneven_ending: flag indicating that the current line starts mid-word.
-  //   When set at the start of an enable_i burst, the first input sub-word
-  //   is processed as a "leftover" from the previous (partial) line and is
-  //   written to the second SPAD using data_i bits above SECOND_SPAD_DATA
-  //   rather than the normal low bits.
-  reg                                      uneven_ending;
-
-  // uneven_ending_storage: persistent state of uneven_ending across compute_i.
-  //   Toggled each time uneven_counter wraps around iact_x_line_repetitions_i,
-  //   so alternating lines correctly start at sub-word 0 or sub-word 1.
-  reg                                      uneven_ending_storage;
-
-  // uneven_counter: counts how many compute_i pulses (iact x-line passes) have
-  //   occurred since the last uneven_ending_storage toggle.
-  //   Wraps at iact_x_line_repetitions_i - 1.
-  reg  [                            3 : 0] uneven_counter;
 
   // ---------------------------------------------------------------------------
   // Combinational Logic
@@ -345,9 +328,6 @@ module data_pipeline_iact #(
       transmission_counter       <= 0;
       transmission_counter_delay <= 0;
       compute_sent               <= 0;
-      uneven_ending              <= 0;
-      uneven_ending_storage      <= 0;
-      uneven_counter             <= 0;
     end else begin
       // -----------------------------------------------------------------------
       // Default: de-assert one-cycle pulse outputs.
@@ -370,10 +350,9 @@ module data_pipeline_iact #(
         // The address / data driven to the first SPAD are updated below.
         first_spad_en_o <= 1;
 
-        // Clear the compute_sent flag and uneven_ending so they do not persist
-        // into the active processing burst.
+        // Clear the compute_sent flag so it does not persist into the active
+        // processing burst.
         compute_sent    <= 0;
-        uneven_ending   <= 0;
 
         // On the first enable_i cycle after compute_i, clear second_spad_words_o.
         // This is deferred by one cycle via compute_sent to avoid a race between
@@ -396,8 +375,10 @@ module data_pipeline_iact #(
           first_spad_addr_o <= first_spad_addr_o + 1;
         end
 
-        // Wrap cycle_counter at SECOND_SPAD_DATA_CYCLE so it stays in range.
-        if (cycle_counter == $bits(cycle_counter)'(SECOND_SPAD_DATA_CYCLE - 1)) begin
+        // Wrap cycle_counter at SECOND_SPAD_DATA_CYCLE so it stays in range. With one value per first-SPAD slot
+        // (first_spad_max_i == 1, one input channel) every word carries a single activation in sub-word 0, so the
+        // counter restarts after every sub-word (bug #17 fix, as upstream 36395dd).
+        if (cycle_counter == $bits(cycle_counter)'(SECOND_SPAD_DATA_CYCLE - 1) || (first_spad_max_i == 1)) begin
           cycle_counter <= 0;
         end
 
@@ -467,26 +448,6 @@ module data_pipeline_iact #(
           payload_reg         <= current_data[SECOND_PAYLOAD_WIDTH-1 : 0];
         end
 
-        // -----------------------------------------------------------------
-        // Uneven-ending sub-word handling:
-        // When uneven_ending is set (line started mid-word), the first
-        // enable_i cycle carries a "leftover" byte from the previous line.
-        // It is extracted from data_i bits above SECOND_SPAD_DATA (i.e.
-        // the high byte of the first input word when only one byte remains
-        // from the previous line).
-        //
-        // This leftover byte is always treated as non-zero for second-SPAD
-        // purposes (uneven_ending is only set when such a byte exists).
-        // -----------------------------------------------------------------
-        if (uneven_ending) begin
-          second_spad_words_o <= second_spad_words_o + 1;
-          payload_reg         <= data_i[SECOND_SPAD_DATA + SECOND_PAYLOAD_WIDTH-1 : SECOND_SPAD_DATA];
-          second_spad_en_o    <= 1;
-          address_temp_2      <= address_temp_2 + 1;
-          overhead_reg        <= overhead_reg + 1;
-          first_spad_data_o   <= overhead_reg + 1'd1;
-        end
-
       end else begin
         // ---------------------------------------------------------------------
         // Idle: enable_i == 0.
@@ -512,19 +473,6 @@ module data_pipeline_iact #(
         // Does NOT clear first_spad_words_o or second_spad_words_o here;
         // second_spad_words_o is cleared on the next enable_i cycle via
         // compute_sent; first_spad_words_o is updated at enable_i falling edge.
-        //
-        // Uneven-ending bookkeeping:
-        //   When first_spad_max_i < 4 (line width is not a multiple of the
-        //   packing factor), the next line may need to start at sub-word 1
-        //   instead of 0.  The logic here:
-        //   - Increments uneven_counter; wraps at iact_x_line_repetitions_i - 1.
-        //   - When counter wraps: toggles uneven_ending_storage and seeds
-        //     cycle_counter and uneven_ending to 1 - uneven_ending_storage
-        //     (next line starts mid-word).
-        //   - Otherwise: seeds them from uneven_ending_storage (continue
-        //     alternating pattern).
-        //   When compute_sent is already set (two consecutive compute_i pulses):
-        //     fully resets cycle_counter, uneven_ending, uneven_counter to 0.
         // ---------------------------------------------------------------------
         first_spad_en_o            <= 0;
         second_spad_en_o           <= 0;
@@ -541,31 +489,6 @@ module data_pipeline_iact #(
         second_spad_words_o        <= 0;
         compute_sent               <= 1;  // flag: clear second_spad_words_o next enable cycle
         cycle_counter              <= 0;
-
-        // Uneven-line handling (only for non-FC layers where lines don't fill full words)
-        if (first_spad_max_i < 2) begin
-          uneven_counter <= uneven_counter + 1;
-          if (uneven_counter == iact_x_line_repetitions_i - 1) begin
-            uneven_counter <= 0;
-          end
-          if (uneven_counter == iact_x_line_repetitions_i - 1) begin
-            // Wrap: toggle the storage flag; next line starts at the opposite sub-word.
-            uneven_ending_storage <= 1 - uneven_ending_storage;
-            cycle_counter <= $bits(cycle_counter)'(1) - $bits(cycle_counter)'(uneven_ending_storage);
-            uneven_ending         <= 1 - uneven_ending_storage;
-          end else begin
-            // No wrap: continue with the current storage value.
-            cycle_counter <= $bits(cycle_counter)'(uneven_ending_storage);
-            uneven_ending <= uneven_ending_storage;
-          end
-        end
-
-        // Fully reset uneven state on a second consecutive compute_i pulse.
-        if (compute_sent) begin
-          cycle_counter  <= 0;
-          uneven_ending  <= 0;
-          uneven_counter <= 0;
-        end
         if (!SPARSITY_EN) begin
           first_spad_en_o    <= 0;
           first_spad_data_o  <= 0;

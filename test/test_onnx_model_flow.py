@@ -39,7 +39,7 @@ PLATFORM = {"CLUSTER_ROWS": "2", "CLUSTER_COLUMNS": "2", "NUM_GLB_IACT": "1", "N
 
 
 def build_layers(model, params):
-    """LayerParameters as OpenEye_FPGA_tb builds them, with the bug #17 channel padding."""
+    """LayerParameters as OpenEye_FPGA_tb builds them (channel padding only with OPENEYE_PAD_CHANNELS=1)."""
     def build(m):
         out = [0] * len(m)
         for n, layer in reversed(list(enumerate(m))):

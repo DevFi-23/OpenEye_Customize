@@ -45,3 +45,14 @@ def test_check_at_the_limit():
 def test_default_depth(monkeypatch):
     monkeypatch.delenv("BUFFER_WIDTH_WGHT", raising=False)
     assert open_eye_parameters.get_oep(1).BUFFER_WIDTH_WGHT == 13
+
+
+def test_iact_buffer_check():
+    # bug #37: the iact buffer fields are IACT_BUFFER_ADDR_WIDTH = 13 bits (were 12, so 4,096 words arrived as 0)
+    layer = types.SimpleNamespace(layer_name="Conv", iact_buffer_words_per_write=4096)
+    assert lp.check_iact_buffer(layer) == 4096                        # conv 14 x 14 x 32 at CR 1 X 2
+    layer.iact_buffer_words_per_write = 8191
+    assert lp.check_iact_buffer(layer) == 8191                        # the largest value of the field
+    layer.iact_buffer_words_per_write = 8192
+    with pytest.raises(NotImplementedError, match="8192 words per pass"):
+        lp.check_iact_buffer(layer)

@@ -228,6 +228,10 @@ module OpenEye_FPGA #(
     localparam FINAL_DATA_IACT_BITWIDTH = SPARSITY_EN ? 4 + DATA_IACT_BITWIDTH : DATA_IACT_BITWIDTH,
     localparam FINAL_DATA_WGHT_BITWIDTH = SPARSITY_EN ? 4 + DATA_WGHT_BITWIDTH : DATA_WGHT_BITWIDTH,
 
+    // Address width of the iact layer buffer of every iact_stream_constructor (8,192 words). The buffer fields of
+    // the status stream (words per write, read / write address increments) have this width: they were 12 bits, so a
+    // layer that writes 4,096 words per pass got 0 (bug #37: conv 14 x 14 x 32 at CLUSTER_ROWS 1, CLUSTER_COLUMNS 2).
+    localparam integer IACT_BUFFER_ADDR_WIDTH = 13,
     localparam integer IACT_RAM_CELLS_VALUES_PER_WORD = 8,
     localparam integer IACT_RAM_CELLS_WORD_BITWIDTH = DATA_IACT_BITWIDTH * IACT_RAM_CELLS_VALUES_PER_WORD,
     localparam integer WGHT_RAM_CELLS_WORD_BITWIDTH = FINAL_DATA_WGHT_BITWIDTH * PARALLEL_MACS * NUM_GLB_WGHT,
@@ -417,17 +421,17 @@ reg [1023:0] fst_path;
   wire [ 7:0] iact_read_limit_2;
   wire [ 7:0] iact_read_limit_3;
   wire [ 7:0] iact_read_limit_4;
-  wire [11:0] iact_read_inc_0;
-  wire [11:0] iact_read_inc_1;
-  wire [11:0] iact_read_inc_2;
-  wire [11:0] iact_read_inc_3;
-  wire [11:0] iact_read_inc_4;
-  wire [11:0] iact_write_limit_0;
+  wire [IACT_BUFFER_ADDR_WIDTH-1:0] iact_read_inc_0;
+  wire [IACT_BUFFER_ADDR_WIDTH-1:0] iact_read_inc_1;
+  wire [IACT_BUFFER_ADDR_WIDTH-1:0] iact_read_inc_2;
+  wire [IACT_BUFFER_ADDR_WIDTH-1:0] iact_read_inc_3;
+  wire [IACT_BUFFER_ADDR_WIDTH-1:0] iact_read_inc_4;
+  wire [IACT_BUFFER_ADDR_WIDTH-1:0] iact_write_limit_0;
   wire [ 7:0] iact_write_limit_1;
   wire [ 7:0] iact_write_limit_2;
-  wire [11:0] iact_write_inc_0;
-  wire [11:0] iact_write_inc_1;
-  wire [11:0] iact_write_inc_2;
+  wire [IACT_BUFFER_ADDR_WIDTH-1:0] iact_write_inc_0;
+  wire [IACT_BUFFER_ADDR_WIDTH-1:0] iact_write_inc_1;
+  wire [IACT_BUFFER_ADDR_WIDTH-1:0] iact_write_inc_2;
   wire [ 9:0] pagu_wght_limit;
   wire [4-1:0]psum_pagu_cs_limit_0;
   wire [4-1:0]psum_pagu_cs_limit_1;
@@ -603,7 +607,7 @@ reg [1023:0] fst_path;
   // Iact Converter Timing Counters
   // -----------------------------------------------------------------------
   wire [7:0] iact_converter_max_cycles;             // Total y-lines to process including kernel overlap = iact_size_y + kernel_size - 1 (set in GET_WGHT).
-  wire [11:0] iact_buffer_words_per_write;          // Words written per cycle into iact buffer per writing cycle
+  wire [IACT_BUFFER_ADDR_WIDTH-1:0] iact_buffer_words_per_write; // Words written into the iact buffer per writing cycle
   wire [11:0] iact_x_pos_inc;
   wire [7:0] iact_words_per_compute;
   wire [7:0] iact_converter_buffer_addr_max_cycles; // Maximum value of iact_converter_buffer_addr_cycles (from dma_storage).
@@ -2973,7 +2977,7 @@ end
             .DATA_IACT_OVERHEAD(DATA_IACT_OVERHEAD),
             .RAM_CELLS         (IACT_RAM_CELLS),
             .WORD_BITWIDTH     (TRANS_BITWIDTH_IACT * NUM_GLB_IACT),
-            .ADDRWIDTH         (13)
+            .ADDRWIDTH         (IACT_BUFFER_ADDR_WIDTH)
         ) iact_stream_constructor (
             .clk_i                       (clk_i),
             .rst_ni                      (rst_n),

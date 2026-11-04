@@ -12,13 +12,23 @@ registers:
   - {name: kernel_size_y, width: 4}
   - {name: x_lines_reg, width: 8}
   - {name: needed_wght_cycles, width: 8}
+  # Activation of the layer (doc/experiments/2026-11-02_activation_rtl_design.md): Leaky ReLU negative slope
+  # act_neg_mant / 2^act_neg_shift; act_round rounds the requantization half up instead of the floor.
+  # quant_clamp_low: lower saturation bound of the quantizers + 128 (0: -128 = plain int8 saturation, 128: 0 = ReLU
+  # with zero point 0). These four and act_mode / act_keep_table sit in free bits of earlier words (they were
+  # the last fields until the iact buffer fields grew to 13 bits, bug #37): the status stream keeps 28 / 14 / 7
+  # words at DMA 32 / 64 / 128 bit for every CLUSTER_ROWS / CLUSTER_COLUMNS 1-4 and BRANCHES 1-2.
+  - {name: act_neg_mant, width: 8}
   - {name: needed_cycles, width: 18}
+  - {name: quant_clamp_low, width: 8}
   - {name: trans_cycles_iact, width: 16}
   - {name: trans_cycles_wght, width: 16}
   - {name: trans_cycles_psum, width: 16}
   - {name: iact_glb_writing_cycles, width: 16}
   - {name: iact_converter_buffer_addr_max_cycles, width: 8}
   - {name: fc_size_reg, width: 14}
+  - {name: act_neg_shift, width: 7}
+  - {name: act_round, width: 1}
   - {name: iact_size_x, width: 12}
   - {name: iact_size_y, width: 8}
   - {name: iact_size_c, width: 12}
@@ -62,7 +72,7 @@ registers:
   - {name: cluster_per_conv_cycle, width: ceil(log2((int(CLUSTER_ROWS)*int(CLUSTER_COLUMNS))+1))}
   - {name: iact_converter_max_cycles, width: 8}
   - {name: iact_x_pos_inc, width: 12}
-  - {name: iact_buffer_words_per_write, width: 12}
+  - {name: iact_buffer_words_per_write, width: 13}   # = IACT_BUFFER_ADDR_WIDTH of OpenEye_FPGA.v, as the iact_read_inc_*, iact_write_limit_0, iact_write_inc_* (bug #37)
   - {name: iact_words_per_compute, width: 8}
   - {name: pooling_mode, width: 1}
   - {name: gemm_mode, width: 1}
@@ -74,18 +84,18 @@ registers:
   - {name: iact_read_limit_2, width: 8}
   - {name: iact_read_limit_3, width: 8}
   - {name: iact_read_limit_4, width: 8}
-  - {name: iact_read_inc_0, width: 12}
-  - {name: iact_read_inc_1, width: 12}
-  - {name: iact_read_inc_2, width: 12}
-  - {name: iact_read_inc_3, width: 12}
+  - {name: iact_read_inc_0, width: 13}
+  - {name: iact_read_inc_1, width: 13}
+  - {name: iact_read_inc_2, width: 13}
+  - {name: iact_read_inc_3, width: 13}
   - {name: act_keep_table, width: 1}    # activation table mode: keep the previous layer's table (in a gap)
-  - {name: iact_read_inc_4, width: 12}
-  - {name: iact_write_limit_0, width: 12}
+  - {name: iact_read_inc_4, width: 13}
+  - {name: iact_write_limit_0, width: 13}
   - {name: iact_write_limit_1, width: 8}
   - {name: iact_write_limit_2, width: 8}
-  - {name: iact_write_inc_0, width: 12}
-  - {name: iact_write_inc_1, width: 12}
-  - {name: iact_write_inc_2, width: 12}
+  - {name: iact_write_inc_0, width: 13}
+  - {name: iact_write_inc_1, width: 13}
+  - {name: iact_write_inc_2, width: 13}
   - {name: pagu_wght_limit, width: 10}
   - {name: psum_pagu_cs_limit_0, width: 4}
   - {name: psum_pagu_cs_limit_1, width: 4}
@@ -106,16 +116,6 @@ registers:
   - {name: psum_pagu_addr_inc_2, width: 8}
   - {name: psum_pagu_addr_inc_3, width: 8}
   - {name: psum_pagu_addr_inc_4, width: 8}
-  # Lower saturation bound of the quantizers + 128 (0: -128 = plain int8 saturation, 128: 0 = ReLU with
-  # zero point 0). Last field: fits into the last status word, so the word count does not change.
-  - {name: quant_clamp_low, width: 8}
-  # Activation of the layer (doc/experiments/2026-11-02_activation_rtl_design.md): Leaky ReLU negative slope
-  # act_neg_mant / 2^act_neg_shift; act_round rounds the requantization half up instead of the floor. With
-  # act_mode and act_keep_table (placed in gaps further up) they fill free bits only: the status stream keeps
-  # 28 / 14 / 7 words at DMA 32 / 64 / 128 bit.
-  - {name: act_neg_mant, width: 8}
-  - {name: act_neg_shift, width: 7}
-  - {name: act_round, width: 1}
   
 
 

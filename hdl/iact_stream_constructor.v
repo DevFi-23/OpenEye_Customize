@@ -103,28 +103,30 @@ module iact_stream_constructor #(
     input      [                                  6-1:0] wght_size_x_i,
     input      [                                  4-1:0] wght_size_y_i,
     input      [                                  3-1:0] stride_x_i,
-    input      [                                  3-1:0] stride_y_i,
+    /* verilator lint_off UNUSEDSIGNAL */
+    input      [                                  3-1:0] stride_y_i,   // unused since the bug #17 fix (row-pair reads)
+    /* verilator lint_on UNUSEDSIGNAL */
     input      [                                  4-1:0] y_lines_per_calc,
     input                                                fully_connected_i,
     input      [                                   11:0] x_pos_inc,
-    input      [                                   11:0] needed_iact_buffer_words_i,
+    input      [                          ADDRWIDTH-1:0] needed_iact_buffer_words_i,
     input      [                                  8-1:0] iact_words_per_compute,
     input      [                                    7:0] rd_loop_limit_0,
     input      [                                    7:0] rd_loop_limit_1,
     input      [                                    7:0] rd_loop_limit_2,
     input      [                                    7:0] rd_loop_limit_3,
     input      [                                    7:0] rd_loop_limit_4,
-    input      [                                   11:0] rd_addr_inc_0,
-    input      [                                   11:0] rd_addr_inc_1,
-    input      [                                   11:0] rd_addr_inc_2,
-    input      [                                   11:0] rd_addr_inc_3,
-    input      [                                   11:0] rd_addr_inc_4,
-    input      [                                   11:0] wr_loop_limit_0,
+    input      [                          ADDRWIDTH-1:0] rd_addr_inc_0,
+    input      [                          ADDRWIDTH-1:0] rd_addr_inc_1,
+    input      [                          ADDRWIDTH-1:0] rd_addr_inc_2,
+    input      [                          ADDRWIDTH-1:0] rd_addr_inc_3,
+    input      [                          ADDRWIDTH-1:0] rd_addr_inc_4,
+    input      [                          ADDRWIDTH-1:0] wr_loop_limit_0,
     input      [                                    7:0] wr_loop_limit_1,
     input      [                                    7:0] wr_loop_limit_2,
-    input      [                                   11:0] wr_addr_inc_0,
-    input      [                                   11:0] wr_addr_inc_1,
-    input      [                                   11:0] wr_addr_inc_2,
+    input      [                          ADDRWIDTH-1:0] wr_addr_inc_0,
+    input      [                          ADDRWIDTH-1:0] wr_addr_inc_1,
+    input      [                          ADDRWIDTH-1:0] wr_addr_inc_2,
     input      [                                    3:0] padding_x,
     input      [                                    3:0] padding_y
 );
@@ -132,10 +134,11 @@ module iact_stream_constructor #(
   // then through cluster rows, matching DenseWghtStreamMapper.
   // The source stream rotates over PE rows. A physical activation bank can
   // hold more than one row's slice when there are fewer banks than PE rows.
-  // Single-channel rows share the two subwords consumed by the PE pipeline.
-  reg [ADDRWIDTH-1:0] single_write_column, single_write_row;
-  reg single_write_half, single_write_half_q, single_read_half;
-  reg single_output_half;
+  // One input channel: every pixel is a word of its own (the activation in sub-word 0, the other sub-words 0), written
+  // and read by the same address loops as several channels; the PEs take sub-word 0 only (data_pipeline_iact, one
+  // value per word when first_spad_max_i == 1). Until bug #17 was fixed (as upstream 36395dd) a word held two image
+  // rows at a row-pair address computed from row and column only, which ignored the x passes of an image wider than
+  // one pass (MNIST Conv1 28 x 28: the output rows came out equal in pairs).
   wire single_channel = !fully_connected_i && (iact_channels_per_pe_i == 1);
   // Dense (FC) layers give every iact bank its own K slice: the writer
   // rotates over the banks and advances the address once per rotation. A
@@ -143,13 +146,10 @@ module iact_stream_constructor #(
   // ram_rd_addr + r*channel_div_trans), so it must broadcast each word to all
   // banks and advance the address on every write, as before 23be043.
   wire rotate_banks = fully_connected_i && (NUM_GLB_IACT > 1);
-  wire [ADDRWIDTH-1:0] conv_row_words =
-      needed_iact_router_cycles_i * NUM_GLB_IACT * channel_div_trans;
   reg                           ram_wr_en;
   reg                           ram_wr_en_q;
   reg                           configured;
   reg  [         ADDRWIDTH-1:0] ram_wr_addr;
-  reg  [         ADDRWIDTH-1:0] ram_wr_addr_q;
   reg                           ram_rd_en;
   reg  [         ADDRWIDTH-1:0] ram_rd_addr;
   wire [     WORD_BITWIDTH-1:0] ram_data_o;
@@ -195,14 +195,16 @@ module iact_stream_constructor #(
     reg [3:0] switching_cycle;
 
     reg [16-1:0] fsm_cycle;
-    reg [12-1:0] wr_addr_0;
-    reg [12-1:0] wr_addr_1;
-    reg [12-1:0] wr_addr_2;
-    reg [12-1:0] rd_addr_0;
-    reg [12-1:0] rd_addr_1;
-    reg [12-1:0] rd_addr_2;
-    reg [12-1:0] rd_addr_3;
-    reg [12-1:0] rd_addr_4;
+    // Buffer addresses: ADDRWIDTH bits like ram_wr_addr / ram_rd_addr. They were 12 bits, so with the 12-bit status
+    // fields no layer could use the upper half of the 8,192-word buffer (bug #37).
+    reg [ADDRWIDTH-1:0] wr_addr_0;
+    reg [ADDRWIDTH-1:0] wr_addr_1;
+    reg [ADDRWIDTH-1:0] wr_addr_2;
+    reg [ADDRWIDTH-1:0] rd_addr_0;
+    reg [ADDRWIDTH-1:0] rd_addr_1;
+    reg [ADDRWIDTH-1:0] rd_addr_2;
+    reg [ADDRWIDTH-1:0] rd_addr_3;
+    reg [ADDRWIDTH-1:0] rd_addr_4;
     reg [7:0] wr_cycle_loop_cnt_0;
     reg [7:0] wr_cycle_loop_cnt_1;
     reg [7:0] wr_cycle_loop_cnt_2;
@@ -217,11 +219,11 @@ module iact_stream_constructor #(
     // 256 and every activation from index 512 on was never written (bug #19).
     reg [12-1:0] x_pos_in_w_cycle;
     reg [ 8-1:0] channel_trans_cycle;
-  wire [12-1:0] rd_addr_inc_0_next;
-  wire [12-1:0] rd_addr_inc_1_next;
-  wire [12-1:0] rd_addr_inc_2_next;
-  wire [12-1:0] rd_addr_inc_3_next;
-  wire [12-1:0] rd_addr_inc_4_next;
+  wire [ADDRWIDTH-1:0] rd_addr_inc_0_next;
+  wire [ADDRWIDTH-1:0] rd_addr_inc_1_next;
+  wire [ADDRWIDTH-1:0] rd_addr_inc_2_next;
+  wire [ADDRWIDTH-1:0] rd_addr_inc_3_next;
+  wire [ADDRWIDTH-1:0] rd_addr_inc_4_next;
   wire [3:0]values_per_word;
   assign values_per_word = fully_connected_i ? 1 : iact_channels_per_pe_i;
   // Every bank holds the serial input window. Read neighboring pixels from
@@ -230,20 +232,14 @@ module iact_stream_constructor #(
       (single_channel ? NUM_GLB_IACT - 1 :
       ((!fully_connected_i && (ram_inc_counter == values_per_word - 2)) ?
        ((NUM_GLB_IACT - 1) * channel_div_trans) : 0));
-  assign rd_addr_inc_1_next = rd_addr_1 +
-      ((single_channel && !single_read_half) ? 0 : rd_addr_inc_1);
+  assign rd_addr_inc_1_next = rd_addr_1 + rd_addr_inc_1;
   assign rd_addr_inc_2_next = rd_addr_2 + rd_addr_inc_2;
   assign rd_addr_inc_3_next = rd_addr_3 + rd_addr_inc_3;
-  // Single-channel RAM words hold two image rows. Move by whole row pairs,
-  // keeping the remaining half-row for the next window's initial read.
-  assign rd_addr_inc_4_next = rd_addr_4 + (single_channel ?
-      ((({1'b0, stride_y_i} + single_output_half) >> 1) * conv_row_words) : rd_addr_inc_4);
+  assign rd_addr_inc_4_next = rd_addr_4 + rd_addr_inc_4;
 
     integer pec, per, b;
     always @(posedge clk_i, negedge rst_ni) begin
       if (!rst_ni) begin
-        single_read_half           <= 0;
-        single_output_half         <= 0;
         fsm_enc_current_state      <= IDLE;
         iact_data_o                <= 0;
         iact_enable_o              <= 0;
@@ -287,8 +283,6 @@ module iact_stream_constructor #(
             current_iact_cycle_mod_reg <= 0;
             current_iact_cycle_reg     <= 0;
             if (enable_store) begin
-              single_read_half   <= 0;
-              single_output_half <= 0;
               ram_rd_addr        <= 0;
               rd_addr_0          <= 0;
               rd_addr_1          <= 0;
@@ -305,7 +299,6 @@ module iact_stream_constructor #(
               end else begin
                 fsm_enc_current_state     <= ENCODE;
                 fsm_enc_cycle             <= 0;
-                single_read_half          <= single_output_half;
                 current_iact_cycle_reg    <= ~0;
                 // The window register is pre-decremented so its first advance
                 // lands on row 0. It used to start at ~0 with a +1 step; since
@@ -374,7 +367,6 @@ module iact_stream_constructor #(
               ram_rd_addr            <= rd_addr_inc_0_next;
               rd_cycle_loop_cnt_0    <= rd_cycle_loop_cnt_0 + 1;
               if (rd_cycle_loop_cnt_0 == rd_loop_limit_0) begin
-                if (single_channel) single_read_half <= !single_read_half;
                 rd_cycle_loop_cnt_0  <= 0;
                 rd_addr_0            <= rd_addr_inc_1_next;
                 rd_addr_1            <= rd_addr_inc_1_next;
@@ -403,7 +395,6 @@ module iact_stream_constructor #(
                   rd_addr_3           <= rd_addr_inc_3_next;
                   rd_cycle_loop_cnt_3 <= rd_cycle_loop_cnt_3 + 1;
                   if (rd_cycle_loop_cnt_3 == rd_loop_limit_3) begin
-                    if (single_channel) single_output_half <= single_output_half ^ stride_y_i[0];
                     rd_cycle_loop_cnt_3 <= 0;
                     ram_rd_addr         <= rd_addr_inc_4_next;
                     rd_addr_0           <= rd_addr_inc_4_next;
@@ -431,8 +422,6 @@ module iact_stream_constructor #(
           fsm_enc_cycle <= 1;
         end
         if (reset_cycle_i) begin
-          single_read_half           <= 0;
-          single_output_half         <= 0;
           fsm_enc_current_state      <= IDLE;
           iact_data_o                <= 0;
           iact_enable_o              <= 0;
@@ -458,10 +447,6 @@ reg enable_write_to_storage;
     always @(posedge clk_i, negedge rst_ni) begin
       // Reset
       if (!rst_ni) begin
-        single_write_column           <= 0;
-        single_write_row              <= 0;
-        single_write_half             <= 0;
-        single_write_half_q           <= 0;
         // Initialize the FSM cycle counter to 0 for tracking FSM state transitions
         fsm_cycle                     <= 0;
         enable_write_to_storage       <= 0;
@@ -482,7 +467,6 @@ reg enable_write_to_storage;
         ram_wr_en                     <= 0;
         ram_wr_en_q                   <= 0;
         ram_wr_addr                   <= 0;
-        ram_wr_addr_q                 <= 0;
         address_storage               <= 0;
         iact_router_counter           <= 0;
         kernel_y_counter              <= 0;
@@ -504,23 +488,7 @@ reg enable_write_to_storage;
           end
         end
       end else begin
-        ram_wr_addr_q       <= ram_wr_addr;
         ram_wr_en_q         <= ram_wr_en;
-        if (enable_store) begin
-          single_write_column <= 0;
-          single_write_row <= 0;
-          single_write_half <= 0;
-        end
-        if (single_channel && ram_wr_en) begin
-          ram_wr_addr_q <= single_write_row + single_write_column;
-          single_write_half_q <= single_write_half;
-          single_write_column <= single_write_column + 1;
-          if (single_write_column == conv_row_words - 1) begin
-            single_write_column <= 0;
-            single_write_half <= !single_write_half;
-            if (single_write_half) single_write_row <= single_write_row + conv_row_words;
-          end
-        end
         case (fsm_current_state)
           FSM_INITIALIZE: begin
             fsm_cycle               <= 0;
@@ -703,19 +671,14 @@ reg enable_write_to_storage;
     for (r_gen = 0; r_gen < NUM_GLB_IACT; r_gen = r_gen + 1) begin : BUFFER
       wire [BITS_PER_ROUTER-1:0]ram_data_i_w;
       wire [BITS_PER_ROUTER-1:0]ram_data_o_w;
-      // One-channel packing computes its own row-pair address into
-      // ram_wr_addr_q (row 2k low slot, row 2k+1 high slot of the same word);
-      // every other mode writes at ram_wr_addr.
-      wire [ADDRWIDTH-1:0] bank_addr = ram_wr_en_q ? (single_channel ? ram_wr_addr_q : ram_wr_addr) :
+      wire [ADDRWIDTH-1:0] bank_addr = ram_wr_en_q ? ram_wr_addr :
           (ram_rd_addr + (fully_connected_i ? 0 : r_gen * channel_div_trans));
-      wire [WORDS_PER_TRANS-1:0] write_mask;
+      wire [WORDS_PER_TRANS-1:0] write_mask = {WORDS_PER_TRANS{1'b1}};
       wire [BITS_PER_ROUTER-1:0] write_data;
       for (w_gen = 0; w_gen < WORDS_PER_TRANS; w_gen = w_gen + 1) begin : WRITE_LANE
-        // Successive single-channel rows fill the low and high halves.
-        // A low-half write also clears the upper half for odd-height padding.
-        assign write_mask[w_gen] = !single_channel || (w_gen != 0) || !single_write_half_q;
+        // One input channel: the activation in sub-word 0, the other sub-words 0.
         assign write_data[w_gen*IACT_DATA_DATA+:IACT_DATA_DATA] =
-            (single_channel && !single_write_half_q && (w_gen != 0)) ?
+            (single_channel && (w_gen != 0)) ?
             {IACT_DATA_DATA{1'b0}} : ram_data_i_w[w_gen*IACT_DATA_DATA+:IACT_DATA_DATA];
       end
       RAM_SP #(

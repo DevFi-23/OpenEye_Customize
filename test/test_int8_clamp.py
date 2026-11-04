@@ -65,9 +65,8 @@ def test_reference_saturates_dense():
 def test_regmap_field():
     os.environ.setdefault("DMA_BITWIDTH", "64")
     transmissions, width = generator.layout_registers(REGMAP_DIR)
-    last = transmissions[-1]
-    field = [r for r in last if r["name"] == "quant_clamp_low"]
+    # quant_clamp_low was the last field; since bug #37 it sits in a free gap further up (regmap.yaml)
+    field = [r for regs in transmissions for r in regs if r["name"] == "quant_clamp_low"]
     assert field and field[0]["width"] == 8
     words = generator.pack_registers({"quant_clamp_low": 128}, REGMAP_DIR)
-    pos = field[0]["pos"]
-    assert any((w >> pos) & 0xFF == 0x80 for w in words)
+    assert (words[field[0]["trans"]] >> field[0]["pos"]) & 0xFF == 0x80
