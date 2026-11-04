@@ -1358,10 +1358,13 @@ end
   wire [   EXPONENT_WIDTH-1:0] quant_exp    [QUANT_AMOUNT-1:0]; // Per-filter right-shift exponent (7-bit; applied after multiply).
   wire [   MANTISSA_WIDTH-1:0] quant_mant   [QUANT_AMOUNT-1:0]; // Per-filter scale mantissa (25-bit; multiplied with shifted psum).
   genvar quant_count;
+  // Each field with its own width. The exponent and mantissa slices used OFFSET_WIDTH (8): the exponent came out right
+  // only because quant_exp is 7 bits wide, the mantissa lost everything above bit 7, so a multiplier >= 256 was taken
+  // modulo 256 (bug #38; the toolchain kept every mantissa below 256 until then).
   for (quant_count = 0; quant_count < QUANT_AMOUNT; quant_count=quant_count+1) begin
     assign quant_offset[quant_count] = quant_reg[(quant_count*(OFFSET_WIDTH+EXPONENT_WIDTH+MANTISSA_WIDTH))+:OFFSET_WIDTH];
-    assign quant_exp[quant_count]    = quant_reg[OFFSET_WIDTH+(quant_count*(OFFSET_WIDTH+EXPONENT_WIDTH+MANTISSA_WIDTH))+:OFFSET_WIDTH];
-    assign quant_mant[quant_count]   = quant_reg[OFFSET_WIDTH+EXPONENT_WIDTH+(quant_count*(OFFSET_WIDTH+EXPONENT_WIDTH+MANTISSA_WIDTH))+:OFFSET_WIDTH];
+    assign quant_exp[quant_count]    = quant_reg[OFFSET_WIDTH+(quant_count*(OFFSET_WIDTH+EXPONENT_WIDTH+MANTISSA_WIDTH))+:EXPONENT_WIDTH];
+    assign quant_mant[quant_count]   = quant_reg[OFFSET_WIDTH+EXPONENT_WIDTH+(quant_count*(OFFSET_WIDTH+EXPONENT_WIDTH+MANTISSA_WIDTH))+:MANTISSA_WIDTH];
   end
   //#######################
   // Wires: Iact Buffer Interface (iact_stream_constructor → RAM_SP cells)

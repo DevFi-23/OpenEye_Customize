@@ -206,7 +206,9 @@ def test_onnx2model_finds_the_activation(untrained, name):
         if name == "leaky_relu":
             assert layer.activation_alpha == pytest.approx(0.1)
             assert layer.quantization_factor[0] == list(o2m.hardware_multiplier(m / nxt.input_scale))
-            assert layer.activation_negative_factor == list(o2m.hardware_multiplier(0.1 * m / nxt.input_scale))
+            # the negative slope stays 8 bit (status field act_neg_mant), the positive one has the full 24 bits
+            assert layer.activation_negative_factor == list(o2m.hardware_multiplier(0.1 * m / nxt.input_scale,
+                                                                                    o2m.NEG_MANT_BITS))
             assert layer.activation_table is None
         else:
             assert layer.quantization_factor[0] == list(o2m.hardware_multiplier(m / layer.output_scale))

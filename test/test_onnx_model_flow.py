@@ -123,10 +123,15 @@ def onnxruntime_tensors(model_proto, image):
 
 
 def test_hardware_multiplier():
-    assert o2m.hardware_multiplier(0.0033496) == (220, 16)
-    assert o2m.hardware_multiplier(0.5) == (128, 8)
+    # 24-bit mantissa since bug #38 (the RTL kept only 8 bits of it before): the float32 significand
+    assert o2m.hardware_multiplier(0.0033496) == (14386422, 32)
+    assert o2m.hardware_multiplier(0.5) == (8388608, 24)
+    assert o2m.hardware_multiplier(0.0033496, 8) == (220, 16)          # the 8-bit field of the Leaky ReLU slope
+    assert o2m.hardware_multiplier(0.5, 8) == (128, 8)
     with pytest.raises(ValueError):
-        o2m.hardware_multiplier(300.0)
+        o2m.hardware_multiplier(300.0, 8)                                # 300 needs 9 bits
+    with pytest.raises(ValueError):
+        o2m.hardware_multiplier(2.0 ** 24)                               # does not fit 24 bits either
 
 
 def test_relu_flag_of_onnx2model_is_read():

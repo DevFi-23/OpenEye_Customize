@@ -85,7 +85,8 @@ def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, i
               quantizer's saturation, LayerParameters.act_min = 0)
         Test hook OPENEYE_QUANT_SHIFT=<s>: every Conv2D/Dense quantizes with
         multiplier 1 and shift s (quantization_factor), so a small s drives values
-        out of the int8 range and exercises the saturation.
+        out of the int8 range and exercises the saturation. OPENEYE_QUANT_MANT=<m>
+        sets the multiplier instead of 1 (a mantissa wider than 8 bits, bug #38).
         Test hook OPENEYE_ACTIVATION (activation hardware, LayerParameters.act_mode;
         every Conv2D/Dense except the last; items separated by ":"):
             leaky:<mant>:<shift>          Leaky ReLU, negative sums use [mant, shift]
@@ -305,9 +306,10 @@ def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, i
             layer.activation = tf.keras.activations.get("relu")
     shift = os.environ.get("OPENEYE_QUANT_SHIFT")
     if shift:
+        mant = int(os.environ.get("OPENEYE_QUANT_MANT", "1"))
         for layer in weighted:
             outputs = layer.units if isinstance(layer, tf.keras.layers.Dense) else layer.filters
-            layer.quantization_factor = [[1, int(shift)] for _ in range(outputs)]
+            layer.quantization_factor = [[mant, int(shift)] for _ in range(outputs)]
     if os.environ.get("OPENEYE_ACTIVATION"):
         set_test_activation(weighted[:-1], os.environ["OPENEYE_ACTIVATION"])
 

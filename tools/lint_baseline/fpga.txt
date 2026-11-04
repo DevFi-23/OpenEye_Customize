@@ -248,7 +248,6 @@
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 48 bits on the Assign RHS, but Assign RHS's SEL generates 8 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 6 bits on the Assign RHS, but Assign RHS's VARREF 'fsm_row_offset' generates 5 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 8 bits on the Assign RHS, but Assign RHS's VARREF 'iact_x_per_cluster' generates 4 bits.
-1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ASSIGNW expects 25 bits on the Assign RHS, but Assign RHS's SEL generates 8 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator COND expects 11 bits on the Conditional False, but Conditional False's ARRAYSEL generates 10 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator COND expects 14 bits on the Conditional False, but Conditional False's VARREF 'iact_size_x' generates 12 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 12 bits on the LHS, but LHS's VARREF 'current_y' generates 8 bits.
@@ -362,7 +361,6 @@
 1	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 8 bits on the Assign RHS, but Assign RHS's VARREF 'iact_x_add_up' generates 12 bits.
 1	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Operator ASSIGNW expects 10 bits on the Assign RHS, but Assign RHS's COND generates 11 bits.
 1	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Operator ASSIGNW expects 5 bits on the Assign RHS, but Assign RHS's SUB generates 32 or 12 bits.
-1	WIDTHTRUNC | hdl/OpenEye_FPGA.v | Operator ASSIGNW expects 7 bits on the Assign RHS, but Assign RHS's SEL generates 8 bits.
 1	WIDTHTRUNC | hdl/data_pipeline_wght.v | Operator ASSIGNW expects 4 bits on the Assign RHS, but Assign RHS's ADD generates 16 bits.
 1	WIDTHTRUNC | hdl/data_pipeline_wght.v | Operator ASSIGNW expects 4 bits on the Assign RHS, but Assign RHS's COND generates 32 or 17 bits.
 1	WIDTHTRUNC | hdl/data_pipeline_wght.v | Operator ASSIGNW expects 4 bits on the Assign RHS, but Assign RHS's SEL generates 16 bits.

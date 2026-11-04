@@ -7,7 +7,11 @@ import numpy as np
 from onnxruntime.quantization import (quant_pre_process, quantize_dynamic, quantize_static, QuantType, QuantFormat,
                                       CalibrationDataReader)
 
-MANT_BITS = 8       # the RTL multiplies by 8 bits of the 25-bit mantissa field (OpenEye_FPGA.v:1350)
+# Mantissa of the requantization multiplier: the quantizers multiply by a 25-bit signed mantissa, so at most 24 bits
+# (= float32's significand: the multiplier equals ONNX Runtime's float32 scale). Until bug #38 was fixed the RTL kept
+# only the low 8 bits of the field, so this was 8.
+MANT_BITS = 24
+NEG_MANT_BITS = 8   # Leaky ReLU negative slope: the 8-bit status field act_neg_mant (regmap.yaml)
 SHIFT_MAX = 127     # 7-bit shift field
 COMPUTE_OPS = {'ConvInteger', 'QLinearConv', 'MatMulInteger', 'QLinearMatMul', 'QGemm', 'MaxPool'}
 
@@ -135,8 +139,11 @@ def quantize_to_int8_static(src_path, calibration_data, dest_path="simple_mnist_
     print(f"Model statically quantized to SIGNED INT8 (zero point 0, per tensor): {dest_path}")
     return dest_path
 
-def hardware_multiplier(m, mant_bits=MANT_BITS, shift_max=SHIFT_MAX):
-    """Requantization multiplier m as the quantizer's mant / 2^shift: the largest shift for which mant fits mant_bits."""
+def hardware_multiplier(m, mant_bits=None, shift_max=SHIFT_MAX):
+    """Requantization multiplier m as the quantizer's mant / 2^shift: the largest shift for which mant fits mant_bits
+    (default MANT_BITS, read at call time)."""
+    if mant_bits is None:
+        mant_bits = MANT_BITS
     if not m > 0:
         raise ValueError(f"multiplier {m} is not positive")
     shift = 0
@@ -318,7 +325,8 @@ def finish_activations(pipeline):
         if name == 'leaky_relu':
             layer_obj.quantization_factor = [list(hardware_multiplier(m / out_scale))
                                              for _ in layer_obj.quantization_factor]
-            layer_obj.activation_negative_factor = list(hardware_multiplier(layer_obj.activation_alpha * m / out_scale))
+            layer_obj.activation_negative_factor = list(hardware_multiplier(layer_obj.activation_alpha * m / out_scale,
+                                                                              NEG_MANT_BITS))
         else:
             layer_obj.activation_table = activation_table(name, layer_obj.activation_alpha, layer_obj.output_scale,
                                                           out_scale)
