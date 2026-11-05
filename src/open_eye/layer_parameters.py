@@ -120,6 +120,24 @@ def check_iact_buffer(layer_params):
     return words
 
 
+def check_wght_sets(layer_params):
+    """Stop a convolution whose weight stream does not hold one weight set per pass the RTL reads. The RTL runs
+    needed_wght_cycles weight passes per channel batch (iact_transmissions_pe) and reads the rows of every pass from the
+    weight staging buffer; it cannot tell how many rows the host wrote, so a short stream makes it read rows that were
+    never written (X in simulation, 0 or a previous layer's weights on the FPGA) and compute wrong without any sign.
+    Bug #39 was such a stream (one input channel with more than 16 filters per calculation: one set instead of one per
+    filter group); the tiled branch still makes one (#39b: filters not a multiple of the tiling factor, e.g. 3 channels
+    x 64 filters, doc/experiments/2026-11-05_bug39_detail.md). Returns the number of sets."""
+    sets = layer_params.needed_wght_transmissions
+    passes, batches = layer_params.needed_wght_cycles, layer_params.iact_transmissions_pe
+    if sets != passes * batches:
+        raise NotImplementedError(
+            f"{layer_params.layer_name}: the weight stream would hold {sets} weight set(s), the RTL reads "
+            f"{passes} pass(es) x {batches} channel batch(es) = {passes * batches} (bug #39b: "
+            f"{layer_params.filters} filters, {layer_params.used_psum_per_PE} psums per PE); split the filters")
+    return sets
+
+
 def check_wght_buffer(params, wght_words, layer_name=""):
     """Stop a layer whose weights do not fit the weight staging buffer (2^BUFFER_WIDTH_WGHT rows). Its write pointer
     wraps without any sign, so the last rows overwrote the first ones and the layer computed slightly wrong: bug #29

@@ -135,3 +135,33 @@ def test_weight_sets_cover_every_pass(width, channels, filters, monkeypatch):
         monkeypatch.setenv(key, value)
     p = lp.LayerParameters([0], conv_layer(width, channels=channels, filters=filters), oep.get_oep(1), 0, 1)
     assert p.needed_wght_transmissions == p.needed_wght_cycles * p.iact_transmissions_pe
+
+
+def test_check_wght_sets_refuses_a_short_stream():
+    # the guard of bug #39: weight sets in the stream must equal weight passes x channel batches the RTL reads
+    layer = types.SimpleNamespace(layer_name="Conv", filters=64, used_psum_per_PE=21, needed_wght_transmissions=3,
+                                  needed_wght_cycles=4, iact_transmissions_pe=1)
+    with pytest.raises(NotImplementedError, match="3 weight set"):
+        lp.check_wght_sets(layer)
+    layer.needed_wght_transmissions = 4
+    assert lp.check_wght_sets(layer) == 4
+
+
+@pytest.mark.parametrize("width", [8, 28])
+@pytest.mark.parametrize("channels", [1, 2, 4, 8, 32])
+@pytest.mark.parametrize("filters", [16, 32, 64])
+def test_check_wght_sets_accepts_working_layers(width, channels, filters, monkeypatch):
+    for key, value in dict(PLATFORM, QUANT_AMOUNT="64").items():
+        monkeypatch.setenv(key, value)
+    p = lp.LayerParameters([0], conv_layer(width, channels=channels, filters=filters), oep.get_oep(1), 0, 1)
+    assert lp.check_wght_sets(p) == p.needed_wght_cycles * p.iact_transmissions_pe
+
+
+def test_check_wght_sets_refuses_bug39b(monkeypatch):
+    # tiled weights, 64 filters not a multiple of the tiling factor 3: 21 psums per PE (4 passes), sets of 22 (3 sets)
+    for key, value in dict(PLATFORM, QUANT_AMOUNT="64").items():
+        monkeypatch.setenv(key, value)
+    p = lp.LayerParameters([0], conv_layer(14, channels=3, filters=64), oep.get_oep(1), 0, 1)
+    assert (p.needed_wght_transmissions, p.needed_wght_cycles) == (3, 4)
+    with pytest.raises(NotImplementedError, match="bug #39b"):
+        lp.check_wght_sets(p)
