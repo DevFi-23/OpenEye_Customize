@@ -165,3 +165,50 @@ def test_check_wght_sets_refuses_bug39b(monkeypatch):
     assert (p.needed_wght_transmissions, p.needed_wght_cycles) == (3, 4)
     with pytest.raises(NotImplementedError, match="bug #39b"):
         lp.check_wght_sets(p)
+
+
+def test_check_full_passes_refuses_an_uneven_last_pass():
+    # the guard of bug #40: passes x psums per PE x kernels per calculation (the filter slots the RTL computes and
+    # sends) must equal the filters, which the output and bias word counts use
+    layer = types.SimpleNamespace(layer_name="Conv", filters=24, needed_wght_cycles=2, used_psum_per_PE=16,
+                                  different_kernels_per_calculation=1)
+    with pytest.raises(NotImplementedError, match="32 filter slots"):
+        lp.check_full_passes(layer)
+    layer.filters = 32
+    assert lp.check_full_passes(layer) == 32
+
+
+@pytest.mark.parametrize("width", [8, 28])
+@pytest.mark.parametrize("channels", [1, 2, 4, 8, 32])
+@pytest.mark.parametrize("filters", [16, 32, 64])
+def test_check_full_passes_accepts_working_layers(width, channels, filters, monkeypatch):
+    for key, value in dict(PLATFORM, QUANT_AMOUNT="64").items():
+        monkeypatch.setenv(key, value)
+    p = lp.LayerParameters([0], conv_layer(width, channels=channels, filters=filters), oep.get_oep(1), 0, 1)
+    if p.needed_wght_transmissions != p.needed_wght_cycles * p.iact_transmissions_pe:
+        pytest.skip("refused earlier by check_wght_sets (bug #39b)")
+    assert lp.check_full_passes(p) == filters
+
+
+@pytest.mark.parametrize("channels", [1, 2])
+def test_check_full_passes_refuses_bug40(channels, monkeypatch):
+    # 28 x 28 -> 24: 16 + 8 filters in two passes of 16 psums; the RTL sent 10,752 of the 14,336 result words
+    for key, value in dict(PLATFORM, QUANT_AMOUNT="64").items():
+        monkeypatch.setenv(key, value)
+    p = lp.LayerParameters([0], conv_layer(28, channels=channels, filters=24), oep.get_oep(1), 0, 1)
+    assert (p.needed_wght_cycles, p.used_psum_per_PE, p.different_kernels_per_calculation) == (2, 16, 1)
+    assert lp.check_wght_sets(p) == 2
+    with pytest.raises(NotImplementedError, match="bug #40"):
+        lp.check_full_passes(p)
+
+
+def test_check_full_passes_bug40_controls(monkeypatch):
+    # 48 filters: 28 x 28 (one kernel per calculation) fills three passes of 16 and passed on the RTL; 8 x 8 (two
+    # kernels) is 32 + 16, like 8 x 4 x 1 -> 48 that failed 48 / 48 maps
+    for key, value in dict(PLATFORM, QUANT_AMOUNT="64").items():
+        monkeypatch.setenv(key, value)
+    p = lp.LayerParameters([0], conv_layer(28, channels=1, filters=48), oep.get_oep(1), 0, 1)
+    assert lp.check_full_passes(p) == 48
+    p = lp.LayerParameters([0], conv_layer(8, channels=1, filters=48), oep.get_oep(1), 0, 1)
+    with pytest.raises(NotImplementedError, match="64 filter slots"):
+        lp.check_full_passes(p)

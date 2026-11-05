@@ -1,0 +1,87 @@
+diff --git a/src/open_eye/layer_parameters.py b/src/open_eye/layer_parameters.py
+index d297bb8..e5e7b94 100644
+--- a/src/open_eye/layer_parameters.py
++++ b/src/open_eye/layer_parameters.py
+@@ -895,7 +895,9 @@ class LayerParameters(object):
+             else :
+                 # Many filters: limit to 16 psums per PE, double weight transmissions
+                 self.used_psum_per_PE = 32
+-                self.wght_transmissions_pe = math.ceil(self.channels/self.channel_div_trans)
++                # experiment: the bug #39 fix of the fork (channel batches x filter groups)
++                self.wght_transmissions_pe = math.ceil(self.channels/(self.used_channels*self.kernel_per_pe_cluster)) * \
++                    math.ceil(self.filters/(self.used_psum_per_PE*self.different_kernels_per_calculation))
+             # Weights per PE = psums * activations
+             self.used_wght_per_PE = self.used_psum_per_PE*self.used_iact_per_PE
+         else:
+diff --git a/src/open_eye/rtl_test_utils.py b/src/open_eye/rtl_test_utils.py
+index ed70131..0ba5135 100644
+--- a/src/open_eye/rtl_test_utils.py
++++ b/src/open_eye/rtl_test_utils.py
+@@ -924,8 +924,39 @@ async def probe_fsm_states(ptp, dut, stall_report_after=20000, oep=None):
+         stall_report_after = min(stall_report_after, fail_after)
+     progress_key = None
+     idle_for = 0
++    b40_prev = None
++    b40_count = 0
++    b40_pe = None
+     while True:
+         fsm_probe_samples[0] += 1
++        # experiment (scratch copy only): trace one PE of cluster (0,0), x1 y0, on every state change
++        try:
++            if b40_pe is None:
++                b40_pe = dut.OpenEye_Parallel.gen_x[0].gen_y[0].OpenEye_Cluster.pe_cluster.gen_X[1].gen_Y[0].pe
++            st = int(b40_pe.current_state_computing.value)
++            if st != b40_prev and b40_count < 400:
++                b40_count += 1
++                b40_prev = st
++                vals = []
++                for n, path in (("aw", "first_spad_words_wght"), ("dw", "second_spad_words_wght"),
++                                ("ia", "first_spad_words_iact_S"), ("id", "second_spad_words_iact"),
++                                ("wvec", "wght_data_vec"), ("wend", "gen_sparse_fsm.wght_data_end"),
++                                ("wstart", "gen_sparse_fsm.wght_data_start"), ("wavec", "gen_sparse_fsm.wght_addr_vec"),
++                                ("iacur", "gen_sparse_fsm.iact_addr_current"), ("iacnt", "gen_sparse_fsm.iact_addr_count"),
++                                ("iaddr_r", "iact_addr_SPad_data_r"), ("waddr_r", "wght_addr_SPad_data_r"),
++                                ("wdaddr", "wght_data_SPad_addr"), ("psaddr", "psum_spad_addr_r")):
++                    try:
++                        o = b40_pe
++                        for part in path.split("."):
++                            o = getattr(o, part)
++                        vals.append("%s=%s" % (n, str(o.value)))
++                    except Exception:
++                        vals.append("%s=?" % n)
++                logger.info("B40T %s ns state %d %s", cocotb.utils.get_sim_time("ns"), st, " ".join(vals))
++        except Exception as exc:
++            if b40_count == 0:
++                logger.info("B40T unreadable %s", exc)
++                b40_count = 1000
+         try:
+             state = int(dut.fsm_current_state.value)
+         except ValueError:
+@@ -1019,6 +1050,27 @@ async def probe_fsm_states(ptp, dut, stall_report_after=20000, oep=None):
+                     if oep is not None:
+                         dump_iact_path(dut, oep)
+                         dump_pe_occupancy(dut, oep)
++                        # experiment (scratch copy only): PE loop counters of the hang
++                        names = ["current_state_computing", "wght_data_vec", "wght_data_end", "wght_data_start", "wght_data_SPad_addr",
++                                 "iact_addr_SPad_data_r", "iact_addr_current", "iact_addr_count", "iact_data_SPad_addr",
++                                 "first_spad_words_wght", "second_spad_words_wght", "first_spad_words_iact", "second_spad_words_iact",
++                                 "wght_addr_vec", "mux_iact_ready", "next_iact", "fast_cycle", "wght_start_set", "wght_end_set",
++                                 "wght_data_end_pre", "wght_data_start_pre", "wght_addr_SPad_data_r", "iact_oh_delay_1", "iact_oh_delay_2",
++                                 "computing", "psum_spad_addr_r"]
++                        for cx in range(oep.Clusters_X):
++                            for cy in range(oep.Clusters_Y):
++                                for (x, y) in ((0, 0), (1, 0), (0, 1), (3, 2)):
++                                    try:
++                                        pe = dut.OpenEye_Parallel.gen_x[cx].gen_y[cy].OpenEye_Cluster.pe_cluster.gen_X[x].gen_Y[y].pe
++                                        vals = []
++                                        for n in names:
++                                            try:
++                                                vals.append("%s=%s" % (n, str(getattr(pe, n).value)))
++                                            except Exception:
++                                                vals.append("%s=?" % n)
++                                        logger.error("B40 PE cl(%d,%d) x%d y%d: %s", cx, cy, x, y, " ".join(vals))
++                                    except Exception as exc:
++                                        logger.error("B40 PE cl(%d,%d) x%d y%d unreadable %s", cx, cy, x, y, exc)
+             previous = state
+         if fail_after:
+             key = [state]

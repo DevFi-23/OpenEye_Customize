@@ -138,6 +138,25 @@ def check_wght_sets(layer_params):
     return sets
 
 
+def check_full_passes(layer_params):
+    """Stop a convolution whose filter slots do not equal its filters. The RTL computes and sends used_psum_per_PE
+    psums per PE in each of the needed_wght_cycles weight passes, for different_kernels_per_calculation kernels: when
+    the filters do not fill the last pass (e.g. 24 = 16 + 8), the missing filters are padding slots with zero weights,
+    which the RTL computes right, but psum_output_words and trans_cycles_psum count only the real filters, so the RTL
+    stops sending results early and the last outputs never leave the chip (and the testbench reference is wrong too).
+    Bug #40 (doc/experiments/2026-11-05_b10db82_hang.md, section 4): 28 x 28 x 1 -> 24 sent 10,752 of 14,336 words.
+    Returns the number of filter slots."""
+    passes, psums = layer_params.needed_wght_cycles, layer_params.used_psum_per_PE
+    kernels = layer_params.different_kernels_per_calculation
+    slots = passes * psums * kernels
+    if slots != layer_params.filters:
+        raise NotImplementedError(
+            f"{layer_params.layer_name}: {layer_params.filters} filters fill {passes} weight pass(es) x {psums} psums per "
+            f"PE x {kernels} kernel(s) per calculation = {slots} filter slots; the output and bias word counts would "
+            f"miss the padding slots (bug #40); use a filter count that fills every pass")
+    return slots
+
+
 def check_wght_buffer(params, wght_words, layer_name=""):
     """Stop a layer whose weights do not fit the weight staging buffer (2^BUFFER_WIDTH_WGHT rows). Its write pointer
     wraps without any sign, so the last rows overwrote the first ones and the layer computed slightly wrong: bug #29
