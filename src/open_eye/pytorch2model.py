@@ -406,6 +406,16 @@ def create_model_from_pytorch(pytorch_model, input_shape=(1, 1, 28, 28), use_ran
         if isinstance(module, nn.Conv2d):
             # Conv2D layer
             logger.debug(f"Processing Conv2D layer: {name}")
+            # add_conv2d takes no stride, padding, dilation or groups: the layer is computed with stride 1, padding
+            # kernel // 2, one group (2026-11-07, README_FI 8e group A: refuse what would be computed differently)
+            same = tuple(k // 2 for k in module.kernel_size)
+            padding = same if module.padding == 'same' else (module.padding if isinstance(module.padding, tuple) else None)
+            if tuple(module.stride) != (1, 1) or padding != same or tuple(module.dilation) != (1, 1) or \
+                    module.groups != 1:
+                raise NotImplementedError(
+                    f"{name}: Conv2d stride {module.stride}, padding {module.padding}, dilation {module.dilation}, "
+                    f"groups {module.groups}; pytorch2model converts only stride 1, padding kernel // 2 = {same}, "
+                    f"dilation 1, one group (onnx2model takes strides and pads)")
 
             # Get weights and bias
             if hasattr(module, 'weight'):
@@ -455,6 +465,11 @@ def create_model_from_pytorch(pytorch_model, input_shape=(1, 1, 28, 28), use_ran
         elif isinstance(module, nn.MaxPool2d):
             # MaxPooling layer
             logger.debug(f"Processing MaxPool2D layer: {name}")
+            pair = lambda v: tuple(v) if isinstance(v, (tuple, list)) else (v, v)   # noqa: E731
+            if pair(module.kernel_size) != (2, 2) or pair(module.stride) != (2, 2) or pair(module.padding) != (0, 0):
+                raise NotImplementedError(
+                    f"{name}: MaxPool2d kernel {module.kernel_size}, stride {module.stride}, padding {module.padding}; "
+                    f"the RTL pools 2 x 2 windows with stride 2 and no padding")
 
             output_shape = infer_output_shape(module, current_shape)
 
@@ -536,9 +551,12 @@ def create_model_from_pytorch(pytorch_model, input_shape=(1, 1, 28, 28), use_ran
             continue
 
         else:
-            # Skip unsupported layers with a warning
-            if not isinstance(module, (nn.Sequential, nn.Dropout)):
-                logger.warning(f"Unsupported layer type {module.__class__.__name__}: {name}")
+            # Containers hold the layers above; Dropout does nothing at inference. Any other layer would be dropped
+            # and the hardware would compute another network: refuse it (it was only a warning until 2026-11-07).
+            # Operations written in forward() (residual adds, torch.relu, ...) are not modules and cannot be seen
+            # here at all: onnx2model reads the traced graph and refuses them (check_supported_graph).
+            if not isinstance(module, (nn.Sequential, nn.Dropout)) and not any(True for _ in module.children()):
+                raise NotImplementedError(f"Unsupported layer type {module.__class__.__name__}: {name}")
 
     logger.info(f"Successfully converted PyTorch model with {len(openeye_model.layers)} layers")
     return openeye_model

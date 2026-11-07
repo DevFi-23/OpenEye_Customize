@@ -12,6 +12,8 @@
        instead of the Dense-style bank rotation (bug #7).
    Three input channels still fail: the Python stream packs three bytes per
    pixel while the RTL moves activations in pairs (xfail, see README_FI 8b).
+   Since 2026-11-07 the toolchain refuses such a layer (check_conv_geometry);
+   the test sets OPENEYE_ALLOW_UNSUPPORTED=1 so that it still runs the RTL.
 
 2. test_mnist_conv: the three convolution layers of models/mnist_conv_net.py
    with their real shapes. The 64-filter layers need QUANT_AMOUNT >= 64 (one
@@ -59,6 +61,8 @@ THREE_CHANNELS = pytest.mark.xfail(
 @pytest.mark.parametrize("channels", [1, 2, pytest.param(3, marks=THREE_CHANNELS), 4, 8])
 @pytest.mark.parametrize("num_glb_iact", [1, 3])
 def test_iact_channel_mapping(num_glb_iact, channels, request, monkeypatch):
+    if channels == 3:   # refused by check_conv_geometry (bug #7): run the RTL anyway, so a fix shows up as XPASS
+        monkeypatch.setenv("OPENEYE_ALLOW_UNSUPPORTED", "1")
     monkeypatch.setattr(conv, "INPUT_SIZE_X", 8)
     conv._run_conv_const("Convolution_Single", 8, 2, num_glb_iact=num_glb_iact,
                          input_channels=channels, request=request, input_height=4,

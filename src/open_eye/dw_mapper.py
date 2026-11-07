@@ -61,6 +61,11 @@ class DWMapper(LayerMapper):
             sparse_wghts (bool): Whether weights are sparse
 
         """
+        # The RTL of this fork has no depthwise datapath (upstream's dw_mode of b10db82 / e8b3c3e is not taken and did
+        # not compute right upstream either, doc/experiments/2026-11-06_upstream_dw_review.md); the mapping below used
+        # to stop with an IndexError / ValueError of its own (2026-11-07). Say why instead.
+        raise NotImplementedError(
+            f"{layer_params.layer_name}: depthwise convolution is not implemented in this RTL (no depthwise datapath)")
         # Create specialized stream mappers for depthwise convolution
         input_mapper = DwIactStreamMapper(params, layer_params, layer_repetition, dram_layer_content[0], sparse_iacts)
         weight_mapper = DwWghtStreamMapper(params, layer_params, layer_repetition, dram_layer_content[1], sparse_wghts)

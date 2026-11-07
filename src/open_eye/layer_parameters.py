@@ -28,6 +28,7 @@ Typical Usage:
 
 import math
 import logging
+import os
 logger = logging.getLogger("cocotb")
 
 def activation_min(layer):
@@ -169,6 +170,143 @@ def check_wght_buffer(params, wght_words, layer_name=""):
             f"{layer_name} weights need {rows} rows of the weight buffer ({wght_words} DMA words), it has {capacity} "
             f"(BUFFER_WIDTH_WGHT={params.BUFFER_WIDTH_WGHT}); raise BUFFER_WIDTH_WGHT or split the layer")
     return rows
+
+
+# The checks below stop layers that the RTL computes differently from the model while the toolchain streams them
+# without complaint (README_FI section 8e, group A: the run ends normally and the outputs are wrong). Each names the
+# bug of README_FI section 8b and the condition that was measured; doc/experiments/2026-11-07_bug41_stride.md.
+# OPENEYE_ALLOW_UNSUPPORTED=1 turns them into warnings, to reproduce or investigate one of these bugs on the RTL.
+ALLOW_UNSUPPORTED_ENV = "OPENEYE_ALLOW_UNSUPPORTED"
+
+
+def refuse(message):
+    """Raise NotImplementedError(message); with OPENEYE_ALLOW_UNSUPPORTED=1 only log it and go on."""
+    if os.environ.get(ALLOW_UNSUPPORTED_ENV) == "1":
+        logger.warning("%s=1, streaming a refused layer anyway: %s", ALLOW_UNSUPPORTED_ENV, message)
+        return
+    raise NotImplementedError(message)
+
+
+def model_padding(layer):
+    """The padding a model gives a layer, as the toolchain's loaders record it: 'same' or 'valid' (Keras, layer_adapter,
+    pytorch2model), the explicit pads [top, left, bottom, right] (onnx2model padding_pads, ONNX order: begin then end
+    of the two spatial axes) or PyTorch's int / pair; None when the layer object does not say."""
+    pads = getattr(layer, "padding_pads", None)
+    if pads is not None:
+        return [int(p) for p in pads]
+    padding = getattr(layer, "padding", None)
+    if isinstance(padding, str):
+        return padding.lower()
+    if isinstance(padding, int):
+        return [padding] * 4
+    if isinstance(padding, (tuple, list)) and len(padding) == 2 and all(isinstance(p, int) for p in padding):
+        return [padding[0], padding[1], padding[0], padding[1]]
+    return None
+
+
+def tf_same_pads(size, kernel, stride):
+    """Leading and trailing zero padding of TensorFlow's "same" along one axis: the output has ceil(size / stride)
+    pixels, the padding total is what the last window needs, and the odd pixel goes to the end."""
+    out = -(-size // stride)
+    total = max((out - 1) * stride + kernel - size, 0)
+    return total // 2, total - total // 2
+
+
+def check_conv_geometry(layer_params, params):
+    """Stop a convolution whose stride, padding, dilation, grouping or channel count the RTL does not compute as the
+    model does. Returns layer_params.
+
+    * Stride other than 1 (bugs #41, #41b): stride is an optional part of the RTL, parameter STRIDE_ENABLED of
+      OpenEye_FPGA.v (default 0, as upstream since 2e3b351). Built without it, OpenEye_FPGA.v ties stride_x / stride_y to
+      1 while the host still programs the read loops for the stride: 8 x 8 x 4 -> 16 with stride 2 computed every x
+      window (stride 1) and dropped the last kernel row of the last output row, 13 of 16 positions wrong (#41). Built
+      with STRIDE_ENABLED=1, stride 2 is right only for some input widths (CR 2 x CC 2, NUM_GLB_PSUM 4: 8, 16, 24, 28, 32
+      right, 4, 6, 7, 9, 12 wrong at any height; NUM_GLB_PSUM 2: 4, 8 right, 6 wrong): the outputs are correct windows in
+      another order and number than the host expects (#41b, not traced). So every stride above 1 is refused.
+    * Padding (bug #42): the RTL pads kernel // 2 zeros on every side (padding_reg = (kernel_size - 1) / 2), which is
+      Keras / TensorFlow "same" at stride 1, PyTorch padding = kernel // 2, ONNX pads [k // 2] * 4. LayerParameters always
+      assumed it (self.padding = "same") whatever the model said, so "valid" or other pads gave larger, shifted outputs.
+      With a stride above 1 TensorFlow's "same" pads asymmetrically (the odd pixel at the end, tf_same_pads): it equals the
+      RTL's only when the leading padding of both axes is kernel // 2 (odd input sizes for kernel 3, stride 2).
+    * Dilation or groups other than 1: not read by the toolchain (a depthwise or grouped convolution is computed as a
+      dense one).
+    * An odd number of input channels above 1 (bug #7): the input stream packs the channels of a pixel back to back
+      (3 bytes for 3 channels) while the RTL moves activations in channel pairs, so pixels straddle the pairs
+      (doc/experiments/2026-10-14_channel_bugs.md, part 2; test_mnist_layers mapping 3 channels xfail). Pad the input to
+      an even count with a zero channel."""
+    name = layer_params.layer_name
+    stride = (layer_params.strideX, layer_params.strideY)
+    kernel = tuple(layer_params.kernel_size)
+    if stride != (1, 1):
+        if not int(getattr(params, "STRIDE_ENABLED", 0)):
+            refuse(f"{name}: stride {stride[0]} x {stride[1]}; the RTL is built with STRIDE_ENABLED=0 (the default), "
+                   f"OpenEye_FPGA.v uses stride 1 and the outputs are wrong (bug #41)")
+        else:
+            refuse(f"{name}: stride {stride[0]} x {stride[1]}; even with STRIDE_ENABLED=1 the outputs of a strided layer "
+                   f"are wrong for several input widths ({layer_params.iact_size_x} here; bug #41b)")
+    padding = getattr(layer_params, "model_padding", None)
+    rtl = [kernel[0] // 2, kernel[1] // 2, kernel[0] // 2, kernel[1] // 2]
+    if padding == "valid":
+        padding = [0, 0, 0, 0]
+    elif padding == "same":
+        size = (layer_params.iact_size_x, layer_params.iact_size_y)
+        lead = [tf_same_pads(size[i], kernel[i], stride[i]) for i in range(2)]
+        padding = [lead[0][0], lead[1][0], lead[0][1], lead[1][1]] if stride != (1, 1) else rtl
+    if padding is not None and list(padding) != rtl:
+        refuse(
+            f"{name}: the model pads {list(padding)} ([top, left, bottom, right]), the RTL always pads kernel // 2 = "
+            f"{rtl}; the toolchain would compute a different convolution (bug #42)")
+    dilation = tuple(getattr(layer_params, "model_dilation", (1, 1)))
+    groups = int(getattr(layer_params, "model_groups", 1))
+    if any(d != 1 for d in dilation) or groups != 1:
+        refuse(
+            f"{name}: dilation {dilation} / groups {groups}; the toolchain and the RTL compute only dilation 1 and one "
+            f"group (no depthwise or grouped convolution)")
+    if layer_params.channels > 1 and layer_params.channels % 2:
+        refuse(
+            f"{name}: {layer_params.channels} input channels; an odd count above 1 is packed back to back while the RTL "
+            f"moves channel pairs, so the activations reach the wrong PEs (bug #7); pad the input to "
+            f"{layer_params.channels + 1} channels with a zero channel")
+    return layer_params
+
+
+def check_pooling_geometry(layer_params):
+    """Stop a pooling layer the RTL does not compute as the model does. Returns layer_params.
+
+    * Window, stride and padding: the on-chip pooling is 2 x 2 with stride 2 and no padding (MAXPOOLING_READ reads a
+      2 x 2 region, doc/OpenEye_FPGA_documentation.md 5.13); LayerParameters takes the window from the strides alone, so
+      a 3 x 3 / stride 2 pooling became a 2 x 2 one.
+    * Input width of 4 or less (bug #27): the result written back into the iact buffer is wrong (2026-11-07,
+      Conv_Pool_Conv on CR 2 x CC 2: widths 2 and 4 wrong at every height, 6 and 8 right; found with the second pooling
+      of Conv_Pool_Conv_Pool_Conv on 8 x 8, NUM_GLB_PSUM 4 and 2)."""
+    name = layer_params.layer_name
+    stride = (layer_params.strideX, layer_params.strideY)
+    window = tuple(getattr(layer_params, "pool_size", None) or stride)
+    padding = getattr(layer_params, "model_padding", None)
+    if stride != (2, 2) or window != (2, 2) or padding not in (None, "valid", [0, 0, 0, 0]):
+        refuse(
+            f"{name}: window {window}, stride {stride}, padding {padding}; the RTL pools 2 x 2 windows with stride 2 "
+            f"and no padding")
+    if layer_params.iact_size_x <= 4:
+        refuse(
+            f"{name}: input {layer_params.iact_size_x} pixels wide; pooling inputs 4 or fewer pixels wide come out "
+            f"wrong (bug #27)")
+    return layer_params
+
+
+def check_dense_readout(layer_params):
+    """Stop a Dense layer that sends its results out (the last layer) while it needs more than one psum pass (bug #21):
+    the final read-out of the second pass is wrong, only the first used_psum_per_PE outputs are right (K = 64: 40 outputs
+    10 right, 48 outputs 12 right; doc/experiments/2026-10-21_bug19_dense_k512.md). One pass holds 16 x Clusters_X
+    outputs (32 at 2 cluster columns). A Dense layer written back on chip for the next layer is right
+    (doc/experiments/2026-10-24_bug26_dense_writeback.md). Returns layer_params."""
+    passes = layer_params.needed_psum_transmissions
+    if layer_params.send_values_out and passes > 1:
+        refuse(
+            f"{layer_params.layer_name}: {layer_params.filters} outputs need {passes} psum passes; the final read-out "
+            f"of more than one pass is wrong (bug #21); split the outputs into layers of at most "
+            f"{math.ceil(layer_params.filters / passes)}")
+    return layer_params
 
 
 def activation_registers(layer_params):
@@ -801,6 +939,11 @@ class LayerParameters(object):
             self.padding_y = layer.kernel_size[1]//2
         self.strideX = layer.strides[0]
         self.strideY = layer.strides[1]
+        # What the model asks for beyond the RTL's fixed geometry (self.padding stays "same" for the RTL);
+        # check_conv_geometry refuses a layer whose model padding, dilation or groups differ (bugs #42, #43)
+        self.model_padding = model_padding(layer)
+        self.model_dilation = tuple(getattr(layer, "dilation_rate", None) or getattr(layer, "dilations", None) or (1, 1))
+        self.model_groups = int(getattr(layer, "groups", None) or 1)
 
         # Check for optional partial sum storage flag
         if hasattr(layer, 'store_in_psum'):
@@ -1973,6 +2116,10 @@ class LayerParameters(object):
         self.send_values_out = 1
         self.strideX = layer.strides[0]
         self.strideY = layer.strides[1]
+        # The window and padding of the model (the RTL pools 2 x 2 windows with stride 2): check_pooling_geometry
+        window = getattr(layer, "pool_size", None) or getattr(layer, "kernel_size", None)
+        self.pool_size = tuple(window) if window is not None else None
+        self.model_padding = model_padding(layer)
         self.iact_size_x = self.input_shape[1]
         self.iact_size_y = self.input_shape[2]
         self.computing_mx = [[[[1 for _ in range(params.PEs_X)]

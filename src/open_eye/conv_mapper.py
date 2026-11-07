@@ -135,11 +135,13 @@ class ConvMapper(LayerMapper):
         # === REGISTER PACKING ===
         # Pack all layer configuration parameters into hardware register format
         # Uses pack_registers() utility from regmap_pack module
-        from open_eye.layer_parameters import (activation_registers, check_full_passes, check_iact_buffer,
-                                               check_wght_buffer, check_wght_sets)
+        from open_eye.layer_parameters import (activation_registers, check_conv_geometry, check_full_passes,
+                                               check_iact_buffer, check_wght_buffer, check_wght_sets)
         from open_eye.generator import pack_registers
+        # stride, padding, dilation, groups and channel count as the RTL computes them (bugs #41, #42, #7),
         # the weights of this stream must fit the weight staging buffer (bug #29) and hold every pass the RTL reads
         # (bug #39), the filters must fill every pass (bug #40), a pass of activations the iact buffer (bug #37)
+        check_conv_geometry(layer_params, params)
         check_wght_sets(layer_params)
         check_full_passes(layer_params)
         check_wght_buffer(params, layer_params.trans_cycles_wght, str(layer_params.layer_name))

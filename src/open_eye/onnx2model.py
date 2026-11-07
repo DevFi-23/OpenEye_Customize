@@ -14,6 +14,17 @@ MANT_BITS = 24
 NEG_MANT_BITS = 8   # Leaky ReLU negative slope: the 8-bit status field act_neg_mant (regmap.yaml)
 SHIFT_MAX = 127     # 7-bit shift field
 COMPUTE_OPS = {'ConvInteger', 'QLinearConv', 'MatMulInteger', 'QLinearMatMul', 'QGemm', 'MaxPool'}
+# The other nodes of the quantized graphs the toolchain handles (2026-11-07: the ReLU, Leaky ReLU, SiLU and hard-swish
+# MNIST nets of doc/demo_notebooks): data movement, and the activation patterns find_activation / check_fused_relu
+# read. check_supported_graph refuses every other node (bug #43: parse_pipeline used to drop them without a word).
+PASS_OPS = {'QuantizeLinear', 'DequantizeLinear', 'Flatten', 'Reshape', 'Identity', 'Constant'}
+STATIC_ACTIVATION_OPS = {'Relu', 'LeakyRelu', 'QLinearLeakyRelu', 'QLinearSigmoid', 'QLinearMul', 'HardSigmoid',
+                         'HardSwish'}
+# A dynamically quantized graph (no calibration data) dequantizes every layer in float (DynamicQuantizeLinear, Cast,
+# Mul by the scales, Add of the bias) and carries only a ReLU to the hardware (check_fused_relu)
+DYNAMIC_OPS = {'DynamicQuantizeLinear', 'Cast', 'Mul', 'Add'}
+DYNAMIC_ACTIVATION_OPS = {'Relu'}
+CONV_OPS = {'ConvInteger', 'QLinearConv'}
 
 # Activations after a QLinearConv / QGemm of a statically quantized graph, as the planned hardware computes them
 # (doc/experiments/2026-11-02_activation_plan.md): "relu" by the quantizer's lower clamp (act_min 0), "leaky_relu"
@@ -43,7 +54,8 @@ class HardwareLayer:
     def __init__(self, index, layer_type, onnx_op, node_name, has_relu, input_shape, output_shape):
         self.index = index
         self.type = layer_type            # Type name (e.g., conv2d, dense, pooling2d)
-        self.name = node_name            # Node name within the ONNX graph
+        self.name = node_name            # Node name within the ONNX graph (get_model renames it for LayerParameters)
+        self.node_name = node_name       # Node name within the ONNX graph, kept (check_supported_graph)
         self.onnx_op = onnx_op
         self.has_relu = has_relu
         
@@ -87,10 +99,11 @@ class HardwareLayer:
         return f"<HardwareLayer [{self.index}] {self.type} (Name: {self.name})>"
 
 
-def export_to_onnx(model, path="simple_mnist_convnet.onnx"):
-    """Stable export of PyTorch model into ONNX format."""
+def export_to_onnx(model, path="simple_mnist_convnet.onnx", input_shape=(1, 1, 28, 28)):
+    """Stable export of PyTorch model into ONNX format. input_shape [N, C, H, W] of the dummy input: the shapes of the
+    exported graph follow it (get_model takes it from the calibration data; MNIST when there is none)."""
     model.eval()
-    dummy_input = torch.randn(1, 1, 28, 28)
+    dummy_input = torch.randn(*input_shape)
     torch.onnx.export(
         model, dummy_input, path,
         export_params=True, opset_version=18, do_constant_folding=True,
@@ -443,6 +456,91 @@ def build_layer_dict(idx, node, shapes, next_node_map):
         output_shape=shapes.get(node.output[0], "Unknown")
     )
 
+def check_supported_graph(onnx_model, inits, pipeline=None):
+    """Stop a quantized graph that the hardware pipeline would compute differently from the model (bug #43). The
+    pipeline is a chain of COMPUTE_OPS layers; parse_pipeline used to drop every other node without a word, so a
+    residual Add, an AveragePool / GlobalAveragePool, a Concat, a Softmax, a grouped or depthwise convolution or an
+    unrecognised activation vanished and the hardware computed another network. Refuses:
+      * a node outside COMPUTE_OPS, PASS_OPS and the activation ops of the graph's quantization (static: the patterns
+        of find_activation; dynamic: only Relu, plus its own DynamicQuantizeLinear / Cast / Mul / Add);
+      * a dynamic Add without an initializer input (the bias Add has one; a residual Add adds two activations);
+      * a convolution with group, dilations or auto_pad other than 1 / 1 / NOTSET;
+      * compute nodes that are not one chain: each one's data input must come, through pass and activation nodes, from
+        the previous compute node (the first: from the graph input), so branches and skip connections are refused;
+      * with pipeline (after parse_pipeline): an activation node that does not follow a Conv / Dense layer whose
+        activation was recognised (e.g. a ReLU after a MaxPool, which the pooling layer does not apply).
+    Returns the compute nodes in order."""
+    nodes = list(onnx_model.graph.node)
+    dynamic = any(n.op_type in ('ConvInteger', 'MatMulInteger', 'DynamicQuantizeLinear') for n in nodes)
+    activation_ops = DYNAMIC_ACTIVATION_OPS if dynamic else STATIC_ACTIVATION_OPS
+    transparent = PASS_OPS | activation_ops | (DYNAMIC_OPS if dynamic else set())
+    unknown = sorted({n.op_type for n in nodes} - COMPUTE_OPS - transparent)
+    if unknown:
+        raise NotImplementedError(
+            f"ONNX nodes {unknown} are not computed by the hardware pipeline (Conv, Gemm / MatMul, 2 x 2 MaxPool and the "
+            f"activations ReLU, Leaky ReLU, SiLU, hard-swish); they would be dropped (bug #43)"
+            + ("; a dynamically quantized graph carries only ReLU: pass calibration data for static quantization"
+               if dynamic else ""))
+    producer = {o: n for n in nodes for o in n.output}
+    constant = {}
+
+    def is_constant(tensor):
+        """A tensor computed from initializers only (the dynamic bias goes through a Reshape)."""
+        if tensor not in constant:
+            node = producer.get(tensor)
+            constant[tensor] = tensor in inits or (node is not None and all(is_constant(i) for i in node.input if i))
+        return constant[tensor]
+
+    for n in nodes:
+        attrs = {a.name: onnx.helper.get_attribute_value(a) for a in n.attribute}
+        if n.op_type == 'Add' and not any(is_constant(i) for i in n.input):
+            raise NotImplementedError(f"{n.name}: Add of two activations (residual connection) is not computed by the "
+                                      f"hardware pipeline (bug #43)")
+        if n.op_type in CONV_OPS:
+            auto_pad = attrs.get('auto_pad', b'NOTSET')
+            auto_pad = auto_pad.decode() if isinstance(auto_pad, bytes) else auto_pad
+            if attrs.get('group', 1) != 1 or any(d != 1 for d in attrs.get('dilations', [1, 1])) or \
+                    auto_pad not in ('NOTSET', ''):
+                raise NotImplementedError(
+                    f"{n.name}: group {attrs.get('group', 1)}, dilations {list(attrs.get('dilations', [1, 1]))}, "
+                    f"auto_pad {auto_pad}; the hardware computes one group (no depthwise / grouped convolution), "
+                    f"dilation 1 and explicit pads only (bug #43)")
+
+    def source(tensor):
+        """The compute node whose output reaches tensor through transparent nodes (their first input), None for the
+        graph input."""
+        for _ in range(len(nodes) + 1):
+            node = producer.get(tensor)
+            if node is None or node.op_type in COMPUTE_OPS:
+                return node
+            tensor = node.input[0]
+        return None
+
+    compute = [n for n in nodes if n.op_type in COMPUTE_OPS]
+    for i, n in enumerate(compute):
+        came_from = source(n.input[0])
+        expected = compute[i - 1] if i else None
+        if came_from is not expected:
+            raise NotImplementedError(
+                f"{n.name}: its input comes from {came_from.name if came_from is not None else 'the graph input'}, not "
+                f"from {expected.name if expected is not None else 'the graph input'}; the hardware runs one chain of "
+                f"layers (no branches or skip connections, bug #43)")
+    if pipeline is not None:
+        by_node = {layer.node_name: layer for layer in pipeline}
+        for n in nodes:
+            if n.op_type not in activation_ops:
+                continue
+            owner = source(n.input[0])
+            layer = by_node.get(owner.name) if owner is not None else None
+            fused = layer is not None and layer.type in ('conv2d', 'dense') and (
+                getattr(layer, 'activation', 'none') != 'none' or (n.op_type == 'Relu' and layer.has_relu))
+            if not fused:
+                raise NotImplementedError(
+                    f"{n.name} ({n.op_type}) after {owner.name if owner is not None else 'the graph input'} is not an "
+                    f"activation of a Conv / Dense layer the hardware applies; it would be dropped (bug #43)")
+    return compute
+
+
 def parse_pipeline(onnx_model, inits, next_node_map, shapes):
     """Iterates through nodes to build the clean object-oriented hardware pipeline."""
     pipeline = []
@@ -500,7 +598,9 @@ def get_model(torch_model, calibration_data=None):
 
     calibration_data (float32 [N, C, H, W], preprocessed as in training): quantize statically for the hardware
     (quantize_to_int8_static); without it the weights only are quantized (dynamic), as before."""
-    fp32_path = export_to_onnx(torch_model)
+    # The dummy input of the export has the calibration data's shape (MNIST 1 x 28 x 28 without calibration data)
+    shape = (1,) + tuple(np.asarray(calibration_data).shape[1:]) if calibration_data is not None else (1, 1, 28, 28)
+    fp32_path = export_to_onnx(torch_model, input_shape=shape)
     if calibration_data is None:
         int8_path = quantize_to_int8(fp32_path)
     else:
@@ -511,6 +611,7 @@ def get_model(torch_model, calibration_data=None):
     shapes = get_tensor_shapes(onnx_model)
     
     pipeline = finish_activations(fill_missing_shapes(parse_pipeline(onnx_model, inits, next_node_map, shapes)))
+    check_supported_graph(onnx_model, inits, pipeline)      # nothing of the model may be dropped (bug #43)
     print_summary(pipeline)
     
     for layer_number in range(len(pipeline)):
