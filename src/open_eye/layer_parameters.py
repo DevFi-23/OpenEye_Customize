@@ -216,13 +216,13 @@ def check_conv_geometry(layer_params, params):
     """Stop a convolution whose stride, padding, dilation, grouping or channel count the RTL does not compute as the
     model does. Returns layer_params.
 
-    * Stride other than 1 (bugs #41, #41b): stride is an optional part of the RTL, parameter STRIDE_ENABLED of
-      OpenEye_FPGA.v (default 0, as upstream since 2e3b351). Built without it, OpenEye_FPGA.v ties stride_x / stride_y to
-      1 while the host still programs the read loops for the stride: 8 x 8 x 4 -> 16 with stride 2 computed every x
-      window (stride 1) and dropped the last kernel row of the last output row, 13 of 16 positions wrong (#41). Built
-      with STRIDE_ENABLED=1, stride 2 is right only for some input widths (CR 2 x CC 2, NUM_GLB_PSUM 4: 8, 16, 24, 28, 32
-      right, 4, 6, 7, 9, 12 wrong at any height; NUM_GLB_PSUM 2: 4, 8 right, 6 wrong): the outputs are correct windows in
-      another order and number than the host expects (#41b, not traced). So every stride above 1 is refused.
+    * Stride other than 1 without STRIDE_ENABLED=1 (bug #41): stride is an optional part of the RTL, parameter
+      STRIDE_ENABLED of OpenEye_FPGA.v (upstream default 0 since 2e3b351; the fork's default 1 since 2026-11-09). Built without it, OpenEye_FPGA.v ties
+      stride_x / stride_y to 1 while the host still programs the read loops for the stride: 8 x 8 x 4 -> 16 with stride 2
+      computed every x window (stride 1) and dropped the last kernel row of the last output row, 13 of 16 positions
+      wrong. Built with STRIDE_ENABLED=1 a strided layer is right since the fixes of #41b (output order, odd widths),
+      #41c (write-back in output units, RTL) and #41d (odd heights) of 2026-11-08 (doc/experiments/
+      2026-11-07_bug41_stride.md section 8), so a stride is refused only on an RTL built without it.
     * Padding (bug #42): the RTL pads kernel // 2 zeros on every side (padding_reg = (kernel_size - 1) / 2), which is
       Keras / TensorFlow "same" at stride 1, PyTorch padding = kernel // 2, ONNX pads [k // 2] * 4. LayerParameters always
       assumed it (self.padding = "same") whatever the model said, so "valid" or other pads gave larger, shifted outputs.
@@ -237,13 +237,9 @@ def check_conv_geometry(layer_params, params):
     name = layer_params.layer_name
     stride = (layer_params.strideX, layer_params.strideY)
     kernel = tuple(layer_params.kernel_size)
-    if stride != (1, 1):
-        if not int(getattr(params, "STRIDE_ENABLED", 0)):
-            refuse(f"{name}: stride {stride[0]} x {stride[1]}; the RTL is built with STRIDE_ENABLED=0 (the default), "
-                   f"OpenEye_FPGA.v uses stride 1 and the outputs are wrong (bug #41)")
-        else:
-            refuse(f"{name}: stride {stride[0]} x {stride[1]}; even with STRIDE_ENABLED=1 the outputs of a strided layer "
-                   f"are wrong for several input widths ({layer_params.iact_size_x} here; bug #41b)")
+    if stride != (1, 1) and not int(getattr(params, "STRIDE_ENABLED", 0)):
+        refuse(f"{name}: stride {stride[0]} x {stride[1]}; the RTL is built with STRIDE_ENABLED=0 (the upstream default), "
+               f"OpenEye_FPGA.v uses stride 1 and the outputs are wrong (bug #41); build it with STRIDE_ENABLED=1")
     padding = getattr(layer_params, "model_padding", None)
     rtl = [kernel[0] // 2, kernel[1] // 2, kernel[0] // 2, kernel[1] // 2]
     if padding == "valid":
@@ -839,7 +835,10 @@ class LayerParameters(object):
             self.psum_add_up = calculation_ress - self.psum_add_up
             self.psum_add_up = self.psum_add_up % calculation_ress
             self.add_up = self.psum_add_up * self.strideX
-            self.iact_x_add_up = self.iact_size_x + self.add_up
+            # Input columns the padded output row needs: (outputs + psum_add_up) * strideX. Equal to iact_size_x + add_up
+            # at stride 1 and for even widths; an odd width with a stride needs one more (7 -> 8: the last window reads the
+            # right padding column), else the constructor's x loop stopped a column early (bug #41b)
+            self.iact_x_add_up = (self.output_shape[1] + self.psum_add_up) * self.strideX
             # === MASKING PHASE 2: Eliminate PEs beyond computation requirements ===
             # Calculate total number of X positions needed per computation cycle
             x_values_per_cycle = self.iact_x_add_up * self.y_lines_per_calculation * self.different_kernels_per_calculation
@@ -1508,8 +1507,12 @@ class LayerParameters(object):
         self.calculate_used_Y_cluster(params)
         self.calculate_used_refreshes(params)
         self.calculate_computing_matrix(params)
+        # Input rows the output rows need, as iact_x_add_up for the columns: ceil(iact_size_y / strideY) * strideY.
+        # Equal to iact_size_y at stride 1 and for even heights; an odd height with a stride needs the bottom padding row
+        # too (7 -> 8), else the last output row read whatever followed the image (bug #41d)
+        self.iact_y_add_up = math.ceil(self.iact_size_y / self.strideY) * self.strideY
         x_size = (self.iact_x_add_up+2*self.padding_x-self.strideX+1)
-        y_size = (self.iact_size_y+2*self.padding_y-self.strideY+1)
+        y_size = (self.iact_y_add_up+2*self.padding_y-self.strideY+1)
         self.iact_glb_writing_cycles = self.diff_iact_layer*y_size*x_size*self.channel_div_trans + 1
         # === Phase 7: Calculate timing parameters ===
         # Partial sum delay for accumulation pipeline
@@ -1549,7 +1552,7 @@ class LayerParameters(object):
         self.buffer_cycles_for_x_iact = math.ceil((self.strideX*(addition+(params.Clusters_X*params.Clusters_Y*params.PEs_X)))/(params.IACT_RAM_CELLS*(8//4)))
         self.buffer_cycles_for_x_iact = 1
         if (self.buffer_cycles_for_x_iact == 1):
-            self.needed_iact_buffer_words = self.iact_x_line_repetitions*self.needed_Iact_writes*math.ceil((self.channel_div_trans*(self.kernel_size[1]+self.iact_size_y-self.strideY)))*2
+            self.needed_iact_buffer_words = self.iact_x_line_repetitions*self.needed_Iact_writes*math.ceil((self.channel_div_trans*(self.kernel_size[1]+self.iact_y_add_up-self.strideY)))*2
         else :
             self.needed_iact_buffer_words = self.iact_x_line_repetitions*self.needed_Iact_writes*self.channel_div_trans*2
         if (self.buffer_cycles_for_x_iact == 1):
@@ -1595,7 +1598,11 @@ class LayerParameters(object):
             # write-back lane (WRITEBACK_WORDS in OpenEye_FPGA.v). The fixed 4 ended
             # the write-back half way with NUM_GLB_PSUM = 2 (bug #25).
             writeback_lanes = min(params.TRANS_WORDS, params.NUM_GLB_PSUM)
-            self.fsm_psum_limit = math.ceil(self.iact_x_add_up * self.filters * self.iact_size_y / writeback_lanes)
+            # Count output pixels: a padded output row is iact_x_add_up / strideX wide and there are
+            # ceil(iact_size_y / strideY) rows (with input sizes a strided layer wrote 4 x too many, the rows after its
+            # image held junk that the next strided layer read as its bottom padding row, bug #41d)
+            self.fsm_psum_limit = math.ceil((self.iact_x_add_up // self.strideX) * self.filters *
+                                            math.ceil(self.iact_size_y / self.strideY) / writeback_lanes)
             self.fsm_psum_limit = self.fsm_psum_limit + 11
         else:
             self.fsm_psum_limit = ((self.iact_x_add_up * psum_cycles * self.different_kernels_per_calculation * self.needed_wght_cycles * self.used_psum_per_PE * self.iact_size_y)//8) + 12
@@ -1612,7 +1619,7 @@ class LayerParameters(object):
             dilation_pes = max(0,dilation_pes)
             less_temp = full_temp - (dilation_pes * self.channel_div_trans)
             self.iact_repetitions_per_write = (self.iact_x_line_repetitions-1) * less_temp + full_temp
-            self.iact_buffer_words_per_write =  self.iact_repetitions_per_write * ((self.iact_size_y + self.kernel_size[1]) - self.strideY) * self.diff_iact_layer
+            self.iact_buffer_words_per_write =  self.iact_repetitions_per_write * ((self.iact_y_add_up + self.kernel_size[1]) - self.strideY) * self.diff_iact_layer
 
         else:
             self.iact_buffer_words_per_write = self.needed_Iact_writes * self.channel_div_trans

@@ -126,7 +126,7 @@ module OpenEye_FPGA #(
       parameter SPARSITY_EN   = 1,  // 1=sparse mode (default), 0=dense mode
       parameter TRANS_BITWIDTH_IACT = 24,
       parameter TRANS_BITWIDTH_WGHT = 8,
-      parameter STRIDE_ENABLED = 0,
+      parameter STRIDE_ENABLED = 1,  // 1: use each layer's stride_x/y_reg; 0: stride tied to 1 (smaller). 1 since 2026-11-09
   `else
     `include "parameters_FPGA.vh"
       // Defaultvalues
@@ -2341,7 +2341,8 @@ end
             if (iact_to_psum_start_shifting &
                 ((WRITEBACK_WORDS >= WRITEBACK_CHANNELS) | (iact_to_psum_trans_counter <= WRITEBACK_WORDS[3:0]))) begin
               iact_to_psum_x_pos_counter <= iact_to_psum_x_pos_counter + 1;
-              if (iact_to_psum_x_pos_counter < iact_size_x) begin
+              // A row has psum_size_x outputs (iact_size_x / stride); a fully connected layer keeps iact_size_x (bug #41c)
+              if (iact_to_psum_x_pos_counter < (fully_connected_layer ? iact_size_x : psum_size_x)) begin
                 iact_to_psum_storage_counter <= iact_to_psum_storage_counter + 1;
                 if (iact_to_psum_storage_counter == ((8/WRITEBACK_CHANNELS)*IACT_RAM_CELLS)-1) begin
                   iact_to_psum_storage_counter <= 0;
@@ -2380,7 +2381,9 @@ end
               // filter order, the flat layout of the next Dense layer's input
               // (iact_x_add_up stays the layer's input size for the FC converter).
               // Bug #26, doc/experiments/2026-10-24_bug26_dense_writeback.md.
-              if ((iact_to_psum_x_pos_counter >= iact_x_add_up - 1) | fully_connected_layer) begin
+              // The row period counts outputs: iact_x_add_up / stride_x (iact_x_add_up is a multiple of the stride,
+              // written as a product; with STRIDE_ENABLED = 0 stride_x is 1 and this is iact_x_add_up - 1). Bug #41c.
+              if ((({2'd0, iact_to_psum_x_pos_counter} * {9'd0, stride_x}) >= (iact_x_add_up - {9'd0, stride_x})) | fully_connected_layer) begin
                 iact_to_psum_x_pos_counter <= 0;
               end
             end            

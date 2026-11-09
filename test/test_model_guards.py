@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: SHL-2.1
 """The toolchain refuses the layers the RTL computes differently from the model (README_FI section 8e, group A).
 
-Before 2026-11-07 each of these ran to the end and gave wrong outputs without any sign: stride above 1 (bug #41 on an RTL
-built with STRIDE_ENABLED=0, #41b for several widths with STRIDE_ENABLED=1), a padding other than kernel // 2 (#42), unsupported ONNX nodes, branches, grouped /
+Before 2026-11-07 each of these ran to the end and gave wrong outputs without any sign: stride above 1 on an RTL built
+with STRIDE_ENABLED=0 (bug #41), a padding other than kernel // 2 (#42), unsupported ONNX nodes, branches, grouped /
 dilated convolutions (#43), an odd input channel count above 1 (#7), pooling inputs 4 or fewer pixels wide (#27), a last
 Dense layer with more than one psum pass (#21). doc/experiments/2026-11-07_bug41_stride.md has the measurements.
 """
@@ -58,15 +58,16 @@ def test_conv_geometry_accepts_the_working_layers(monkeypatch):
         assert lp.check_conv_geometry(p, params) is p
 
 
-def test_stride_is_refused(monkeypatch):
+def test_stride_needs_stride_enabled(monkeypatch):
     # Bug #41: 8 x 8 x 4 -> 16 with stride 2 was wrong at 13 of 16 positions on the default RTL (STRIDE_ENABLED=0).
-    # Bug #41b: with STRIDE_ENABLED=1 stride 2 is right only for some widths (7 x 7 wrong, 8 x 8 right), so refused too.
-    for enabled, bug in ((0, "bug #41\\)"), (1, "bug #41b")):
-        params = platform(monkeypatch, stride_enabled=enabled)
-        p = build(conv(7, strides=2), params)[0]
-        with pytest.raises(NotImplementedError, match=bug):
-            lp.check_conv_geometry(p, params)
-    monkeypatch.setenv(lp.ALLOW_UNSUPPORTED_ENV, "1")         # to reproduce the bugs on the RTL
+    # With STRIDE_ENABLED=1 a strided layer is right since the fixes of #41b-#41d (2026-11-08), so it is accepted
+    # (7 x 7: TensorFlow's "same" pads symmetrically there, as the RTL).
+    params = platform(monkeypatch, stride_enabled=0)
+    p = build(conv(7, strides=2), params)[0]
+    with pytest.raises(NotImplementedError, match="STRIDE_ENABLED=0.*bug #41\\)"):
+        lp.check_conv_geometry(p, params)
+    params = platform(monkeypatch, stride_enabled=1)
+    p = build(conv(7, strides=2), params)[0]
     assert lp.check_conv_geometry(p, params) is p
 
 
@@ -95,17 +96,16 @@ def test_tf_same_pads_is_tensorflow(size, kernel, stride):
     np.testing.assert_allclose(same, by_hand, rtol=1e-5, atol=1e-5)
 
 
-def test_tensorflow_same_with_stride_2_on_an_even_input(monkeypatch, caplog):
+def test_tensorflow_same_with_stride_2_on_an_even_input(monkeypatch):
     # TensorFlow pads 8 x 8, kernel 3, stride 2 by [0, 0, 1, 1] (windows centred at 1, 3, 5, 7); the RTL and the
-    # testbench reference pad 1 on every side (centres 0, 2, 4, 6): another convolution, refused on top of the stride
-    # (the stride-2 runs of 2026-11-07 passed against the toolchain's reference, not TensorFlow's). 7 x 7: [1, 1, 1, 1].
+    # testbench reference pad 1 on every side (centres 0, 2, 4, 6): another convolution, refused even with
+    # STRIDE_ENABLED=1 (the stride-2 runs of 2026-11-07/08 passed against the toolchain's reference, not TensorFlow's).
     params = platform(monkeypatch, stride_enabled=1)
-    monkeypatch.setenv(lp.ALLOW_UNSUPPORTED_ENV, "1")         # every refusal only warns: see which ones fire
-    lp.check_conv_geometry(build(conv(8, strides=2), params)[0], params)
-    assert "bug #41b" in caplog.text and "pads [0, 0, 1, 1]" in caplog.text
-    caplog.clear()
-    lp.check_conv_geometry(build(conv(7, strides=2), params)[0], params)
-    assert "bug #41b" in caplog.text and "bug #42" not in caplog.text
+    p = build(conv(8, strides=2), params)[0]
+    with pytest.raises(NotImplementedError, match=r"pads \[0, 0, 1, 1\].*bug #42"):
+        lp.check_conv_geometry(p, params)
+    p = build(conv(7, strides=2), params)[0]                      # 7 x 7: [1, 1, 1, 1], as the RTL
+    assert lp.check_conv_geometry(p, params) is p
 
 
 def test_valid_padding_is_refused(monkeypatch):

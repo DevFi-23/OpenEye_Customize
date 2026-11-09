@@ -68,6 +68,8 @@ def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, i
             - "Convolution_Single": One 2D convolution layer (no write-back)
             - "Convolution_Stack": Two stacked 2D convolution layers (exercises
               the interlayer psum->iact write-back)
+            - "Conv_Dense": Conv2D, Flatten, Dense with outputsize outputs (the
+              write-back of a convolution into a Dense input)
             - "Depthwise_Convolution": Depthwise 2D convolution layer
             - "FC": Fully connected (Dense) layer
             - "Pooling": Conv2D followed by MaxPooling2D and another Conv2D
@@ -156,6 +158,12 @@ def create_layer(layer_mode, filters, kernelsize_x, kernelsize_y, inputsize_x, i
             model.add(tf.keras.layers.Conv2D(filters, (kernelsize_x, kernelsize_y), padding="same", input_shape=(inputsize_x, inputsize_y, channels), strides = strides))
             model.add(tf.keras.layers.MaxPooling2D(pool_size = (2, 2), strides=(2, 2), padding="valid"))
             model.add(tf.keras.layers.Conv2D(filters, (kernelsize_x, kernelsize_y), padding="same", input_shape=(math.ceil(inputsize_x/2), math.ceil(inputsize_y/2), filters), strides = strides))
+        case "Conv_Dense":
+            # Conv, flatten, Dense (OUTPUT_SIZE outputs): the convolution's output is written back in the flat layout
+            # of a Dense input. Added 2026-11-08 to check that write-back after a strided convolution (bug #41c).
+            model.add(tf.keras.layers.Conv2D(filters, (kernelsize_x, kernelsize_y), padding="same", input_shape=(inputsize_x, inputsize_y, channels), strides = strides))
+            model.add(tf.keras.layers.Flatten())
+            model.add(tf.keras.layers.Dense(units=outputsize, use_bias=True))
         case "Conv_Pool_Conv_Pool_Conv":
             # As Conv_Pool_Conv with a second pool/conv pair: catches state that
             # the first pooling pass leaves behind for the second, as in MNIST.

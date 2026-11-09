@@ -209,10 +209,10 @@ Một test cocotb là một tiến trình; máy 12 nhân / 7 GB RAM chạy song 
 venv/bin/python -m pytest -q test/test_*.py
 ```
 
-Hiện tại (2026-11-07): **459 pass, 11 fail** (56 test phép kiểm tra nhóm A của mục 8e trong `test_model_guards.py` + 5 test bộ đệm weight / iact của #29 / #37, `test_wght_buffer.py` + 8 test số bộ weight và 32 test phép kiểm tra `check_wght_sets` của #39, 34 test phép kiểm tra `check_full_passes` của #40, `test_channel_pad.py` + 129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8 + 6 test đường model thật so với ONNX Runtime + 22 test thứ tự stream bias của lỗi #32 + 31 test hàm kích hoạt, bước A và B + 3 test profiler hàm kích hoạt, bước C; 12 trong số đó cần checkpoint của `models/train_mnist.py`, không có thì skip). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
+Hiện tại (2026-11-08): **474 pass, 11 fail** (15 test tham số stride trong `test_stride_params.py` + 56 test phép kiểm tra nhóm A của mục 8e trong `test_model_guards.py` + 5 test bộ đệm weight / iact của #29 / #37, `test_wght_buffer.py` + 8 test số bộ weight và 32 test phép kiểm tra `check_wght_sets` của #39, 34 test phép kiểm tra `check_full_passes` của #40, `test_channel_pad.py` + 129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8 + 6 test đường model thật so với ONNX Runtime + 22 test thứ tự stream bias của lỗi #32 + 31 test hàm kích hoạt, bước A và B + 3 test profiler hàm kích hoạt, bước C; 12 trong số đó cần checkpoint của `models/train_mnist.py`, không có thì skip). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
 thay đổi của fork. Các file của fork: `test_profile_report.py`, `test_profile_phases.py`, `test_channel_pad.py`, `test_conv_wght_encoding.py`, `test_paper_table3.py`,
 `test_memory_model.py`, `test_fc_writeback.py`, `test_conv_writeback.py`, `test_int8_clamp.py`, `test_onnx_model_flow.py` (cần `torch`, `onnxruntime`, file `.pth` đã huấn luyện),
-`test_psum_bias_order.py`, `test_activation.py`, `test_model_guards.py` (56 test, các phép kiểm tra nhóm A của mục 8e, cần `torch`, `onnxruntime`).
+`test_psum_bias_order.py`, `test_activation.py`, `test_model_guards.py` (56 test, các phép kiểm tra nhóm A của mục 8e, cần `torch`, `onnxruntime`), `test_stride_params.py` (15 test, #41b/#41d).
 
 ### Test mô phỏng RTL (cocotb qua pytest)
 
@@ -235,6 +235,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ../../venv/bin/python -m pytest -q -p no:cachep
 | `test_real_model.py` | (cả file) | Model PyTorch MNIST đã huấn luyện đi trọn đường toolchain (`onnx2model` lượng tử tĩnh → `LayerParameters` → `DRAMContents` → RTL), ảnh test 0 và 1 (mục 8d) | ~11 phút (~36 phút khi chạy 6 song song) | 2 PASS (trọn model khớp từng bit, lớp 7 và 2 = nhãn); `test_real_model_activation`: 3 biến thể Leaky ReLU / SiLU / hard-swish × ảnh 0, 1, 6 PASS (cần checkpoint của `models/train_mnist.py`) |
 | `test_pooling.py` | (cả file) | Conv → max-pool 2×2 → Conv, input rộng 8 / 6, cao 2 / 4 (dốc) | ~6 phút | 4 PASS |
 | `test_nets.py` | (cả file) | Model MNIST nhỏ (Keras ngẫu nhiên) qua `data_create` | ~40 s | 1 PASS |
+| `test_stride.py` | (cả file) | Conv stride 2 với RTL dựng `STRIDE_ENABLED=1` (#41b–#41d): 6 layer đơn (rộng 4, 7, 8, 12, 24; `NUM_GLB_PSUM` 2), 2 Conv nối tiếp (8×8, 14×8, 16×14), Conv → Pool → Conv 28×28, Conv → Dense (8×8, 16×14) | 17–45 s | 12 PASS (trên `69320ba`: 10 FAIL) |
 | `test_quant_mantissa.py` | (cả file) | Mantissa hệ số lượng tử 17 và 24 bit (#38): Conv → Conv, Dense → Dense (móc `OPENEYE_QUANT_MANT`) | 25–45 s | 3 PASS (trước bản sửa: 3 FAIL) |
 | `test_cluster_rows1.py` | (cả file) | `CLUSTER_ROWS=1`: Dense 32 → 10 ở X 2 (#36), Dense 1568 → 32 → 10 ở X 4 và X 2 (#29, #36), mạng paper CR 1 X 2 Y 3 (#28, #29, #36), Conv 14×14×32 → 32 ở X 2 (#37, 4.096 word bộ đệm iact mỗi lượt) | 20 s – 4 phút | 5 PASS (trước các bản sửa: 5 FAIL) |
 | `test_empty_pass.py` | (cả file) | Lượt không có activation khác 0 (lỗi #31): Conv lượt rỗng đầu, lượt rỗng giữa, Dense 1024 → 10 có khối input 0 (`OPENEYE_ZERO_BLOCK`) | ~40 s | 3 PASS (RTL trước bản sửa: 3 FAIL) |
@@ -250,7 +251,7 @@ venv/bin/python -m pytest --collect-only -q test/cocotb_fpga/test_conv_const.py 
 xargs -P 8 -I{} sh -c 'venv/bin/python -m pytest -q "{}" | tail -1' < ids.txt
 ```
 
-**Bộ hồi quy RTL đầy đủ hiện tại (2026-11-04, sau hàng O): 189 test** = `test_conv_const` 36, `test_mnist_layers` 27, `test_gemm_layer` 63 (với
+**Bộ hồi quy RTL đầy đủ hiện tại (2026-11-08): 201 test** = 189 test dưới đây + `test_stride` 12; chạy bằng `doc/experiments/2026-11-07_bug41_stride/regression.sh <thư mục>`; kết quả: **197 PASS + 4 xfail đã biết**. Trước đó (2026-11-04, sau hàng O): 189 test = `test_conv_const` 36, `test_mnist_layers` 27, `test_gemm_layer` 63 (với
 `OPENEYE_SKIP_FC_WRITE_CHECK=1`), `test_pooling` 4, `test_nets` 1, `test_dense_chain` 11, `test_glb_psum2` 7, `test_int8_clamp` 9, `test_empty_pass` 3,
 `test_activation_rtl` 12, `test_real_model` 8 (ReLU ảnh 0, 1 + 3 hàm × 2 ảnh), `test_cluster_rows1` 5, `test_quant_mantissa` 3: **185 PASS + 4 xfail đã biết** (3 channel ×2 #7,
 Conv3 ×2 #9; xfail #17 cũ nay là `test_mnist_conv1_with_padding`, PASS); thêm 2 testbench riêng (bộ lượng tử 2, `activation_table` 3). Khoảng 1 giờ với 6–7 tiến trình song song.
@@ -283,6 +284,7 @@ Chi tiết: mục 6 (profiler), 6.13 (model nhiều layer), 6.14 (Bảng 3), 6.1
 | #22 (sau bản sửa) | `pytest test_mnist_layers.py -k trained`; `venv/bin/python -m pytest -q test/test_conv_wght_encoding.py` | `DUT vs numpy: ... equal, 0 differ` |
 | #23 | `pytest "test_conv3x3_sparse.py::test_conv3x3_8ch_sparse50[3-4-3-2-1-8-4-32-3-3-1-16]"` | Output 0 ở các x lẻ của hàng 1 |
 | #41 (stride 2, phần cứng mặc định) | `OPENEYE_ALLOW_UNSUPPORTED=1 venv/bin/python doc/experiments/2026-11-04_bug39/run39.py s2 8 8 4 16 STRIDE=2` (khoảng 4 phút), rồi `venv/bin/python doc/experiments/2026-11-07_bug41_stride/window_map.py test/.temp/b39_s2`; đối chứng: `STRIDE_ENABLED=1 OPENEYE_ALLOW_UNSUPPORTED=1 venv/bin/python doc/experiments/2026-11-04_bug39/run39.py s2e 8 8 4 16 STRIDE=2` (PASS); #41b: cùng lệnh với `s2w12 12 8 4 16 STRIDE=2` (FAIL) | `16 of 16 feature maps differ`; bảng cửa sổ tâm (x, 2y) thay vì (2x, 2y) |
+| #41b–#41d (stride 2 khi bật stride, **đã sửa**) | Sau bản sửa: `venv/bin/python -m pytest -q test/cocotb_fpga/test_stride.py` (12 test). Lỗi cũ: trên commit `69320ba` (`git worktree add`), `STRIDE_ENABLED=1 OPENEYE_ALLOW_UNSUPPORTED=1 venv/bin/python doc/experiments/2026-11-04_bug39/run39.py w12 12 8 4 16 STRIDE=2` rồi `doc/experiments/2026-11-07_bug41_stride/slot_map.py test/.temp/b39_w12 0 20`; chuỗi: `run25.py st8 Convolution_Stack 2 CH=4 NF=4 W=8 H=8 STRIDE=2`; bộ đệm: thêm `DUMP_IACT_IMAGE=1` | Trên `69320ba`: `test_stride.py` 10/12 FAIL; bảng ô: DUT 6 giá trị + 2 ô đệm mỗi filter, host chờ 6 ô đệm |
 | #27 (pooling rộng ≤ 4) | `OPENEYE_ALLOW_UNSUPPORTED=1 venv/bin/python doc/experiments/2026-10-26_bug25/run25.py p4x4 Conv_Pool_Conv 3 CH=4 NF=4 W=4 H=4` (khoảng 1 phút) | `Iact buffer check failed after layer 1` |
 | #21 (Dense cuối > 32 output) | `OPENEYE_ALLOW_UNSUPPORTED=1 venv/bin/python doc/experiments/2026-11-07_bug41_stride/dense_run.py 64 40 1` | `FAIL` |
 | #25 (`NUM_GLB_PSUM=2`, **đã sửa**) | Sau bản sửa: `venv/bin/python -m pytest -q test/cocotb_fpga/test_glb_psum2.py`. Lỗi cũ (trên commit `e062707` qua `git worktree`, như #26). Ca nhỏ nhất: `venv/bin/python doc/experiments/2026-10-26_bug25/run25.py k2 Convolution_Stack 2 GLBP=2 CH=4 H=4` (conv → conv; `GLBP=4` thì PASS). Mạng paper: `venv/bin/python tools/run_profile.py -k paper_cr2_x2_y3` | `test/.temp/b25_k2/cocotb_sim.log`: `Iact buffer check failed after layer 0`, mỗi word đổi chỗ 2 nhóm 2 byte ở giữa |
@@ -319,7 +321,7 @@ Chi tiết: mục 6 (profiler), 6.13 (model nhiều layer), 6.14 (Bảng 3), 6.1
 | `OPENEYE_LAYER_SEED=<n>` | Seed weight Keras của các layer đơn trong `data_create` | không |
 | `OPENEYE_ZERO_IACTS`, `OPENEYE_CONST_IACTS=<c>`, `OPENEYE_CONST_WGHTS=<c>`, `OPENEYE_RAMP_IACTS`, `OPENEYE_ASYMMETRIC_KERNEL`, `OPENEYE_MIX_WEIGHTS`, `OPENEYE_BIAS_STEP=<s>` | Hook dữ liệu để gỡ lỗi (input 0/hằng/dốc, kernel bất đối xứng, ...) | tắt |
 | `OPENEYE_ALLOW_UNSUPPORTED=1` | Các phép kiểm tra nhóm A của `LayerParameters` (#41 stride, #42 padding, #7 channel lẻ, #27 pooling, #21 Dense cuối; mục 8e) chỉ ghi cảnh báo, layer vẫn được tạo stream: để tái hiện lỗi trên RTL | tắt (báo lỗi) |
-| `STRIDE_ENABLED=1` | Dựng RTL có stride (tham số `STRIDE_ENABLED` của `OpenEye_FPGA.v`, ghi vào `parameters_FPGA.vh`); cần cho Conv stride > 1 (#41) nhưng chưa đủ (#41b), toolchain vẫn từ chối stride > 1 | 0 |
+| `STRIDE_ENABLED=0/1` | Có stride trong RTL hay không (tham số `STRIDE_ENABLED` của `OpenEye_FPGA.v`, ghi vào `parameters_FPGA.vh`; mục 5.10). Bằng 0: mạch nhỏ hơn 155 LUT nhưng toolchain từ chối Conv stride > 1 (#41) | **1** (từ 2026-11-09; 0 trước đó) |
 | `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` | Tránh plugin pytest-rerunfailures mở socket | nên đặt khi chạy trực tiếp |
 
 ## 4. Cấu trúc project
@@ -399,9 +401,12 @@ OpenEye_orig/
 │   │   ├── test_empty_pass.py ★  Lượt không có activation khác 0 (lỗi #31): 3 test
 │   │   ├── test_cluster_rows1.py ★ CLUSTER_ROWS=1: lỗi #28, #29, #36 (Dense, mạng paper CR 1 X 2 Y 3), #37 (Conv 14×14×32): 5 test
 │   │   ├── test_quant_mantissa.py ★ Mantissa 17/24 bit của hệ số lượng tử (#38): 3 test
+│   │   ├── test_stride.py     ★  Conv stride 2 với RTL dựng `STRIDE_ENABLED=1` (#41b–#41d): 12 test
 │   │   ├── test_pooling.py, test_nets.py   Conv → MaxPool → Conv và model MNIST nhỏ (của upstream, nằm trong bộ hồi quy)
 │   │   └── regmap.yaml        ★  Định nghĩa các thanh ghi cấu hình gửi qua DMA (nguồn của dma_storage.v; ★ `quant_clamp_low` #30, 5 trường hàm kích hoạt)
 │   ├── cocotb_parallel/          Test của OpenEye_Parallel (SERIAL=0), đã cũ (mục 5.7)
+│   ├── test_model_guards.py   ★  Phép kiểm tra nhóm A (mục 8e): 56 unit test
+│   ├── test_stride_params.py  ★  Tham số phía host của Conv có stride (#41b, #41d): 15 unit test
 │   ├── test_memory_model.py   ★  16 unit test của mô hình bộ nhớ
 │   ├── test_profile_report.py ★  Unit test của công cụ báo cáo (kể cả bảng hàm kích hoạt, bước C)
 │   ├── test_profile_phases.py ★  Unit test quy tắc gán pha của profiler (kể cả `load_act`, input của layer)
@@ -644,6 +649,23 @@ thì vừa tiết kiệm tài nguyên, vừa giảm DMA, vừa giúp simulation 
 
   **Kết luận:** tăng lên 32 **không có lợi** cho các layer đang đo (chậm hơn một chút, tốn thêm khoảng 8 % LUT, 13 % FF, 28 URAM). Chỉ nên tăng khi một layer
   có activation đầu vào **lớn hơn 64 KB** (ví dụ ảnh 224 × 224 × 3 = 150 KB), lúc đó 4 bank không chứa đủ.
+
+### 5.10 Stride và tham số `STRIDE_ENABLED` (2026-11-08, mặc định 1 từ 2026-11-09)
+
+**Stride** là bước trượt của cửa sổ kernel. Stride 1: cửa sổ đặt tại mọi pixel, output cùng kích thước input. Stride 2: cửa sổ đặt cách 2 pixel theo cả
+hai chiều, output còn một nửa chiều rộng và một nửa chiều cao, tức 4 lần ít output (và ít phép nhân) hơn. Mạng hiện đại (ResNet, MobileNet...) dùng Conv
+stride 2 để thu nhỏ ảnh thay cho pooling.
+
+**`STRIDE_ENABLED`** là **tham số lúc dựng phần cứng** (Verilog `parameter` của `OpenEye_FPGA.v`, dòng 129; Python `OpenEyeParameters.STRIDE_ENABLED`,
+đọc từ biến môi trường, ghi vào `parameters_FPGA.vh`), không phải thanh ghi đổi được lúc chạy. Mỗi layer luôn gửi stride của nó trong thanh ghi cấu hình
+(`stride_x_reg`, `stride_y_reg`, 3 bit), nhưng:
+- `STRIDE_ENABLED = 1`: `stride_x = stride_x_dma` (giá trị thanh ghi). Bộ dựng stream iact dùng nó để chọn cột input cho từng cột PE (`pec × stride_x`),
+  điểm kết thúc vòng x; bộ chuyển đổi dùng nó cho giới hạn `x_bound`, `y_bound`; từ bản sửa #41c, pha ghi ngược dùng nó cho độ dài hàng output.
+- `STRIDE_ENABLED = 0` (mặc định, từ upstream `2e3b351`): `stride_x = stride_y = 1` cố định (dòng 369–370). Công cụ tổng hợp coi đó là hằng số và bỏ
+  hẳn các phép nhân / so sánh theo stride: mạch nhỏ hơn, nhưng **giá trị stride trong thanh ghi bị bỏ qua**, nên layer stride 2 tính sai (#41). Từ
+  2026-11-07 toolchain từ chối layer stride > 1 khi tham số bằng 0.
+
+**Từ 2026-11-09 mặc định là `STRIDE_ENABLED = 1`** (đề xuất 5 của mục 8e, được bạn đồng ý; Python `OpenEyeParameters` và tham số RTL; mục 9 "`STRIDE_ENABLED = 1` làm mặc định"). Đo bằng Vivado (`doc/synth/2026-11-09_route4ns_stride1_zu7ev`): **+155 LUT (+0,25 %), +7 FF**, BRAM / URAM / DSP như cũ, vẫn đạt 250 MHz (WNS +0,042 ns); phần tăng nằm ở `dma_storage` (các trường stride không còn bị lược bỏ), còn phép nhân `pec × stride` trong bộ dựng stream không tốn thêm (`pec` là hằng của từng cột PE, Vivado thay bằng dịch và cộng; ước lượng Yosys +300 LUT là quá cao). Layer stride 1 giữ nguyên số chu kỳ (hồi quy, 12 ca mốc, Bảng 3 đều giống hệt). Muốn mạch nhỏ nhất và chắc chắn không dùng stride thì dựng với `STRIDE_ENABLED=0` (biến môi trường hoặc `export_vivado.py --set STRIDE_ENABLED=0`); toolchain khi đó từ chối layer stride > 1.
 
 ## 6. Hướng dẫn chạy công cụ đo hiệu suất
 
@@ -1243,6 +1265,7 @@ Vì vậy part mặc định của `export_vivado.py` là `xczu7ev-ffvc1156-2-e`
 | `QUANT_AMOUNT` | 32 | Bảng lượng tử 32 entry (1 entry mỗi filter, tối đa 32 filter) |
 | `TRANS_WORDS`, `BUFFER_WIDTH`, `BRANCHES` | 8, 12, 1 | Số word truyền giữa các layer, độ sâu bộ đệm iact (2^12), 1 nhánh |
 | `BUFFER_WIDTH_PSUM`, `BUFFER_WIDTH_WGHT` | 14, 13 (mặc định; weight 12 trước 2026-11-03, lỗi #29) | Bộ đệm psum 16.384 địa chỉ (144 RAMB36), bộ đệm weight 8.192 hàng |
+| `STRIDE_ENABLED` | **1** (mặc định từ 2026-11-09; 0 trước đó, như upstream) | Phần cứng dùng stride của từng layer (mục 5.10); +155 LUT so với 0 |
 
 Lý do chọn: (1) **giống hệt cấu hình đã đo chu kỳ** (`test_profile.py`), nên fmax đổi trực tiếp chu kỳ ra thời gian; (2) đây là vùng cấu hình mà RTL
 **chạy đúng** trong test (`NUM_GLB_IACT=3` sai, `CLUSTER_ROWS=1` có thể treo, 1 channel sai); (3) 2×2 cluster là cấu hình nhỏ nhất vẫn có cả
@@ -1331,9 +1354,13 @@ Lưu ý:
   Kiểm tra danh sách thiết bị trước khi chọn part.
 - Lưu báo cáo vào repo: chép `reports/utilization.txt`, `reports/timing_summary.txt` và `config.json` vào `doc/synth/<ngày>_<cấu hình>/`.
 
-### Kết quả Vivado hiện tại: mốc phần cứng (sau các bản sửa #13, #6/#7, #14, 3 commit upstream, #19, #26, #25, #30, #31, upstream `e78e5b7`, dòng `wghts_per_pe + 1`, phần cứng hàm kích hoạt, các bản sửa #28, #29, #36, #38 và hàng O #37, #17; ngày 2026-11-04)
+### Kết quả Vivado hiện tại: mốc phần cứng (sau các bản sửa #13, #6/#7, #14, 3 commit upstream, #19, #26, #25, #30, #31, upstream `e78e5b7`, dòng `wghts_per_pe + 1`, phần cứng hàm kích hoạt, các bản sửa #28, #29, #36, #38, hàng O #37, #17, #41c và `STRIDE_ENABLED = 1`; ngày 2026-11-09)
 
-**Mới nhất: `doc/synth/2026-11-04_route4ns_rowO_zu7ev/SUMMARY.md`** (hàng O: #37 trường bộ đệm iact 13 bit, #17 bỏ đường 1 channel cặp hàng): 0 CRITICAL, 311 cảnh báo (4 cảnh báo mới "cổng `iact_x_line_repetitions_i` không tải" của cổng giữ lại không dùng), WNS +0,169 / **+0,077 ns** (đạt 250 MHz, ~254,9 MHz), **LUT −1.547 (59.389), FF −525 (39.398), BRAM 192 → 188**, URAM 12, DSP 4 sau route. Mỗi PE −14 … −18 LUT, −7 FF (trạng thái "dòng lệch" đã xoá); mỗi constructor −37 FF, −25 … −58 LUT và **bớt 1 RAMB36** (bộ đệm iact 6 → 5 RAMB36 vì mặt nạ ghi theo byte nay là hằng số); `dma_storage` +17 LUT, +23 FF (10 trường rộng thêm 1 bit). Đường xấu nhất sau route vẫn là địa chỉ psum → BRAM psum (đi dây). Bảng dưới vẫn là lần `cr1fix`, hai cột cuối là `fix38` và `rowO`.
+**Mới nhất: `doc/synth/2026-11-09_route4ns_stride1_zu7ev/SUMMARY.md`** (đề xuất 5: cùng RTL, dựng với `STRIDE_ENABLED = 1`, nay là mặc định): 0 CRITICAL, 311 cảnh báo y như cũ; WNS +0,171 / **+0,042 ns** sau route (đạt 250 MHz, ~252,7 MHz; đường găng `fsm_cycle` → `router_configurator`, như lần `wsend`); LUT 61.674 / **59.548** (+155 / +175 so với `fix41`, +0,25 %: gần hết ở `dma_storage` +220, các `iact_stream_constructor` không tăng), FF 39.406 / 39.449 (+7 / +13), CARRY8 +4, BRAM 188 / URAM 12 / DSP 4 như cũ.
+
+Lần trước: `doc/synth/2026-11-08_route4ns_fix41_zu7ev/SUMMARY.md` (bản sửa #41c, 2 dòng ghi ngược; cấu hình như rowO, `STRIDE_ENABLED = 0`): 0 CRITICAL, 311 cảnh báo y như rowO; WNS +0,196 / **+0,009 ns** sau route (đạt 250 MHz, ~250,6 MHz; đường găng là dây giữa hai PE ở hai cluster, 95,5 % trễ do route, không qua logic vừa sửa: dao động vị trí như lần `wsend`); LUT 61.519 / 59.373 (+21 / −16), FF 39.399 / 39.436, BRAM 188 / URAM 12 / DSP 4 như cũ.
+
+Lần trước: `doc/synth/2026-11-04_route4ns_rowO_zu7ev/SUMMARY.md` (hàng O: #37 trường bộ đệm iact 13 bit, #17 bỏ đường 1 channel cặp hàng): 0 CRITICAL, 311 cảnh báo (4 cảnh báo mới "cổng `iact_x_line_repetitions_i` không tải" của cổng giữ lại không dùng), WNS +0,169 / **+0,077 ns** (đạt 250 MHz, ~254,9 MHz), **LUT −1.547 (59.389), FF −525 (39.398), BRAM 192 → 188**, URAM 12, DSP 4 sau route. Mỗi PE −14 … −18 LUT, −7 FF (trạng thái "dòng lệch" đã xoá); mỗi constructor −37 FF, −25 … −58 LUT và **bớt 1 RAMB36** (bộ đệm iact 6 → 5 RAMB36 vì mặt nạ ghi theo byte nay là hằng số); `dma_storage` +17 LUT, +23 FF (10 trường rộng thêm 1 bit). Đường xấu nhất sau route vẫn là địa chỉ psum → BRAM psum (đi dây). Bảng dưới vẫn là lần `cr1fix`, hai cột cuối là `fix38` và `rowO`.
 
 Lần trước (`fix38`, `doc/synth/2026-11-04_route4ns_fix38_zu7ev/SUMMARY.md`) (bản sửa #38, mantissa 25 bit vào bộ lượng tử): 0 CRITICAL, cảnh báo y như lần `cr1fix`, WNS +0,211 / **+0,044 ns** (đạt 250 MHz, ~252,8 MHz), BRAM / URAM / DSP **192 / 12 / 4 như cũ**; LUT +318 sau tổng hợp / +293 sau route (60.936), FF +85 (39.923). Mỗi bộ lượng tử (4 bộ) **+69 LUT, +17 FF, 0 DSP**: trước bản sửa bit 8–24 của mantissa luôn là 0 nên Vivado chỉ dựng bộ nhân 8 × 21 bit vừa một DSP48E2 (27 × 18); nay là 25 × 21 bit, cả hai toán hạng đều rộng hơn 18 bit, nên vẫn 1 DSP và phần tích riêng còn lại làm bằng LUT/CARRY8; thanh ghi `mant_s1` 8 → 25 bit (+17 FF). Sau tổng hợp timing giống hệt; sau route đường xấu nhất là địa chỉ bộ đệm psum → chân WE của BRAM psum (1 LUT, 95 % là dây), loại đường do đi dây quen thuộc, không có đường nào của bộ lượng tử trong 10 đường xấu nhất. Bảng dưới vẫn là lần `cr1fix`, cột cuối là lần `fix38`.
 
@@ -1396,7 +1423,9 @@ cấu hình ở bảng trên; RTL của lần `act` = `dev` `f853b61` (bước B
 | 2026-11-02 | `2026-11-02_route4ns_wsend_zu7ev` | Tổng hợp + place & route, 4 ns, sau dòng `wghts_per_pe + 1` | 0 CRITICAL, cảnh báo như cũ; LUT −199, FF −6; WNS +0,020 ns (đường găng mới `fsm_cycle` → `router_configurator`, không qua phép so sánh vừa sửa) |
 | 2026-11-03 | `2026-11-03_route4ns_cr1fix_zu7ev` | Tổng hợp + place & route, 4 ns, bản sửa #28, #29, #36 (bộ đệm weight 8.192 hàng trong URAM) | 0 CRITICAL, cảnh báo như cũ; URAM 8 → 12, FF +288 trong bộ đệm, BRAM/DSP/LUT như cũ; WNS +0,075 ns. Lần đầu không ép URAM: 64 RAMB36 + 845 LUT (BRAM 82 %) |
 | 2026-11-04 | `2026-11-04_route4ns_fix38_zu7ev` | Tổng hợp + place & route, 4 ns, bản sửa #38 (lát cắt exponent/mantissa của bảng lượng tử) | 0 CRITICAL, cảnh báo như cũ; mỗi bộ lượng tử +69 LUT, +17 FF (bộ nhân 25 × 21 thay vì 8 × 21), DSP vẫn 4, BRAM/URAM như cũ; LUT +293, FF +85 sau route; WNS +0,044 ns (đường địa chỉ psum → BRAM, do đi dây) |
-| 2026-11-04 | `2026-11-04_route4ns_rowO_zu7ev` | Tổng hợp + place & route, 4 ns, hàng O (#37 trường bộ đệm iact 13 bit, #17 bỏ đường 1 channel cặp hàng) | **Mốc hiện tại**. 0 CRITICAL, 311 cảnh báo; LUT −1.547, FF −525, BRAM 192 → 188 (bộ đệm iact 6 → 5 RAMB36 mỗi constructor), mỗi PE −7 FF; WNS +0,077 ns |
+| 2026-11-09 | `2026-11-09_route4ns_stride1_zu7ev` | Tổng hợp + place & route, 4 ns, cùng RTL với `STRIDE_ENABLED = 1` (đề xuất 5, nay mặc định) | **Mốc hiện tại**: 0 CRITICAL, cảnh báo như cũ; LUT +155 / +175, FF +7 / +13, CARRY8 +4 so với `fix41`; BRAM/URAM/DSP như cũ; WNS +0,042 ns |
+| 2026-11-08 | `2026-11-08_route4ns_fix41_zu7ev` | Tổng hợp + place & route, 4 ns, bản sửa #41c (ghi ngược theo kích thước output) | Mốc trước (`STRIDE_ENABLED = 0`): 0 CRITICAL, cảnh báo như cũ; LUT +21 / −16, FF +1 / +38; BRAM/URAM/DSP như cũ; WNS +0,009 ns (đường găng giữa hai PE, do route) |
+| 2026-11-04 | `2026-11-04_route4ns_rowO_zu7ev` | Tổng hợp + place & route, 4 ns, hàng O (#37 trường bộ đệm iact 13 bit, #17 bỏ đường 1 channel cặp hàng) | Mốc trước. 0 CRITICAL, 311 cảnh báo; LUT −1.547, FF −525, BRAM 192 → 188 (bộ đệm iact 6 → 5 RAMB36 mỗi constructor), mỗi PE −7 FF; WNS +0,077 ns |
 | 2026-11-02 | `2026-11-02_route4ns_act_zu7ev` | Tổng hợp + place & route, 4 ns, phần cứng hàm kích hoạt (bước B) | 0 CRITICAL; LUT +778 (+1,3 %, do bước B khoảng +550), FF +59, 256 LUTRAM cho 4 bảng tra; WNS +0,045 ns |
 
 Ước lượng Yosys so với Vivado: LUT logic lệch dưới 1 %, nên Yosys dùng tốt để so sánh LUT tương đối. BRAM, URAM và DSP lệch nhiều (Yosys không dùng URAM
@@ -1539,7 +1568,10 @@ dài 96 thay vì 192 chu kỳ.
 | 39 | Input 1 channel với hơn 16 filter mỗi lần tính (từ 2 lượt weight, ví dụ MNIST Conv1 32 filter, 8×4×1 → 64): nhóm filter thứ hai (16–31) được tính bằng weight của nhóm đầu (0–15), bias đúng | `src/open_eye/layer_parameters.py` (Python: `wght_transmissions_pe` của nhánh nhiều filter = `ceil(channels / channel_div_trans)`, tức số lô channel, không phải số nhóm filter) | **Phát hiện và sửa 2026-11-04** khi bản sửa #17 thôi đệm MNIST Conv1 (mục 9 "Sửa #37, #17", `doc/experiments/2026-11-04_rowO_bug17_bug37.md` mục 3): có từ trước (RTL cũ 8×4×1 → 64: 64/64 feature map sai), upstream `36395dd` cũng có. Stream weight chỉ chứa 1 lượt trong khi RTL đọc `needed_wght_cycles` lượt; nay = số lô channel × số nhóm filter. Chỉ layer 1 channel nhiều lượt weight đổi tham số (315 cấu hình); test `test_weight_sets_cover_every_pass`, `test_random_data[8x4_c1_f64]`. **2026-11-05** (`doc/experiments/2026-11-05_bug39_detail.md`): điều kiện chính xác (kernel 3×3) = 1 channel và hơn 16 filter mỗi lần tính; RTL tính đúng (nhóm filter weight 0 ra bias) nhưng không kiểm tra độ dài stream, nên đọc hàng chưa ghi (X trong mô phỏng → SPAD giữ weight lượt trước; trên FPGA là 0 hoặc weight cũ); chưa từng làm sai kết quả đã commit. Thêm **`check_wght_sets`** (Python): từ chối layer có số bộ weight ≠ số lượt × số lô channel. Còn **#39b** (nhánh tile, số filter không chia hết hệ số chia, ví dụ 3 channel × 64 filter): bị từ chối, sửa sau cùng #7 / 1×1 / 7×7. Upstream `36395dd` và `b10db82` có cùng lỗi Python |
 | 40 | Conv có **lượt weight cuối thiếu filter** (số filter mỗi lần tính không chia hết số psum mỗi PE, ví dụ 28×28×1 → 24 = 16 + 8, 8×4×1 → 48 = 32 + 16, cả 2 channel): FAIL toàn bộ feature map | Python: `src/open_eye/layer_parameters.py:1469` `psum_output_words` và :1274 `trans_cycles_psum` tính bằng số filter thật; `src/open_eye/test_utils_main.py:574` `filter_cycles` làm tròn xuống (dòng 620 chỉ sang khối x mới khi `filter >= filters`) | **Phát hiện 2026-11-05** khi điều tra lỗi treo của upstream `b10db82` (mục 9 "Lỗi treo của `b10db82`", `doc/experiments/2026-11-05_b10db82_hang.md` mục 4). RTL tính **đúng**: giải mã theo thứ tự đã đệm thì mọi giá trị DUT gửi ra bằng numpy (14.112/14.112), nhưng RTL tính và gửi đủ ô filter đệm (passes × psum/PE × kernel) còn host chỉ cho phép `psum_output_words` word, nên phần cuối (1/4 với 16 + 8) không bao giờ ra khỏi chip; tham chiếu của testbench cũng sai. Không ảnh hưởng kết quả đã commit (hồi quy, Bảng 3, MNIST đều chia chẵn). Lưới k3: 162/2.880 cấu hình lọt qua `check_wght_sets`. Upstream có cùng công thức. **Hướng 1 đã làm 2026-11-05** (được bạn đồng ý): phép kiểm tra **`check_full_passes`** (Python, `ConvMapper`) từ chối layer có số ô filter (lượt × psum/PE × kernel mỗi lần tính) ≠ số filter; quét tĩnh 78 layer Conv của Bảng 3, 12 ca mốc, 4 model hàm kích hoạt: 0 bị chặn. Còn để ngỏ: chia đều psum mỗi PE (hướng 2), đệm trong toolchain (hướng 3) |
 | 35 | Conv3 7×7×64 → 64 của model thật khi ghi ngược cho Dense: ghi chép cũ là "cột cuối x = 6 sai" (đọc nhầm layout) | **Chính là #31**: các output sai nằm ở **hàng output cuối y = 6**; trong cửa sổ của hàng này nhóm channel 44–47 không có activation khác 0 → lượt đó và mọi lượt sau bị mất (mô hình khớp DUT 448/448 giá trị) | **Đã sửa** cùng #31 (`test_real_model[0]` PASS) |
-| 41 | Conv **stride 2** tính sai: 8×8×4 → 16, stride 2 (CR 2 × CC 2, dữ liệu ngẫu nhiên, seed 1): 16/16 feature map sai, 207/256 giá trị; theo cửa sổ (`window_map.py`): DUT tính tâm (x, 2y) thay vì (2x, 2y), tức trục X không có stride, trục Y đúng ở 3/4 hàng, hàng output cuối thiếu hàng kernel cuối | **Cấu hình**: stride là phần tuỳ chọn của RTL, tham số `STRIDE_ENABLED` của `OpenEye_FPGA.v` (mặc định 0, từ upstream `2e3b351`, 16/09) buộc `stride_x/y = 1` (dòng 369–370), trong khi Python vẫn lập trình vòng đọc theo stride (trục Y) | **Điều tra 2026-11-07** (`doc/experiments/2026-11-07_bug41_stride.md`, không sửa RTL): dựng với `STRIDE_ENABLED=1` thì stride 2 **PASS** ở độ rộng 8, 16, 24, 28, 32 (mọi chiều cao) nhưng **vẫn FAIL** ở độ rộng 4, 6, 7, 9, 12 (`NUM_GLB_PSUM` 2: 4, 8 đúng, 6 sai) = **#41b**: các giá trị là cửa sổ đúng nhưng sai vị trí / thiếu (12×8: giải mã được 224/384 ô), tức lệch thứ tự / số word output của layer có stride, chưa truy; stride 1 PASS cùng số chu kỳ (33.150 ns). Tài liệu mô tả stride là tính năng (thanh ghi `stride_x/y_reg` 1–8, PE trượt C0 × U), mục "Test Coverage Gaps" ghi stride 2 chưa test, `STRIDE_ENABLED` không có mô tả: hai lỗi: #41 là lỗi cấu hình / toolchain (nhận stride khi phần cứng mặc định không có), #41b là lỗi thật của đường stride tuỳ chọn; không phải lỗi phép nhân-cộng. Upstream `b1e02a0`: cùng mặc định, cùng lỗi; với `STRIDE_ENABLED=1` stream ra khớp tham chiếu nhưng testbench upstream giải mã lệch một hàng. Thêm: "same" của TensorFlow với stride 2 trên ảnh chẵn đệm [0, 1], khác RTL [1, 1]. **Phép kiểm tra `check_conv_geometry`** từ chối mọi stride > 1 (với `STRIDE_ENABLED=0`: #41, với `STRIDE_ENABLED=1`: #41b) và padding kiểu TF lệch. Đề xuất: điều tra #41b (Python trước), rồi mới dựng phần cứng với `STRIDE_ENABLED=1` (cần đồng ý; Yosys: +75 LUT, +4 FF mỗi constructor, khoảng +300 LUT cả thiết kế). Tái hiện: mục 3c "Tái hiện các lỗi" |
+| 41 | Conv **stride 2** tính sai: 8×8×4 → 16, stride 2 (CR 2 × CC 2, dữ liệu ngẫu nhiên, seed 1): 16/16 feature map sai, 207/256 giá trị; theo cửa sổ (`window_map.py`): DUT tính tâm (x, 2y) thay vì (2x, 2y), tức trục X không có stride, trục Y đúng ở 3/4 hàng, hàng output cuối thiếu hàng kernel cuối | **Cấu hình**: stride là phần tuỳ chọn của RTL, tham số `STRIDE_ENABLED` của `OpenEye_FPGA.v` (mặc định 0, từ upstream `2e3b351`, 16/09) buộc `stride_x/y = 1` (dòng 369–370), trong khi Python vẫn lập trình vòng đọc theo stride (trục Y) | **Điều tra 2026-11-07** (`doc/experiments/2026-11-07_bug41_stride.md`, không sửa RTL): dựng với `STRIDE_ENABLED=1` thì stride 2 **PASS** ở độ rộng 8, 16, 24, 28, 32 (mọi chiều cao) nhưng **vẫn FAIL** ở độ rộng 4, 6, 7, 9, 12 (`NUM_GLB_PSUM` 2: 4, 8 đúng, 6 sai) = **#41b**: các giá trị là cửa sổ đúng nhưng sai vị trí / thiếu (12×8: giải mã được 224/384 ô); **nguyên nhân tìm ra 2026-11-08** (2 lỗi Python, hàng #41b dưới); stride 1 PASS cùng số chu kỳ (33.150 ns). Tài liệu mô tả stride là tính năng (thanh ghi `stride_x/y_reg` 1–8, PE trượt C0 × U), mục "Test Coverage Gaps" ghi stride 2 chưa test, `STRIDE_ENABLED` không có mô tả: hai lỗi: #41 là lỗi cấu hình / toolchain (nhận stride khi phần cứng mặc định không có), #41b là lỗi thật của đường stride tuỳ chọn; không phải lỗi phép nhân-cộng. Upstream `b1e02a0`: cùng mặc định, cùng lỗi; với `STRIDE_ENABLED=1` stream ra khớp tham chiếu nhưng testbench upstream giải mã lệch một hàng. Thêm: "same" của TensorFlow với stride 2 trên ảnh chẵn đệm [0, 1], khác RTL [1, 1]. **Phép kiểm tra `check_conv_geometry`** từ chối mọi stride > 1 (với `STRIDE_ENABLED=0`: #41, với `STRIDE_ENABLED=1`: #41b) và padding kiểu TF lệch. **2026-11-08: #41b, #41c, #41d đã sửa** (hàng dưới, mục 9); phép kiểm tra nay chỉ từ chối stride khi `STRIDE_ENABLED=0`. **2026-11-09: `STRIDE_ENABLED = 1` là mặc định** (đề xuất 5, được bạn đồng ý; Vivado +155 LUT, đạt 250 MHz). Tái hiện: mục 3c "Tái hiện các lỗi" |
+| 41b | Stride 2 với `STRIDE_ENABLED=1` sai ở độ rộng 4, 6, 7, 9, 12 (đúng ở 8, 16, 24, 28, 32) | Python: (A) `test_utils_main.py:593` `calculate_conv_serial` chuyển kernel khi `x_cor >= psum_size_x + add_up` (`add_up` = pixel input = `psum_add_up` × stride) thay vì `psum_add_up` (vị trí output): thứ tự giải mã / stream tham chiếu lệch 4 ô mỗi filter khi một lần tính có nhiều kernel; (B) `layer_parameters.py:842` `iact_x_add_up = iact_size_x + add_up` cho ảnh lẻ (7 → 7, 9 → 15) thay vì (số output + `psum_add_up`) × stride (8, 16): vòng x của constructor dừng sớm một cột | **Điều tra 2026-11-08** (`doc/experiments/2026-11-07_bug41_stride.md` mục 8, công cụ `slot_map.py`, bản vá thử `fix41b_scratch.patch`; không sửa file nào của `dev`): A + B trong worktree tạm → mọi layer stride 2 đơn lẻ đã thử (rộng 4–32, `NUM_GLB_PSUM` 2 và 4) đúng giá trị (chỉ ô đệm khác 0 = #9); stride 1 không đổi, cùng số chu kỳ. **Đã sửa 2026-11-08** (được bạn đồng ý, mục 9 "Sửa #41b, #41c, #41d") |
+| 41c | Hai Conv stride 2 nối tiếp (ghi ngược trên chip): bộ đệm iact sau layer đầu sai (8×8: 4/8 word) | RTL `OpenEye_FPGA.v` `RECEIVE_PSUMS_TO_IACT`: đếm pixel output theo `iact_size_x` (dòng 2344) và quay vòng hàng ở `iact_x_add_up` (dòng 2384), tức kích thước input | **Phát hiện 2026-11-08**: bản vá thử (chỉ worktree) dùng `psum_size_x` (Dense giữ `iact_size_x`) và `iact_x_add_up / stride_x` → chuỗi 8×8, 16×16, 14×8 PASS, 12×8 đúng giá trị; chuỗi stride 1 và Conv → Pool → Conv giống hệt, cùng số chu kỳ. **Đã sửa 2026-11-08** (được bạn đồng ý, mục 9): 2 dòng RTL, quay vòng viết dạng tích `x_pos × stride_x ≥ iact_x_add_up − stride_x` (không có bộ chia; với `STRIDE_ENABLED=0` `stride_x` là hằng 1) |
+| 41d | Layer stride 2 đọc input do pha ghi ngược tạo ra có **chiều cao lẻ**: hàng output cuối sai (14×14 → 7×7 → 4×4, 16×14 → 8×7 → 4×4: chỉ y = 3 sai; 10×10 → 5×5 → 3×3: chỉ y = 2) | Python `layer_parameters.py`: số hàng mỗi lượt `iact_size_y + kernel − strideY` = H + 1 khi stride 2, đủ cho cao chẵn (tâm cửa sổ cuối H − 2) nhưng thiếu hàng đệm dưới cho cao lẻ (tâm H − 1 cần hàng H); stride 1 che hàng đó, nên rác pha ghi ngược để sau ảnh (có cả ở stride 1) không lộ | **Phát hiện và sửa 2026-11-08** (được bạn đồng ý, mục 9): `iact_y_add_up = ⌈H / strideY⌉ × strideY` thay `iact_size_y` trong 3 công thức (giống B theo trục x); chuỗi 16×14 → 8×7 → 4×4 và Conv → Pool → Conv 28×28 (bộ đệm có dữ liệu cũ) PASS |
 | 42 | Toolchain **bỏ qua padding của model**: `LayerParameters` luôn dùng `padding = "same"` (`layer_parameters.py:355`, đệm `kernel // 2` mỗi bên, dòng 799), còn `padding_pads` mà `onnx2model` đọc từ ONNX không được dùng. Conv `padding = 0` ("valid", ví dụ LeNet-5) hay đệm lệch (TF "same" với stride 2) được tính như "same" | Python | **Phát hiện 2026-11-07** bằng đọc code (mục 8e), chưa chạy. Model MNIST trong repo dùng `padding = 1` (= "same") nên không bị **2026-11-07:** tài liệu RTL ghi `padding_reg = (kernel_size - 1) / 2`: chỉ có padding "same" là **giới hạn thiết kế**; lỗi là toolchain không báo. **Phép kiểm tra `check_conv_geometry`** đọc padding của model (`model_padding`: chuỗi Keras, pads ONNX, số / cặp PyTorch) và từ chối khi khác `kernel // 2`. |
 | 43 | `onnx2model` chỉ nhận đúng model kiểu MNIST: (a) `export_to_onnx` cố định input giả `1 × 1 × 28 × 28` (`onnx2model.py:93`); (b) chỉ lấy `COMPUTE_OPS` (Conv, Gemm/MatMul, MaxPool), **lặng lẽ bỏ** mọi op khác (`Add` của residual, `AveragePool`, `GlobalAveragePool`, `Concat`...; dòng 453); (c) không đọc thuộc tính `group`: Conv depthwise thành Conv thường 1 channel. Testbench nạp model thật cố định `SimpleMNISTConvNet` và ảnh MNIST | Python | **Phát hiện 2026-11-07** bằng đọc code (mục 8e), chưa chạy. Đã có phép kiểm tra cho zero point ≠ 0 và scale weight theo channel (báo lỗi rõ) **2026-11-07:** tài liệu `tutorial/model_formats.rst` liệt kê phần không hỗ trợ (concatenation, skip connection, BatchNorm chưa fuse, dilated conv) và hứa báo lỗi "Unsupported layer type": giới hạn là thiết kế, việc bỏ lặng lẽ là lỗi. **`onnx2model.check_supported_graph`** từ chối op lạ, Add residual, `group` / `dilations` / `auto_pad`, layer không nối thành chuỗi, hàm kích hoạt không gộp được vào Conv/Dense; input giả khi export lấy theo dữ liệu hiệu chỉnh. `pytorch2model` (đường `model_loader`) cũng bỏ qua stride / padding / groups / dilation và chỉ cảnh báo module lạ: nay từ chối. Depthwise (`DWMapper`): fork không có đường dữ liệu depthwise, nay báo lỗi rõ thay cho `IndexError` / `ValueError`. |
 | 44 | `pytorch2model.extract_quantization_params` gọi `layer.weight()` với cả layer float (với bản torch hiện tại `Parameter` có thuộc tính `q_scale`): `TypeError: 'Parameter' object is not callable`, nên `create_model_from_pytorch` không chuyển được Conv2d / Linear float nào | `src/open_eye/pytorch2model.py:308` | **Phát hiện 2026-11-07** khi viết test cho #43; không liên quan đến đường model thật của fork (`onnx2model`), chưa sửa (`test_model_guards.py::test_pytorch2model_accepts_supported_modules` ghi lại) |
@@ -1719,7 +1751,7 @@ Cột "Tài liệu" là kết quả đọc lại các file trong `doc/` để xe
 
 | # | Khi nào gặp trong model thật | Ví dụ | Tài liệu nói gì → kết luận | Phép kiểm tra |
 |---|---|---|---|---|
-| 41, 41b | Conv stride 2 | ResNet, MobileNet | Stride là tính năng (thanh ghi 1–8, PE trượt C0 × U) nhưng chưa test; phần cứng mặc định dựng với `STRIDE_ENABLED=0` (không có stride), không tài liệu nào ghi → **lỗi cấu hình / toolchain** (#41); dựng với `STRIDE_ENABLED=1` thì đúng ở độ rộng 8, 16, 24, 28, 32 nhưng sai ở 4, 6, 7, 9, 12 → **lỗi thật** (#41b) | `check_conv_geometry`: từ chối mọi stride > 1 |
+| 41, 41b–d | Conv stride 2 | ResNet, MobileNet | Stride là tính năng (thanh ghi 1–8, PE trượt C0 × U) nhưng chưa test; phần cứng mặc định dựng với `STRIDE_ENABLED=0` (không có stride), không tài liệu nào ghi → **lỗi cấu hình / toolchain** (#41); với `STRIDE_ENABLED=1`: 2 lỗi Python (#41b), ghi ngược dùng kích thước input (#41c, RTL), input trên chip cao lẻ mất hàng output cuối (#41d) → **lỗi thật**, **đã sửa 2026-11-08** | `check_conv_geometry`: từ chối stride > 1 khi `STRIDE_ENABLED=0` |
 | 42 | Conv không phải "same" (padding 0, đệm lệch; TF "same" với stride 2 trên ảnh chẵn) | LeNet-5; Conv stride 2 xuất từ TF | RTL chỉ đệm `(kernel_size − 1) / 2` → **giới hạn thiết kế**, lỗi là toolchain không báo | `check_conv_geometry`: padding của model phải bằng `kernel // 2` |
 | 43 | Op ngoài Conv / Gemm / MaxPool (`Add` residual, `AveragePool`, `GlobalAveragePool`, `Concat`, `Softmax`), conv nhóm / depthwise / dilated, input khác 1 × 1 × 28 × 28 | ResNet, MobileNet | `model_formats.rst` ghi các op này không hỗ trợ và hứa lỗi "Unsupported layer type" → **giới hạn thiết kế**, lỗi là bị bỏ lặng lẽ | `onnx2model.check_supported_graph`; `pytorch2model` từ chối Conv2d / MaxPool2d nó không chuyển được và module lạ; `DWMapper` báo không có depthwise |
 | 7 | Ảnh **3 channel** (RGB) | CIFAR-10, mạng ảnh màu | Tài liệu có ví dụ đóng gói 3 channel và input RGB → **lỗi thật** | `check_conv_geometry`: số channel lẻ > 1 |
@@ -1728,7 +1760,7 @@ Cột "Tài liệu" là kết quả đọc lại các file trong `doc/` để xe
 | 23 | Activation thưa dạng bàn cờ với `NUM_GLB_IACT = 3` | Phụ thuộc cấu hình | Phụ thuộc dữ liệu, chưa rõ nguyên nhân | **Chưa chặn được** (không có điều kiện tĩnh) |
 | 19b | Dense N = 32 từ 8 lượt K | Dense ẩn 512 → 32 | **Chưa tái hiện lại được** (PASS cả commit lúc phát hiện `10bcaf7` lẫn `dev`, seed 1–5) | Chưa có điều kiện để chặn |
 
-`OPENEYE_ALLOW_UNSUPPORTED=1` biến các phép kiểm tra của `LayerParameters` (#41/#41b, #42, #7, #27, #21) thành cảnh báo để tái hiện lỗi trên RTL;
+`OPENEYE_ALLOW_UNSUPPORTED=1` biến các phép kiểm tra của `LayerParameters` (#41, #42, #7, #27, #21) thành cảnh báo để tái hiện lỗi trên RTL;
 #21 tái hiện lại được (Dense 64 → 40: 30/40 output sai).
 Quét tĩnh (`doc/experiments/2026-11-07_bug41_stride/scan_guards.py`) 78 Conv, 46 pooling, 39 Dense của Bảng 3, 12 ca mốc và 4 model hàm kích hoạt:
 0 layer bị chặn.
@@ -1752,9 +1784,7 @@ kernel 5×5 chưa có test nào trong fork; `CLUSTER_ROWS = 1` (#10) với các 
 **E. Khi đưa lên FPGA thật:** wrapper AXI không biên dịch (#16); 12 thanh ghi có set và reset cùng mức ưu tiên chưa phân tích (#15, cùng loại rủi ro
 "mô phỏng khác phần cứng" với #13 đã sửa).
 
-**Thứ tự đề xuất** (cập nhật 2026-11-07): (1) ~~phép kiểm tra Python cho nhóm A~~ **xong 2026-11-07**; (2) điều tra #41b (thứ tự / số word output
-phụ thuộc độ rộng khi có stride; Python trước), rồi dựng phần cứng với `STRIDE_ENABLED=1` (đổi tham số, không sửa code RTL, chờ đồng ý; Yosys ước tính
-khoảng +300 LUT; chạy lại hồi quy, mốc chu kỳ, Bảng 3, Vivado);
+**Thứ tự đề xuất** (cập nhật 2026-11-09): (1) ~~phép kiểm tra Python cho nhóm A~~ **xong 2026-11-07**; (2) stride: ~~sửa #41b, #41c, #41d, nới phép kiểm tra~~ **xong 2026-11-08**; ~~dựng phần cứng với `STRIDE_ENABLED=1`~~ **xong 2026-11-09, mặc định** (+155 LUT, đạt 250 MHz, 0 chu kỳ thay đổi);
 (3) #7 bằng Python (đệm 3 → 4 channel, đề xuất cũ); (4) #21, #27 (điều tra RTL); (5) #12 (lượng tử theo filter, RTL). Padding khác "same" (#42)
 là giới hạn thiết kế: dùng model có padding `kernel // 2`; TF "same" stride 2 ở layer đầu có thể đổi bằng cách dịch input một pixel (`doc/experiments/2026-11-07_bug41_stride.md` mục 5).
 
@@ -3075,9 +3105,62 @@ mọi layer Conv đã lưu profile (`doc/experiments/2026-11-05_b10db82_hang/sca
 | Lint | `fpga` 457 → **444** (hết 11 cảnh báo lệch 12/13 bit, 2 cảnh báo của phần đã xoá; 3 cảnh báo đổi số bit trong thông báo, đã cập nhật baseline); `parallel` 36 |
 | Vivado 4 ns (`doc/synth/2026-11-04_route4ns_rowO_zu7ev/`, **mốc phần cứng mới**) | **0 CRITICAL**, 311 cảnh báo (4 mới: cổng `iact_x_line_repetitions_i` không tải); WNS +0,169 / **+0,077 ns** (đạt 250 MHz); **LUT −1.547, FF −525, BRAM 192 → 188** sau route (mỗi PE −7 FF; mỗi constructor −37 FF và bộ đệm iact 6 → 5 RAMB36 vì mặt nạ ghi byte nay là hằng số); URAM 12, DSP 4 |
 
+### Sửa #41b, #41c, #41d: Conv có stride khi phần cứng dựng với `STRIDE_ENABLED=1` (2026-11-08, được bạn đồng ý)
+
+Chi tiết: `doc/experiments/2026-11-07_bug41_stride.md` mục 8–9. Stride là phần tuỳ chọn của RTL (tham số `STRIDE_ENABLED`, mặc định 0); với tham số
+bằng 1, Conv stride 2 vẫn sai vì phía host lập trình và giải mã layer bằng kích thước **input** ở những chỗ cần kích thước **output** (với stride 1
+hai thứ trùng nhau nên chưa từng lộ), và pha ghi ngược của RTL cũng vậy. Công cụ tìm lỗi: `slot_map.py` (mỗi ô output của DUT ứng với cửa sổ nào),
+`window_map.py`, `padcheck.py`, `DUMP_IACT_IMAGE=1` (nội dung bộ đệm iact cả sau ảnh).
+
+**Các chỗ sửa** (mọi giá trị không đổi khi stride 1):
+- (A, #41b) `src/open_eye/test_utils_main.py` `calculate_conv_serial`: chuyển kernel sau `psum_size_x + psum_add_up` ô output (cũ `+ add_up`, đơn vị pixel input).
+- (B, #41b) `src/open_eye/layer_parameters.py`: `iact_x_add_up = (số output + psum_add_up) × strideX` (ảnh rộng lẻ thiếu một cột).
+- (Y, #41d) `layer_parameters.py`: `iact_y_add_up = ⌈H / strideY⌉ × strideY` trong `y_size` (chu kỳ ghi của bộ chuyển đổi), `needed_iact_buffer_words`,
+  `iact_buffer_words_per_write`: một lượt có thêm hàng đệm dưới mà cửa sổ cuối của ảnh cao lẻ cần.
+- (W) `layer_parameters.py`: `fsm_psum_limit` của pha ghi ngược đếm theo output (stride 2 trước chạy gấp 4 lần cần thiết; chuỗi 8×8: 30.880 → 28.960 ns).
+- (C, #41c, **RTL**) `hdl/OpenEye_FPGA.v` `RECEIVE_PSUMS_TO_IACT`, 2 dòng: một hàng output có `psum_size_x` pixel (Dense giữ `iact_size_x`), chu kỳ hàng
+  `iact_x_add_up / stride_x` viết dạng tích `x_pos × stride_x ≥ iact_x_add_up − stride_x` (không bộ chia; `STRIDE_ENABLED=0` thì `stride_x` là hằng 1).
+- (F) `test_utils_main.py` `fill_dram_with_ref` (cũng là `DRAM.dense_input_order`): thứ tự làm phẳng Conv → Dense theo kích thước output (sau Conv stride 2
+  trước đây vượt chỉ số).
+- Phép kiểm tra `check_conv_geometry`: chỉ từ chối stride khi `STRIDE_ENABLED=0` (#41); vẫn từ chối "same" của TF đệm lệch (#42).
+- Mode model mới `Conv_Dense` (`data_create.py`), test `test/test_stride_params.py` (15), `test/cocotb_fpga/test_stride.py` (12), sửa 2 test của
+  `test_model_guards.py`.
+
+| Kiểm chứng | Kết quả |
+|---|---|
+| `test_stride.py` (RTL, `STRIDE_ENABLED=1`) | **12/12 PASS**; trên `69320ba` 10/12 FAIL (2 PASS là rộng 8 và 24, vốn đúng) |
+| Các ca khác đã chạy | layer đơn rộng 5, 6, 9, 10, 14 và chuỗi 14×14, 10×10, 12×8: giá trị đúng, chỉ ô đệm / word dư khác 0 (#9, như stride 1 rộng 7) |
+| Hồi quy RTL 201 test (189 + 12) | **197 PASS + 4 xfail đã biết, 0 FAIL** |
+| 12 ca mốc (`doc/perf/baseline_2026-11-04`) | **12/12 giống hệt**: 0 chu kỳ, 0 word DMA lệch |
+| Bảng 3 (16 cấu hình, `tools/paper_table3.py --run`) | **16/16 PASS, 16/16 profile giống hệt** `paper_table3_2026-11-04` (mọi layer: tổng chu kỳ và chu kỳ từng pha) |
+| Unit test Python | 474 pass (+15), 11 fail có từ trước |
+| Lint | `fpga` 444 → **443** (hết 1 cảnh báo độ rộng ở dòng quay vòng), 0 mới; baseline cập nhật |
+| Vivado 4 ns | 0 CRITICAL, 311 cảnh báo y như cũ; LUT 61.519 / 59.373 (synth / route, +21 / −16), FF +1 / +38, BRAM 188 / URAM 12 / DSP 4 như cũ; WNS +0,196 / **+0,009 ns** (đạt 250 MHz; đường găng giữa hai PE ở hai cluster, 95,5 % do route, không qua logic vừa sửa); **mốc phần cứng mới** `doc/synth/2026-11-08_route4ns_fix41_zu7ev/` |
+
+### `STRIDE_ENABLED = 1` làm mặc định (đề xuất 5, 2026-11-09, được bạn đồng ý)
+
+Ý nghĩa của tham số: mục 5.10. Phần cứng trước đây được dựng với `STRIDE_ENABLED = 0` (mặc định của upstream): stride bị gắn cứng bằng 1, nên toolchain
+phải từ chối mọi Conv stride > 1 (#41). Sau các bản sửa #41b–#41d (mục trên) đường stride đã đúng, nên dựng phần cứng có stride.
+
+**Các chỗ sửa:** `src/open_eye/open_eye_parameters.py` mặc định `STRIDE_ENABLED` 0 → **1** (chú thích cũ "AXI bus width" sai, đã thay);
+`hdl/OpenEye_FPGA.v` giá trị mặc định của `parameter STRIDE_ENABLED` 0 → 1 (chỉ dùng khi không có `parameters_FPGA.vh`; mọi bản dựng của test và
+`export_vivado.py` lấy giá trị từ Python). Cách đo: chạy mọi thứ với biến môi trường `STRIDE_ENABLED=1` **trước** khi đổi mặc định (cùng kết quả,
+vì mặc định chỉ dùng khi biến không đặt), rồi đổi mặc định và kiểm tra lại không đặt biến.
+
+| Kiểm chứng (`STRIDE_ENABLED = 1`) | Kết quả |
+|---|---|
+| Vivado 4 ns (`doc/synth/2026-11-09_route4ns_stride1_zu7ev/`, **mốc phần cứng mới**) | 0 CRITICAL, 311 cảnh báo y như `STRIDE_ENABLED = 0`; LUT 61.674 / 59.548 (synth / route, **+155 / +175**, +0,25 %), FF +7 / +13, CARRY8 +4, BRAM 188 / URAM 12 / DSP 4 như cũ; WNS +0,171 / **+0,042 ns** (đạt 250 MHz); phần tăng ở `dma_storage` (+220 LUT), các bộ dựng stream không tăng |
+| Hồi quy RTL 201 test | **197 PASS + 4 xfail đã biết, 0 FAIL** (mọi bản dựng có `STRIDE_ENABLED = 1`, đã kiểm trong `parameters_FPGA.vh`) |
+| 12 ca mốc (`doc/perf/baseline_2026-11-04`) | **12/12 giống hệt**: 0 chu kỳ, 0 word DMA lệch |
+| Bảng 3 (16 cấu hình) | **16/16 PASS, 16/16 profile giống hệt** (tổng và từng pha của mọi layer) |
+| Lint | `fpga` 443, `parallel` 36: 0 mới |
+| Sau khi đổi mặc định, không đặt biến | `export_vivado.py` mặc định ra header giống hệt bản đã chạy Vivado; lint như trên; unit test 474 pass (11 fail có từ trước); Conv 7×7 stride 2 qua RTL PASS không cần `OPENEYE_ALLOW_UNSUPPORTED` |
+
+Muốn mạch nhỏ nhất (không dùng stride) thì dựng với `STRIDE_ENABLED=0`: toolchain sẽ từ chối layer stride > 1 (#41).
+
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
-**Số liệu mục này là của ngày 2026-10-10.** Hiện tại (baseline lint `tools/lint_baseline/`, sau các bản sửa #14, #19, #30, upstream `e78e5b7` và bước B của hàm kích hoạt, bản sửa #29, #38, hàng O #37/#17): `fpga` **444**, `parallel` **36** (#38: hết `WIDTHEXPAND` / `WIDTHTRUNC` của hai lát cắt trường lượng tử; #29: `wghts_per_pe` nay 13 bit như toán hạng nó được so sánh, bớt 1 `WIDTHEXPAND`; bước B: `data_dma_i_reg` nay dùng hết nên bớt 1 `UNUSEDSIGNAL`; `e78e5b7` bớt 1 `BLKSEQ` trong `OpenEye_FPGA.v`; #30 xoá cảnh báo
+**Số liệu mục này là của ngày 2026-10-10.** Hiện tại (baseline lint `tools/lint_baseline/`, sau các bản sửa #14, #19, #30, upstream `e78e5b7` và bước B của hàm kích hoạt, bản sửa #29, #38, hàng O #37/#17, #41c): `fpga` **443**, `parallel` **36** (#38: hết `WIDTHEXPAND` / `WIDTHTRUNC` của hai lát cắt trường lượng tử; #29: `wghts_per_pe` nay 13 bit như toán hạng nó được so sánh, bớt 1 `WIDTHEXPAND`; bước B: `data_dma_i_reg` nay dùng hết nên bớt 1 `UNUSEDSIGNAL`; `e78e5b7` bớt 1 `BLKSEQ` trong `OpenEye_FPGA.v`; #30 xoá cảnh báo
 `WIDTHTRUNC` gán 46 bit vào 8 bit trong `quantization_unit.v`: chính là chỗ quấn vòng mà lint đã chỉ ra từ trước);
 mục (1) bên dưới (`PE.v:2210`) đã sửa (2026-10-21), mục (2)–(3) đã được phân tích trong lỗi #22 (mục 8b, #11).
 Output gốc đầy đủ: `doc/lint/verilator-5.020_2026-10-10.txt`; chạy lại đúng lệnh CI của upstream trên RTL hiện tại (2026-10-14, vẫn 38 warning, giống hệt):
@@ -3738,3 +3821,28 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   gốc `10bcaf7`). Lỗi mới #44 (`pytorch2model` không chuyển được layer float, có từ trước). Tài liệu trong `doc/`: #7, #21, #27, #41b là lỗi thật;
   #42, #43 và pooling 2 × 2 là giới hạn thiết kế mà toolchain phải báo. Unit test 459 pass (+56 `test_model_guards.py`); quét tĩnh 163 layer của
   Bảng 3, ca mốc, model hàm kích hoạt: 0 bị chặn; hồi quy RTL 189 test = 185 PASS + 4 xfail đã biết, 0 FAIL (như trước; `test_nets` chạy lại riêng vì script hồi quy thiếu `venv/bin` trong PATH, đã sửa). Cập nhật mục 2, 3c, 8b (#7, #19b, #21, #23, #27, #41–#44), 8e.
+
+### 2026-11-08
+
+- **Điều tra #41b** (không sửa file nào của `dev`, thử trong worktree tạm; `doc/experiments/2026-11-07_bug41_stride.md` mục 8, công cụ mới
+  `slot_map.py`, `padcheck.py`, bản vá thử `fix41b_scratch.patch`). Hai nguyên nhân Python: (A) `calculate_conv_serial` chuyển kernel theo
+  `add_up` (pixel input) thay vì `psum_add_up` (vị trí output) → thứ tự giải mã lệch khi hàng output có đệm và một lần tính nhiều kernel
+  (rộng 4, 6, 12); (B) `iact_x_add_up` của ảnh lẻ thiếu một cột (rộng 7, 9). A + B: mọi layer stride 2 đơn lẻ đã thử đúng giá trị, stride 1
+  không đổi. Thêm **#41c** (RTL: pha ghi ngược đếm theo kích thước input; bản vá 2 dòng thử trong worktree làm chuỗi stride 2 đúng, chuỗi
+  stride 1 cùng chu kỳ) và **#41d** (layer stride 2 đọc input trên chip có chiều cao lẻ mất hàng output cuối, chưa truy). Đề xuất 5 bước (mục 8.6
+  của tài liệu), chờ đồng ý. Cập nhật mục 8b (#41, thêm #41b–#41d), 8e.
+- **Sửa #41b, #41c, #41d** (được bạn đồng ý, bước 1–4; mục 9 "Sửa #41b, #41c, #41d", `doc/experiments/2026-11-07_bug41_stride.md` mục 9). Python:
+  thứ tự output (A), `iact_x_add_up` ảnh lẻ (B), `iact_y_add_up` ảnh cao lẻ (#41d: một lượt thiếu hàng đệm dưới; tìm ra bằng `DUMP_IACT_IMAGE`),
+  `fsm_psum_limit` ghi ngược theo output (W), thứ tự làm phẳng Conv → Dense theo output (F, lỗi thêm tìm ra khi kiểm chứng); RTL 2 dòng
+  `RECEIVE_PSUMS_TO_IACT` (#41c); phép kiểm tra chỉ còn chặn stride khi `STRIDE_ENABLED=0`; mode `Conv_Dense`; test `test_stride_params.py` (15),
+  `test_stride.py` (12, RTL `STRIDE_ENABLED=1`; trên `69320ba` 10 FAIL). Hồi quy 201 = 197 PASS + 4 xfail, 0 FAIL; 12 ca mốc và Bảng 3 16/16 giống
+  hệt (0 chu kỳ); unit test 474 pass; lint `fpga` 444 → 443; Vivado 4 ns: 0 CRITICAL, LUT/FF/BRAM như cũ, WNS +0,009 ns (đạt 250 MHz; đường găng do route), mốc phần cứng mới `doc/synth/2026-11-08_route4ns_fix41_zu7ev/`. Thêm mục 5.10 (stride và `STRIDE_ENABLED`). Cập nhật mục 3c, 4, 5, 6d, 8b, 8e, 9, 9b.
+
+### 2026-11-09
+
+- **Đề xuất 5: `STRIDE_ENABLED = 1` làm mặc định** (được bạn đồng ý; mục 9 "`STRIDE_ENABLED = 1` làm mặc định", mục 5.10). Vivado 4 ns với cùng RTL
+  (`doc/synth/2026-11-09_route4ns_stride1_zu7ev/`, mốc phần cứng mới): 0 CRITICAL, cảnh báo như cũ, +155 LUT (+0,25 %), +7 FF, BRAM / URAM / DSP như cũ,
+  WNS +0,042 ns (đạt 250 MHz); ước lượng Yosys +300 LUT là quá cao (phép nhân `pec × stride` có `pec` hằng). Với `STRIDE_ENABLED=1`: hồi quy 201 test =
+  197 PASS + 4 xfail, 12 ca mốc và Bảng 3 giống hệt (0 chu kỳ), lint 0 cảnh báo mới. Đổi mặc định trong `open_eye_parameters.py` và
+  `OpenEye_FPGA.v`; kiểm lại không đặt biến: export Vivado giống hệt, unit test 474 pass, Conv 7×7 stride 2 PASS. Cập nhật mục 3c (biến môi trường),
+  5.10, 6d (cấu hình, mốc, lịch sử), 8b (#41), 8e, 9.

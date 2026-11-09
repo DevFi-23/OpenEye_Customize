@@ -1,4 +1,4 @@
-"""window_map.py <sim dir> [layer]: which input window every DUT output of a strided convolution was computed on.
+"""window_map.py <sim dir> [layer]: which input window (layer: the layer number, its output in demo/layer_<n>_0) every DUT output of a strided convolution was computed on.
 
 Reads verify_layer<layer>.pkl (OPENEYE_DUMP_VERIFY=1) and demo/layer_0_<layer>/output.txt of a simulation, computes the
 stride-1 "same" convolution of the raw integers with numpy (S1[f][cx][cy], window centred at input pixel (cx, cy), zero
@@ -40,7 +40,7 @@ ref = np.array(ref, dtype=np.int64)
 order = d["output_order"]
 if order and isinstance(order[0], list) and (not order[0] or isinstance(order[0][0], (list, type(None)))):
     order = [pos for rep in order for pos in rep]
-lines = [l.strip() for l in open(os.path.join(sim, "demo", f"layer_0_{layer}", "output.txt")) if l.strip()]
+lines = [l.strip() for l in open(os.path.join(sim, "demo", f"layer_{layer}_0", "output.txt")) if l.strip()]
 dut = {}
 for wi, line in enumerate(lines):
     if set(line) - {"0", "1"}:

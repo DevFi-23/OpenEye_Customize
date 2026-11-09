@@ -260,7 +260,6 @@
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 32 bits on the RHS, but RHS's VARREF 'iact_glb_writing_cycles' generates 16 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 32 or 12 bits on the LHS, but LHS's VARREF 'iact_converter_cycles' generates 8 bits.
 5	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 32 or 8 bits on the LHS, but LHS's VARREF 'iact_channels_counter' generates 5 bits.
-1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator GTE expects 32 or 12 bits on the LHS, but LHS's VARREF 'iact_to_psum_x_pos_counter' generates 10 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator LT expects 12 bits on the LHS, but LHS's VARREF 'iact_to_psum_x_pos_counter' generates 10 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator LT expects 12 bits on the LHS, but LHS's VARREF 'iact_x_per_cluster' generates 4 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator LT expects 14 bits on the LHS, but LHS's VARREF 'current_x' generates 12 bits.

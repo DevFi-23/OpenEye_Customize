@@ -1,0 +1,48 @@
+diff --git a/hdl/OpenEye_FPGA.v b/hdl/OpenEye_FPGA.v
+index cfd3792..d3798d5 100644
+--- a/hdl/OpenEye_FPGA.v
++++ b/hdl/OpenEye_FPGA.v
+@@ -2341,7 +2341,7 @@ end
+             if (iact_to_psum_start_shifting &
+                 ((WRITEBACK_WORDS >= WRITEBACK_CHANNELS) | (iact_to_psum_trans_counter <= WRITEBACK_WORDS[3:0]))) begin
+               iact_to_psum_x_pos_counter <= iact_to_psum_x_pos_counter + 1;
+-              if (iact_to_psum_x_pos_counter < iact_size_x) begin
++              if (iact_to_psum_x_pos_counter < (fully_connected_layer ? iact_size_x : psum_size_x)) begin   // scratch #41c
+                 iact_to_psum_storage_counter <= iact_to_psum_storage_counter + 1;
+                 if (iact_to_psum_storage_counter == ((8/WRITEBACK_CHANNELS)*IACT_RAM_CELLS)-1) begin
+                   iact_to_psum_storage_counter <= 0;
+@@ -2380,7 +2380,7 @@ end
+               // filter order, the flat layout of the next Dense layer's input
+               // (iact_x_add_up stays the layer's input size for the FC converter).
+               // Bug #26, doc/experiments/2026-10-24_bug26_dense_writeback.md.
+-              if ((iact_to_psum_x_pos_counter >= iact_x_add_up - 1) | fully_connected_layer) begin
++              if ((iact_to_psum_x_pos_counter >= (iact_x_add_up / stride_x) - 1) | fully_connected_layer) begin   // scratch #41c
+                 iact_to_psum_x_pos_counter <= 0;
+               end
+             end            
+diff --git a/src/open_eye/layer_parameters.py b/src/open_eye/layer_parameters.py
+index 018433c..7ca0f3a 100644
+--- a/src/open_eye/layer_parameters.py
++++ b/src/open_eye/layer_parameters.py
+@@ -839,7 +839,7 @@ class LayerParameters(object):
+             self.psum_add_up = calculation_ress - self.psum_add_up
+             self.psum_add_up = self.psum_add_up % calculation_ress
+             self.add_up = self.psum_add_up * self.strideX
+-            self.iact_x_add_up = self.iact_size_x + self.add_up
++            self.iact_x_add_up = (self.output_shape[1] + self.psum_add_up) * self.strideX   # scratch #41b B
+             # === MASKING PHASE 2: Eliminate PEs beyond computation requirements ===
+             # Calculate total number of X positions needed per computation cycle
+             x_values_per_cycle = self.iact_x_add_up * self.y_lines_per_calculation * self.different_kernels_per_calculation
+diff --git a/src/open_eye/test_utils_main.py b/src/open_eye/test_utils_main.py
+index 345f38a..f9ab357 100644
+--- a/src/open_eye/test_utils_main.py
++++ b/src/open_eye/test_utils_main.py
+@@ -590,7 +590,7 @@ def calculate_conv_serial(params, layer_params, calculated_results, file_dma_ref
+             y_cor = les.y_start
+             for cl_y in range(params.Clusters_Y) :
+                 for cl_x in range(params.Clusters_X) :
+-                    if (x_cor >= layer_params.psum_size_x+layer_params.add_up) :
++                    if (x_cor >= layer_params.psum_size_x+layer_params.psum_add_up) :
+                         if (kernel_counter < layer_params.different_kernels_per_calculation - 1) :
+                             kernel_counter = kernel_counter + 1
+                             x_cor = les.x_start

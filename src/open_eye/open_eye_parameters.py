@@ -245,7 +245,9 @@ class OpenEyeParameters(object):
         try:
             self.STRIDE_ENABLED = int(os.getenv("STRIDE_ENABLED"))
         except:
-            self.STRIDE_ENABLED = 0          # AXI bus width for DMA transfers (64 bits)
+            # Stride in the RTL (parameter STRIDE_ENABLED of OpenEye_FPGA.v): 1 uses each layer's stride, 0 ties it to 1
+            # (smaller; check_conv_geometry then refuses strided layers, bug #41). 1 since 2026-11-09 (+155 LUT, README_FI 5.10)
+            self.STRIDE_ENABLED = 1
 
         # === COMMUNICATION MODE ===
         self.SERIAL = serial           # Serial (DMA) vs parallel communication mode

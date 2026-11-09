@@ -590,7 +590,9 @@ def calculate_conv_serial(params, layer_params, calculated_results, file_dma_ref
             y_cor = les.y_start
             for cl_y in range(params.Clusters_Y) :
                 for cl_x in range(params.Clusters_X) :
-                    if (x_cor >= layer_params.psum_size_x+layer_params.add_up) :
+                    # x_cor counts output positions: the padded row is psum_size_x + psum_add_up wide (add_up counts input
+                    # pixels, psum_add_up * strideX; with a stride the order was 4 slots late per kernel, bug #41b)
+                    if (x_cor >= layer_params.psum_size_x+layer_params.psum_add_up) :
                         if (kernel_counter < layer_params.different_kernels_per_calculation - 1) :
                             kernel_counter = kernel_counter + 1
                             x_cor = les.x_start
@@ -904,13 +906,16 @@ def fill_dram_with_ref(ref_output, dram, current_layer_params, next_layer_params
                         dram[f][x][y] = ref_output[f][x][y]
         else:
             if any(x in str(next_layer_params.layer_name) for x in ("Dense")):
+                # The output map's size, not the input's (iact_size_x / iact_size_y): equal at stride 1, a strided
+                # convolution's outputs are fewer and indexed past the Dense input (bug #41c family, 2026-11-08)
+                out_x, out_y = len(ref_output[0]), len(ref_output[0][0])
                 for f in range(len(ref_output)):  
                     for x in range(len(ref_output[f])):
                         for y in range(len(ref_output[f][x])):
                             pos = (f%4)
                             pos = pos + (4*x)
-                            pos = pos + (current_layer_params.iact_size_x*4*y)
-                            pos = pos + (current_layer_params.iact_size_x*current_layer_params.iact_size_y*4*math.floor(f/4))
+                            pos = pos + (out_x*4*y)
+                            pos = pos + (out_x*out_y*4*math.floor(f/4))
                             dram[pos] = ref_output[f][x][y]
     elif "Pooling" in str(current_layer_params.layer_name):
         if "Dense" in str(next_layer_params.layer_name):
