@@ -2014,9 +2014,31 @@ module PE #(
                 end
               end
             end
-            if (wght_filter == PARALLEL_MACS) begin
+            // The filter loop restarts every cycle when the PE has at most
+            // PARALLEL_MACS filters (wght_filter stays 0): keep the base address.
+            if ((wght_filter == PARALLEL_MACS) | (filters_reg_M0 <= $bits(filters_reg_M0)'(PARALLEL_MACS))) begin
               for (mac_i = 0; mac_i < PARALLEL_MACS; mac_i=mac_i+1) begin
                 psum_spad_addr_mem[mac_i] <= mac_i[PSUM_ADDR_BITWIDTH-1:0];
+              end
+            end
+
+            // Psum read-after-write forwarding, as in the sparse FSM (4e8402c):
+            // a write whose address equals the read address is suppressed
+            // (psum_data_SPad_en_w_i), so the value comes from the adder.
+            for (mac_i = 0; mac_i < PARALLEL_MACS; mac_i=mac_i+1) begin
+              if (psum_spad_addr_r[mac_i] == psum_spad_addr_w[mac_i]) begin
+                reuse_psum_spad[mac_i] <= 1;
+                reused_data[mac_i]     <= adder_o_w[mac_i];
+              end
+            end
+            if (!SERIAL) begin
+              for (mac_j = 0; mac_j < PARALLEL_MACS; mac_j=mac_j+1) begin
+                for (mac_k = 0; mac_k < PARALLEL_MACS; mac_k=mac_k+1) begin
+                  if (psum_spad_addr_r[mac_j] == psum_spad_addr_w[mac_k]) begin
+                    reuse_psum_spad[mac_j] <= 1;
+                    reused_data[mac_j]     <= adder_o_w[mac_k];
+                  end
+                end
               end
             end
 

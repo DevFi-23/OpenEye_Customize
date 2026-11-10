@@ -508,7 +508,7 @@ module data_pipeline_wght #(
       //     includes the word being written now).
       //   - When enable_delay is low: reset second_spad_addr_o to 0.
       // -----------------------------------------------------------------------
-      if (enable_delay & ((data_storage_2 != 0) | raw_mode_i)) begin
+      if (enable_delay & ((data_storage_2 != 0) | raw_mode_i | !SPARSITY_EN)) begin
         first_spad_en_o       <= 1;
         second_spad_en_o      <= 1;
         second_spad_data_o    <= premade_spad_2_output;
@@ -517,7 +517,7 @@ module data_pipeline_wght #(
           first_spad_addr_o  <= first_spad_addr_o + 1;
           first_spad_words_o <= first_spad_addr_o + 2;
         end
-        if ((second_spad_data_o != 0) | (raw_mode_i & second_spad_en_o)) begin
+        if ((second_spad_data_o != 0) | ((raw_mode_i | !SPARSITY_EN) & second_spad_en_o)) begin
           // Advance write address when the previous cycle stored a word.
           // Sparse: non-zero output is the previous-write indicator (zero
           // words are never stored). Raw: zero words are stored too, so the
@@ -571,7 +571,7 @@ module data_pipeline_wght #(
       //   Reset data_storage_1 to -filters_w (sentinel so next burst starts
       //   at the right offset) and overhead_pos to filters_w.
       // -----------------------------------------------------------------------
-      if (enable_i == 1 & ((data_i != 0) | raw_mode_i)) begin
+      if (enable_i == 1 & ((data_i != 0) | raw_mode_i | !SPARSITY_EN)) begin
         compute_sent       <= 0;
         overhead_delay_reg <= overhead_reg;  // snapshot before this cycle's update
         if (compute_sent) begin

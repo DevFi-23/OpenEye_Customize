@@ -6,6 +6,7 @@ Before 2026-11-07 each of these ran to the end and gave wrong outputs without an
 with STRIDE_ENABLED=0 (bug #41), a padding other than kernel // 2 (#42), unsupported ONNX nodes, branches, grouped /
 dilated convolutions (#43), an odd input channel count above 1 (#7), pooling inputs 4 or fewer pixels wide (#27), a last
 Dense layer with more than one psum pass (#21). doc/experiments/2026-11-07_bug41_stride.md has the measurements.
+Since 2026-11-10 also an odd number of filters per PE on dense hardware (#48, doc/experiments/2026-11-10_bug46_47.md).
 """
 import os
 import types
@@ -46,6 +47,36 @@ def keras(input_shape, *layers):
 def conv(width, channels=4, filters=16, **kw):
     kw.setdefault("padding", "same")
     return keras((width, width, channels), tf.keras.layers.Conv2D(filters, kw.pop("kernel", (3, 3)), **kw))
+
+
+# --- dense hardware (SPARSITY_EN = 0): the weight block layout the PE reads (#48) -----------------------------------
+
+@pytest.mark.parametrize("filters,refused", [(2, False), (3, True), (4, False), (6, True), (8, False), (10, True),
+                                             (16, False)])
+def test_dense_odd_filters_per_pe(filters, refused, monkeypatch, caplog):
+    # Bug #48: on dense hardware 8 x 4 x 4 -> 6 (3 filters per PE) read 24 weight words per pass from an 18-word block
+    # and was wrong everywhere; an even filter count per PE is right (doc/experiments/2026-11-10_bug46_47.md)
+    monkeypatch.setenv("SPARSITY_EN", "0")
+    params = platform(monkeypatch, stride_enabled=1)
+    p = build(keras((8, 4, 4), tf.keras.layers.Conv2D(filters, (3, 3), padding="same")), params)[0]
+    assert (p.used_psum_per_PE % 2 == 1) == refused
+    if not refused:
+        assert lp.check_dense_wght_slots(p, params) == -(-p.used_wght_per_PE // params.PARALLEL_MACS)
+        return
+    with pytest.raises(NotImplementedError, match="bug #48"):
+        lp.check_dense_wght_slots(p, params)
+    monkeypatch.setenv(lp.ALLOW_UNSUPPORTED_ENV, "1")
+    lp.check_dense_wght_slots(p, params)
+    assert "bug #48" in caplog.text
+
+
+def test_dense_slot_check_is_for_dense_hardware_only(monkeypatch):
+    # sparse hardware stops the same layer in the column encoder of bug #22 (ValueError at stream generation)
+    monkeypatch.setenv("SPARSITY_EN", "1")
+    params = platform(monkeypatch, stride_enabled=1)
+    p = build(keras((8, 4, 4), tf.keras.layers.Conv2D(6, (3, 3), padding="same")), params)[0]
+    assert p.used_psum_per_PE == 3
+    assert lp.check_dense_wght_slots(p, params) is None
 
 
 # --- convolution: stride (#41), padding (#42), dilation / groups, channels (#7) ---------------------------------------

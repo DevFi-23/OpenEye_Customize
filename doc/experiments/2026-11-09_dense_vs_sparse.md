@@ -34,7 +34,8 @@ approval.
 
 **2026-11-10:** causes found and a fix proposed, `2026-11-10_bug46_47.md` (#47: all-zero weight words dropped outside raw
 mode; #46: no psum forwarding in the dense FSM). With the proposed patch in a temporary copy the whole MNIST net is
-bit-exact in dense with the same 225,221 cycles as in section 2.
+bit-exact in dense with the same 225,221 cycles as in section 2. Applied the same day (approved); the fixed dense build is 43,523 LUT
+(`doc/synth/2026-11-10_route4ns_dense4647_zu7ev`), -26.9 % against sparse, as measured before the fix.
 
 ## 2. Cycles on the same model
 

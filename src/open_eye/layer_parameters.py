@@ -158,6 +158,30 @@ def check_full_passes(layer_params):
     return slots
 
 
+def check_dense_wght_slots(layer_params, params):
+    """Stop a convolution whose weight block the dense PE (SPARSITY_EN = 0) would read with another layout. Returns the
+    weight words per PE and pass, None for sparse hardware.
+
+    The dense FSM of PE.v reads ceil(used_psum_per_PE / PARALLEL_MACS) weight words for every activation of a pass
+    (the filter pairs of that activation, the last pair padded when the filter count is odd), while the toolchain packs
+    the used_wght_per_PE weights of the PE back to back into ceil(used_wght_per_PE / PARALLEL_MACS) words. With an odd
+    number of filters per PE and more than one activation the PE reads more words than it gets (8 x 4 x 4 -> 6:
+    3 filters per PE, 12 activations, 24 words read, 18 sent): every later weight is shifted and the outputs are wrong
+    without any sign (bug #48, doc/experiments/2026-11-10_bug46_47.md section 5). Sparse hardware stops the same layer
+    in the column encoder of bug #22 (ValueError "encoded columns need ... words")."""
+    if int(getattr(params, "SPARSITY_EN", 1)):
+        return None
+    macs = params.PARALLEL_MACS
+    block = math.ceil(layer_params.used_wght_per_PE / macs)
+    read = layer_params.used_iact_per_PE * math.ceil(layer_params.used_psum_per_PE / macs)
+    if read != block:
+        refuse(
+            f"{layer_params.layer_name}: {layer_params.used_psum_per_PE} filters per PE with PARALLEL_MACS={macs} on "
+            f"dense hardware (SPARSITY_EN=0): the PE reads {read} weight words per pass, the stream packs {block} "
+            f"(bug #48); use a filter count that gives a multiple of {macs} filters per PE")
+    return block
+
+
 def check_wght_buffer(params, wght_words, layer_name=""):
     """Stop a layer whose weights do not fit the weight staging buffer (2^BUFFER_WIDTH_WGHT rows). Its write pointer
     wraps without any sign, so the last rows overwrote the first ones and the layer computed slightly wrong: bug #29
