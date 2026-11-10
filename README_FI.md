@@ -42,13 +42,13 @@ git add <file> && git commit -m "..."
 git push origin dev
 ```
 
-### Trạng thái các commit của upstream (cập nhật 2026-11-06, `upstream/main` = `b1e02a0`)
+### Trạng thái các commit của upstream (cập nhật 2026-11-09, `upstream/main` = `9a742fb`)
 
 `dev` dựa trên upstream `c4bd562`. Từ đó upstream có 22 commit không phải merge (12–29/10/2026). Bảng dưới gộp mọi lần kiểm tra
 (2026-10-19, 21, 24, 30, 31); chi tiết và cách chạy lại: `doc/experiments/2026-10-21_upstream_cherry_pick.md`,
 `doc/experiments/2026-10-31_upstream_review.md` (chạy upstream nguyên bản trong worktree, so với `dev` cùng bộ chạy),
 `doc/experiments/2026-10-31_upstream_551cf85_iact.md`, `doc/experiments/2026-10-31_wght_send_end.md`, `doc/experiments/2026-11-04_upstream_36395dd.md`
-(2 commit mới ngày 03/11), `doc/experiments/2026-11-06_upstream_dw_review.md` (5 commit ngày 05/11, depthwise).
+(2 commit mới ngày 03/11), `doc/experiments/2026-11-06_upstream_dw_review.md` (5 commit ngày 05/11, depthwise), `doc/experiments/2026-11-09_upstream_9a742fb_review.md` (5 commit ngày 06/11, luồng dữ liệu iact).
 
 | Commit (ngày) | Nội dung | So với `dev` | Trạng thái |
 |---|---|---|---|
@@ -73,6 +73,8 @@ git push origin dev
 | `36395dd` (03/11) | Bộ đếm và cổng rộng theo `CYCLE_WIDTH`; **1 channel**: bỏ mọi đường riêng cho 1 channel trong `iact_stream_constructor.v`, `data_pipeline_iact.v` của PE quay vòng bộ đếm sub-word khi 1 channel mỗi PE và bỏ logic "uneven ending"; Python theo cấu trúc DAG (thêm chỉ số cho layer nhiều input), công thức `iact_read_inc_2` mới | **Sửa #17 trong RTL** (2026-11-04: Conv 28×28×1 không đệm PASS, upstream cũ và `dev` FAIL; thời gian mô phỏng ít hơn khoảng 5 % so với đệm channel của `dev`; đo bằng profiler sau khi chép: Conv1 MNIST −1,1 % chu kỳ). Vẫn sai 1 channel nhiều lượt weight (#39, lỗi Python chung, `dev` đã sửa). Vẫn còn #29, #36 và sai Dense 3136 → 10 (đúng ở `dev`); #7, #9, #21, #27 vẫn sai như `dev` | **Không gộp** (phụ thuộc DAG, constructor dòng `551cf85`, mang lại các lỗi `dev` đã sửa). **Đã chép phần 1 channel 2026-11-04** vào constructor của ta và tắt `channel_pad` (hàng O, mục 9 "Sửa #37, #17"); không lấy công thức `iact_read_inc_2` mới và việc bỏ bước nhảy `NUM_GLB_IACT − 1` (`dev` cần cho `NUM_GLB_IACT` 3) |
 | `b10db82` (04/11) | "Re-Enabled python interface for DW Conv": conv depthwise (RTL `PE`, `PE_cluster`, `OpenEye_Cluster`, Python `dw_mapper.py`, `layer_parameters.py`, `wght_stream_mapper.py` sửa nhiều); nhánh nhiều filter của `LayerParameters` nâng từ 16 lên **32 psum mỗi PE** | Chỉ kiểm tra phần liên quan #39 (2026-11-05, `doc/experiments/2026-11-05_bug39_detail.md` mục 8): công thức số bộ weight vẫn cũ, nên **vẫn có #39** khi hơn 32 filter mỗi lần tính (8×4×1 → 96, 28×28×1 → 48 FAIL toàn bộ map); MNIST Conv1 (32 filter) thoát vì chỉ còn 1 lượt; vá công thức thì các ca đó treo: **đã tìm ra 2026-11-05** (`doc/experiments/2026-11-05_b10db82_hang.md`), không do 1 channel hay 32 psum mà do lượt weight cuối thiếu filter (96 = 64 + 32): mapper upstream ghi weight của filter đệm thành số 0 tường minh, `data_pipeline_wght.v` coi word toàn 0 là phần đệm stream, PE nhận 2 thay vì 3 con trỏ cột weight và không thoát vòng MAC = cơ chế **#22** (fork đã sửa, upstream chưa); chia chẵn (64 + 64, 32 + 32) PASS. Không vá thì FAIL do #39 cộng **#40** (cả fork cũng có); #39b còn nguyên. Phần depthwise: đánh giá 2026-11-06 cùng 5 commit sau (hàng dưới): DW 4×1×4, 12×2×8, 8×8×4 **sai** cả ở cấu hình của chính upstream | Chưa lấy |
 | `e8b3c3e`, `2abe8d4`, `0d5a0e3`, `7465852`, `b1e02a0` (05/11) | `e8b3c3e` "Reimplemented Depthwise Convolution": DW chuyển vào FSM **dense** của PE (`dw_mode`), viết lại `get_pagu_values` / `calculate_pe_transmissions`, tham số mới `CHANNEL_CYCLE_WIDTH` (RTL 12, Python 16) nới `iact_channel_max_cycles` và trường regmap, sửa chỉ số x/y của tham chiếu DW, công tắc `WAVES` trong Makefile; `2abe8d4`, `0d5a0e3`: `iact_buffer_addr`, `quantized_value_reg` khai báo `wire` thay `reg` (được lái bằng `assign`); `7465852`: đánh số lại các vòng của bộ sinh địa chỉ đọc iact; `b1e02a0`: testbench PE reset `dw_mode` | Kiểm tra 2026-11-06 (`doc/experiments/2026-11-06_upstream_dw_review.md`): luồng Makefile của upstream (PE dense, Verilator 5.044): Conv 8×8×4 → 16 và 12×6×1 → 8 PASS, **giống hệt từng ns** trước và sau (viết lại PAGU không nhanh hơn); **DW sai ở cả 3 ca, trước và sau** (bản mới ra chủ yếu 0). Lỗi trong code: `rd_cycle_loop_cnt_4 <= rd_cycle_loop_cnt_4` (vòng 4 không bao giờ đếm), `rd_addr_inc_4_next` bị `assign` 2 lần (Yosys: nhiều driver), nhánh Python của DW chưa theo cách đánh số mới; việc nới `CHANNEL_CYCLE_WIDTH` làm dở (bộ đếm trong `psum_pipeline.v`, `router_configurator.v` vẫn 8 bit). Lint `fpga` 464 → 458 (5 mới, 11 cũ hết). Hai dòng `reg` → `wire`: đúng chuẩn Verilog, `dev` có đúng 2 khai báo đó, công cụ của ta chấp nhận | **Không lấy** (phụ thuộc `b10db82`; DW chưa xong và chỉ có ở PE dense, `dev` chạy sparse; PAGU có lỗi và xung đột với bước nhảy `NUM_GLB_IACT − 1`, `iact_read_inc_2` của `dev`). Có thể lấy riêng (cần bạn đồng ý vì là RTL): 2 dòng `reg` → `wire`, công tắc `WAVES`. Theo dõi tiếp DW (mạng kiểu MobileNet) |
+| `302d330`, `21bc1b6`, `9594bec`, `c288541`, `9a742fb` (06/11) | `9594bec` "Changed data flow for iact stream constructors": bộ đệm iact lưu **nhóm 2 channel** (trước 4), `channel_div_trans` 3 bit; nhiều bank iact thì **chia xen** (bus vào constructor 16 bit thay vì 16 × `NUM_GLB_IACT`, một bản dữ liệu thay vì mỗi bank một bản), thêm vòng địa chỉ ghi thứ 4; `9a742fb` "Fixed Interlayer_operability": ghi ngược theo nhóm 2 channel (gắn cứng); còn lại: test DW, test PE debug, `padding_x/y` thành dây. Cấu hình test của upstream: **dense**, `PARALLEL_MACS` 1, psum 32 bit, **1 × 1 cluster** | Kiểm tra 2026-11-09 (13 ca × 3 cây × sparse/dense, `doc/experiments/2026-11-09_upstream_9a742fb_review.md`): **sparse: 13/13 FAIL** (sai hoặc treo; Python tính word bộ đệm iact 96 bit, RTL 64); **dense:** Conv đơn PASS kể cả `NUM_GLB_IACT=3` (upstream cũ FAIL), mọi chuỗi có ghi ngược ở 2 × 2 cluster FAIL (chỉ PASS ở 1 × 1 cluster của họ), 3 và 6 channel FAIL; chu kỳ Conv đơn bằng upstream cũ. Hai lỗi code cũ (`assign` 2 lần, `rd_cycle_loop_cnt_4`) vẫn còn | **Không lấy** (dựa trên `b10db82`; viết lại đúng phần constructor / ghi ngược mà `dev` đã sửa #6/#7, #13, #17, #25, #37, #41c; hỏng chế độ sparse mà `dev` dùng). Ý tưởng đáng giữ: chia xen bank (nếu dùng `NUM_GLB_IACT > 1`); 32 psum mỗi PE của `b10db82` (28×28×1 → 32 nhanh hơn 6–7 %, cần đo riêng) |
+| nhánh `dev_asic_sg13g2` (tới 06/11) | Luồng ASIC IHP SG13G2 (LibreLane / OpenROAD) của tác giả khác, nền `e78e5b7`; dừng ở bước filler của KLayout (cần khoảng 247 GB RAM) | Không liên quan FPGA | Không lấy |
 
 Lỗi còn mở của `dev` chạy trên upstream `93f0e82` (2026-10-31): #7 (3 channel), #9, #19b, #21, #23, #27, #28, #29 **sai y như trên `dev`**
 (#27 sai còn sớm hơn); upstream còn sai Dense 3136 → 10/16 (Dense của model MNIST đã huấn luyện) mà `dev` đúng, do lỗi #19 phần 2 (`current_x`
@@ -110,6 +112,52 @@ blocking** `=`: các công cụ hết bất đồng, diff nhỏ, nhưng thanh gh
 hợp ra các dây (`chain_ready_terms`, `all_psum_ready`, `all_psum_enable`, `results_ready_calc`) và chỉ gán thanh ghi bằng `<=`: đúng mẫu thiết kế đồng bộ,
 lockstep 125 test không lệch, netlist Yosys chạy đúng, lint −4 lỗi −3 cảnh báo, Vivado hết cảnh báo 8-6090. Lấy `c48899f` sẽ xung đột với bản của
 `dev` mà không thêm gì, nên **không lấy**.
+
+### Sparse và dense: upstream có bỏ sparse không, `dev` có đi sai hướng không (phân tích 2026-11-09)
+
+**Hai chế độ** (`SPARSITY_EN`, tham số lúc dựng phần cứng, `doc/source/architecture/sparsity_modes.rst`): **sparse** (= 1, mặc định của OpenEye, kiến trúc
+Eyeriss v2) lưu và truyền activation / weight dạng nén CSC: mỗi giá trị 8 bit kèm 4 bit "overhead" (số số 0 bị bỏ trước nó), PE có thêm SPad địa chỉ
+và chỉ nhân các giá trị khác 0. **Dense** (= 0) truyền giá trị 8 bit trần, không SPad địa chỉ, PE nhân tuần tự mọi giá trị: ít bit hơn 33 %, PE nhỏ
+hơn, điều khiển đơn giản hơn, nhưng không bỏ qua được số 0.
+
+**Upstream không bỏ sparse:** mặc định trong RTL (`SPARSITY_EN = 1`) và Python vẫn là sparse; **nhánh ASIC của chính họ** (`dev_asic_sg13g2`,
+`asic/doc/p2_16_design_report.md`) dựng chip với sparse, 2 × 2 cluster, `PARALLEL_MACS` 2, psum 20 bit, `NUM_GLB_IACT` 1, tức **đúng cấu hình của `dev`**.
+Dense chỉ là cấu hình Makefile mà DenLeb dùng khi phát triển trên `main` (`SPARSITY_EN=0` từ `1a8864d`, 06/08), có lẽ vì: depthwise chỉ có trong FSM dense
+của PE; đường dense dễ gỡ lỗi khi viết lại luồng dữ liệu; GEMM / attention (mạng transformer) gần như không có số 0; giai đoạn giảm diện tích cho FPGA nhỏ
+GateMate. Các commit mới của họ không được chạy thử ở sparse (2026-11-09: 13/13 ca sai, mục trên).
+
+**Lợi ích đo được của sparse trên `dev`** (model MNIST đã huấn luyện, mục 6.15): sau ReLU input của Conv2 / Conv3 / Dense có 43,5 / 87,3 / 74,3 % số 0;
+mất các số 0 đó (Leaky ReLU) làm tổng chu kỳ tăng 8,7 % (compute Conv3 +36 %, Dense +24 %, Conv2 +8,5 %). Giá của định dạng sparse khi không có số 0
+(cùng RTL upstream `b1e02a0`, dữ liệu ngẫu nhiên không có 0): dense nhanh hơn 0,5–7 %. Vậy trên MNIST lợi ích ròng của sparse là vài phần trăm, lớn ở
+layer rất thưa (Conv3), âm ở layer không có số 0 (ảnh input, mạng SiLU / hard-swish / GELU, depthwise, attention). Weight đã huấn luyện chỉ có 1–5 % số 0,
+nên phần nén weight gần như chỉ tốn 4 bit overhead.
+
+**Kết luận:** `dev` không đi sai hướng: nó theo đúng kiến trúc OpenEye và đúng cấu hình chip của upstream, và là bản duy nhất chạy đúng ở sparse. Nhưng
+lợi thế của sparse phụ thuộc dữ liệu, và `dev` không có đường dense chạy được (2026-11-09: 13/13 ca sai). Việc nên làm nếu muốn chắc: đo cùng model ở
+dense và sparse (chu kỳ và Vivado: dense bỏ SPad địa chỉ), rồi để `SPARSITY_EN` là lựa chọn theo model (ReLU / mạng đã tỉa: sparse; SiLU, depthwise,
+attention: dense) thay vì một hướng duy nhất.
+
+**Đo trên cùng model (2026-11-09, `doc/experiments/2026-11-09_dense_vs_sparse.md`).** Model MNIST đã huấn luyện, ảnh 0, cùng cây code, chỉ đổi
+`SPARSITY_EN`. Để dense chạy được phải sửa Python (`wght_stream_mapper.py`: ở dense không mã hoá cột #22, không bỏ word 0); sau đó Conv1 + Pool1 khớp
+từng bit ở dense, các layer sau còn sai do lỗi RTL của chế độ dense (#46, #47, chưa sửa). Chu kỳ của FSM dense không phụ thuộc giá trị nên vẫn so được
+(**kiểm chứng 2026-11-10**: với bản sửa đề xuất cho #46/#47 trên một bản sao tạm, model chạy dense khớp từng bit và ra đúng 225.221 chu kỳ, từng layer như dưới):
+
+| | sparse | dense | dense so với sparse |
+|---|---:|---:|---:|
+| Tổng (250 MHz) | 218.564 (874 µs) | 225.221 (901 µs) | **+3,0 %** |
+| `compute` (bỏ qua số 0 của activation) | 125.647 | 147.856 | +17,7 % (Conv1 −2,9 %, Conv2 +10,5 %, Conv3 +41,7 %, Dense +23,1 %) |
+| `load_wght` (8 bit so với 12 bit mỗi weight) | 38.880 | 23.328 | **−40 %** (mỗi hàng weight 3 word thay vì 5) |
+| Các pha khác (bias, convert, writeback, pooling, ...) | 54.023 | 54.023 | 0 |
+
+Sparse thắng ở compute nhờ số 0 của activation, dense thắng ở nạp weight nhờ bỏ 4 bit overhead (weight đã huấn luyện gần như không có số 0). Trên MNIST
+sparse nhanh hơn 3 %; với mạng không có số 0 trong activation dense sẽ nhanh hơn. Hướng tốt hơn cả hai: **chế độ trộn** (iact sparse, weight 8 bit trần),
+ước lượng ≈ 203.000 chu kỳ (−7,1 % so với sparse), cần sửa RTL (đường weight trong PE), chưa làm. Ngoài chuyện chế độ: `load_bias` chiếm 10,7 % (bias gửi
+thành nguyên bản đồ psum ban đầu, 14.336 word cho 32 bias của Conv1), là chỗ tiết kiệm lớn hơn.
+
+**Diện tích** (Vivado, cấu hình mốc, chỉ đổi `SPARSITY_EN`; `doc/synth/2026-11-09_route4ns_dense_zu7ev/`): dense **43.554 LUT so với 59.548 (−26,9 %)**,
+FF −27,0 %, BRAM 184 so với 188, URAM 10 so với 12, cùng 250 MHz; mỗi PE ~1.000 → 620 LUT. Sparse tốn khoảng một phần tư chip cho SPad địa chỉ, đường
+overhead và điều khiển bỏ số 0. Tóm lại trên MNIST: sparse nhanh hơn 3 % nhưng lớn hơn 37 % (59,5k / 43,6k LUT). Trả lời câu hỏi "fork có sai hướng":
+không sai cho mạng ReLU nếu chỉ tính độ trễ trên cùng số PE; nếu tính theo diện tích, dense (hoặc chế độ trộn) đáng làm cho đúng (#46, #47).
 
 ### `551cf85` so với `dev`: hướng nào tốt hơn (phân tích 2026-10-31, `doc/experiments/2026-10-31_upstream_551cf85_iact.md`)
 
@@ -209,7 +257,7 @@ Một test cocotb là một tiến trình; máy 12 nhân / 7 GB RAM chạy song 
 venv/bin/python -m pytest -q test/test_*.py
 ```
 
-Hiện tại (2026-11-08): **474 pass, 11 fail** (15 test tham số stride trong `test_stride_params.py` + 56 test phép kiểm tra nhóm A của mục 8e trong `test_model_guards.py` + 5 test bộ đệm weight / iact của #29 / #37, `test_wght_buffer.py` + 8 test số bộ weight và 32 test phép kiểm tra `check_wght_sets` của #39, 34 test phép kiểm tra `check_full_passes` của #40, `test_channel_pad.py` + 129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8 + 6 test đường model thật so với ONNX Runtime + 22 test thứ tự stream bias của lỗi #32 + 31 test hàm kích hoạt, bước A và B + 3 test profiler hàm kích hoạt, bước C; 12 trong số đó cần checkpoint của `models/train_mnist.py`, không có thì skip). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
+Hiện tại (2026-11-09): **477 pass, 11 fail** (thêm 3 test luồng weight dense, `test_conv_wght_encoding.py`) (15 test tham số stride trong `test_stride_params.py` + 56 test phép kiểm tra nhóm A của mục 8e trong `test_model_guards.py` + 5 test bộ đệm weight / iact của #29 / #37, `test_wght_buffer.py` + 8 test số bộ weight và 32 test phép kiểm tra `check_wght_sets` của #39, 34 test phép kiểm tra `check_full_passes` của #40, `test_channel_pad.py` + 129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8 + 6 test đường model thật so với ONNX Runtime + 22 test thứ tự stream bias của lỗi #32 + 31 test hàm kích hoạt, bước A và B + 3 test profiler hàm kích hoạt, bước C; 12 trong số đó cần checkpoint của `models/train_mnist.py`, không có thì skip). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
 thay đổi của fork. Các file của fork: `test_profile_report.py`, `test_profile_phases.py`, `test_channel_pad.py`, `test_conv_wght_encoding.py`, `test_paper_table3.py`,
 `test_memory_model.py`, `test_fc_writeback.py`, `test_conv_writeback.py`, `test_int8_clamp.py`, `test_onnx_model_flow.py` (cần `torch`, `onnxruntime`, file `.pth` đã huấn luyện),
 `test_psum_bias_order.py`, `test_activation.py`, `test_model_guards.py` (56 test, các phép kiểm tra nhóm A của mục 8e, cần `torch`, `onnxruntime`), `test_stride_params.py` (15 test, #41b/#41d).
@@ -321,6 +369,8 @@ Chi tiết: mục 6 (profiler), 6.13 (model nhiều layer), 6.14 (Bảng 3), 6.1
 | `OPENEYE_LAYER_SEED=<n>` | Seed weight Keras của các layer đơn trong `data_create` | không |
 | `OPENEYE_ZERO_IACTS`, `OPENEYE_CONST_IACTS=<c>`, `OPENEYE_CONST_WGHTS=<c>`, `OPENEYE_RAMP_IACTS`, `OPENEYE_ASYMMETRIC_KERNEL`, `OPENEYE_MIX_WEIGHTS`, `OPENEYE_BIAS_STEP=<s>` | Hook dữ liệu để gỡ lỗi (input 0/hằng/dốc, kernel bất đối xứng, ...) | tắt |
 | `OPENEYE_ALLOW_UNSUPPORTED=1` | Các phép kiểm tra nhóm A của `LayerParameters` (#41 stride, #42 padding, #7 channel lẻ, #27 pooling, #21 Dense cuối; mục 8e) chỉ ghi cảnh báo, layer vẫn được tạo stream: để tái hiện lỗi trên RTL | tắt (báo lỗi) |
+| `OPENEYE_X_CONTINUE=1` | Output Conv có word X: ghi word đó (dạng chuỗi có `x`) vào `output.txt` và chạy tiếp thay vì dừng ở word X đầu tiên; log `XPOS` với `[f, x, y]` của từng psum X (dùng cho `doc/experiments/2026-11-09_dense_vs_sparse/dense_diag.py`) | tắt (dừng ở word X đầu) |
+| `SPARSITY_EN=0/1` | Phần cứng dense hoặc sparse (mục 2 "Sparse và dense"); `0` chỉ đúng một phần, xem #46, #47, #48 (bản sửa đề xuất 2026-11-10 chưa áp dụng) | 1 |
 | `STRIDE_ENABLED=0/1` | Có stride trong RTL hay không (tham số `STRIDE_ENABLED` của `OpenEye_FPGA.v`, ghi vào `parameters_FPGA.vh`; mục 5.10). Bằng 0: mạch nhỏ hơn 155 LUT nhưng toolchain từ chối Conv stride > 1 (#41) | **1** (từ 2026-11-09; 0 trước đó) |
 | `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` | Tránh plugin pytest-rerunfailures mở socket | nên đặt khi chạy trực tiếp |
 
@@ -1424,6 +1474,7 @@ cấu hình ở bảng trên; RTL của lần `act` = `dev` `f853b61` (bước B
 | 2026-11-03 | `2026-11-03_route4ns_cr1fix_zu7ev` | Tổng hợp + place & route, 4 ns, bản sửa #28, #29, #36 (bộ đệm weight 8.192 hàng trong URAM) | 0 CRITICAL, cảnh báo như cũ; URAM 8 → 12, FF +288 trong bộ đệm, BRAM/DSP/LUT như cũ; WNS +0,075 ns. Lần đầu không ép URAM: 64 RAMB36 + 845 LUT (BRAM 82 %) |
 | 2026-11-04 | `2026-11-04_route4ns_fix38_zu7ev` | Tổng hợp + place & route, 4 ns, bản sửa #38 (lát cắt exponent/mantissa của bảng lượng tử) | 0 CRITICAL, cảnh báo như cũ; mỗi bộ lượng tử +69 LUT, +17 FF (bộ nhân 25 × 21 thay vì 8 × 21), DSP vẫn 4, BRAM/URAM như cũ; LUT +293, FF +85 sau route; WNS +0,044 ns (đường địa chỉ psum → BRAM, do đi dây) |
 | 2026-11-09 | `2026-11-09_route4ns_stride1_zu7ev` | Tổng hợp + place & route, 4 ns, cùng RTL với `STRIDE_ENABLED = 1` (đề xuất 5, nay mặc định) | **Mốc hiện tại**: 0 CRITICAL, cảnh báo như cũ; LUT +155 / +175, FF +7 / +13, CARRY8 +4 so với `fix41`; BRAM/URAM/DSP như cũ; WNS +0,042 ns |
+| 2026-11-09 | `2026-11-09_route4ns_dense_zu7ev` | Tổng hợp + place & route, 4 ns, cấu hình mốc với `SPARSITY_EN = 0` (đo dense / sparse, `doc/experiments/2026-11-09_dense_vs_sparse.md`) | Không phải mốc (dense chưa đúng, #46 #47): 0 CRITICAL; LUT 43.554 sau route (**−26,9 %**), FF 28.797 (−27,0 %), BRAM 184 / URAM 10 / DSP 4; mỗi PE ~1.000 → 620 LUT; WNS +0,062 ns |
 | 2026-11-08 | `2026-11-08_route4ns_fix41_zu7ev` | Tổng hợp + place & route, 4 ns, bản sửa #41c (ghi ngược theo kích thước output) | Mốc trước (`STRIDE_ENABLED = 0`): 0 CRITICAL, cảnh báo như cũ; LUT +21 / −16, FF +1 / +38; BRAM/URAM/DSP như cũ; WNS +0,009 ns (đường găng giữa hai PE, do route) |
 | 2026-11-04 | `2026-11-04_route4ns_rowO_zu7ev` | Tổng hợp + place & route, 4 ns, hàng O (#37 trường bộ đệm iact 13 bit, #17 bỏ đường 1 channel cặp hàng) | Mốc trước. 0 CRITICAL, 311 cảnh báo; LUT −1.547, FF −525, BRAM 192 → 188 (bộ đệm iact 6 → 5 RAMB36 mỗi constructor), mỗi PE −7 FF; WNS +0,077 ns |
 | 2026-11-02 | `2026-11-02_route4ns_act_zu7ev` | Tổng hợp + place & route, 4 ns, phần cứng hàm kích hoạt (bước B) | 0 CRITICAL; LUT +778 (+1,3 %, do bước B khoảng +550), FF +59, 256 LUTRAM cho 4 bảng tra; WNS +0,045 ns |
@@ -1522,7 +1573,7 @@ dài 96 thay vì 192 chu kỳ.
 | Đo hàm kích hoạt: pha `load_act`, chu kỳ khối kích hoạt, số 0 ở input từng layer | **Xong** (2026-11-02, mục 6.15) |
 | Bảng 3 của paper đo bằng profiler (16 cấu hình, theo layer) | **Xong** (2026-10-24, mục 6.14); sau bản sửa #26 và #25: 13/16; **sau bản sửa #28, #29, #36 (2026-11-03): 16/16 cấu hình tính đúng cả mạng** |
 
-### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-11-07)
+### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-11-09)
 
 | # | Lỗi | Nơi | Trạng thái |
 |---|---|---|---|
@@ -1575,6 +1626,10 @@ dài 96 thay vì 192 chu kỳ.
 | 42 | Toolchain **bỏ qua padding của model**: `LayerParameters` luôn dùng `padding = "same"` (`layer_parameters.py:355`, đệm `kernel // 2` mỗi bên, dòng 799), còn `padding_pads` mà `onnx2model` đọc từ ONNX không được dùng. Conv `padding = 0` ("valid", ví dụ LeNet-5) hay đệm lệch (TF "same" với stride 2) được tính như "same" | Python | **Phát hiện 2026-11-07** bằng đọc code (mục 8e), chưa chạy. Model MNIST trong repo dùng `padding = 1` (= "same") nên không bị **2026-11-07:** tài liệu RTL ghi `padding_reg = (kernel_size - 1) / 2`: chỉ có padding "same" là **giới hạn thiết kế**; lỗi là toolchain không báo. **Phép kiểm tra `check_conv_geometry`** đọc padding của model (`model_padding`: chuỗi Keras, pads ONNX, số / cặp PyTorch) và từ chối khi khác `kernel // 2`. |
 | 43 | `onnx2model` chỉ nhận đúng model kiểu MNIST: (a) `export_to_onnx` cố định input giả `1 × 1 × 28 × 28` (`onnx2model.py:93`); (b) chỉ lấy `COMPUTE_OPS` (Conv, Gemm/MatMul, MaxPool), **lặng lẽ bỏ** mọi op khác (`Add` của residual, `AveragePool`, `GlobalAveragePool`, `Concat`...; dòng 453); (c) không đọc thuộc tính `group`: Conv depthwise thành Conv thường 1 channel. Testbench nạp model thật cố định `SimpleMNISTConvNet` và ảnh MNIST | Python | **Phát hiện 2026-11-07** bằng đọc code (mục 8e), chưa chạy. Đã có phép kiểm tra cho zero point ≠ 0 và scale weight theo channel (báo lỗi rõ) **2026-11-07:** tài liệu `tutorial/model_formats.rst` liệt kê phần không hỗ trợ (concatenation, skip connection, BatchNorm chưa fuse, dilated conv) và hứa báo lỗi "Unsupported layer type": giới hạn là thiết kế, việc bỏ lặng lẽ là lỗi. **`onnx2model.check_supported_graph`** từ chối op lạ, Add residual, `group` / `dilations` / `auto_pad`, layer không nối thành chuỗi, hàm kích hoạt không gộp được vào Conv/Dense; input giả khi export lấy theo dữ liệu hiệu chỉnh. `pytorch2model` (đường `model_loader`) cũng bỏ qua stride / padding / groups / dilation và chỉ cảnh báo module lạ: nay từ chối. Depthwise (`DWMapper`): fork không có đường dữ liệu depthwise, nay báo lỗi rõ thay cho `IndexError` / `ValueError`. |
 | 44 | `pytorch2model.extract_quantization_params` gọi `layer.weight()` với cả layer float (với bản torch hiện tại `Parameter` có thuộc tính `q_scale`): `TypeError: 'Parameter' object is not callable`, nên `create_model_from_pytorch` không chuyển được Conv2d / Linear float nào | `src/open_eye/pytorch2model.py:308` | **Phát hiện 2026-11-07** khi viết test cho #43; không liên quan đến đường model thật của fork (`onnx2model`), chưa sửa (`test_model_guards.py::test_pytorch2model_accepts_supported_modules` ghi lại) |
+| 45 | Conv có **hơn 4 channel input mà không chia hết cho 4** (6, 10): toàn bộ feature map sai, không phép kiểm tra nào chặn (12, 8, 16 channel đúng) | ? (mỗi PE xử lý 4 channel một lượt với kernel 3×3; lô channel cuối thiếu, giống #40 theo channel) | **Phát hiện 2026-11-09** khi so với upstream (`doc/experiments/2026-11-09_upstream_9a742fb_review.md`): 8×4×6 → 16 và → 8, 8×4×10 → 16, 16×4×6 → 16 FAIL; upstream có cùng lỗi (treo). Chưa sửa: đề xuất chặn bằng `check_conv_geometry` rồi sửa bằng cách đệm channel lên bội của 4 bằng Python (cùng hướng với #7) |
+| 46 | **Chế độ dense** (`SPARSITY_EN=0`): Conv có ≤ 4 filter mỗi PE (`used_psum_per_PE` 2–4; ở 2 × 2 cluster: 2–4 filter, hoặc 8 filter với ảnh rộng 8) sai mọi feature map | `hdl/PE.v` FSM dense: (a) địa chỉ psum lặp lại trong 2 chu kỳ, lần ghi trước bị chặn (`psum_data_SPad_en_w_i`) mà FSM dense không chuyển tiếp kết quả bộ cộng (FSM sparse có, bản sửa `4e8402c` của upstream; FSM dense viết từ `c8ec883`, trước bản sửa đó); (b) M0 ≤ 2: địa chỉ psum không bao giờ về gốc | **Đã tìm ra nguyên nhân 2026-11-10** (`doc/experiments/2026-11-10_bug46_47.md`); upstream `b1e02a0` và `9a742fb` sai y hệt, chưa có bản sửa. **Đề xuất** (chưa áp dụng, cần đồng ý): chép khối chuyển tiếp của FSM sparse vào `CALCULATING` dense + điều kiện M0 ≤ `PARALLEL_MACS` (`PE.v`, 1 dòng sửa + 22 dòng thêm, `doc/experiments/2026-11-10_bug46_47/proposal_46_47.patch`); thử trên bản sao tạm: mọi ca PASS, sparse không đổi |
+| 47 | **Chế độ dense**: Conv có **word weight toàn 0** (hai weight 0 liền nhau) sai: ví dụ 8×4×16 → 16 seed 1 (filter chẵn X), model MNIST ở dense (Conv2 / Conv3 / Dense sai). Phụ thuộc dữ liệu: seed 2 đúng | `hdl/data_pipeline_wght.v`: ngoài raw mode (chỉ bật cho FC / GEMM) word 0 bị coi là "không có dữ liệu" (quy ước sparse): bỏ word đó và đặt địa chỉ ghi SPad về 0, phần weight còn lại ghi đè đầu SPad, PE đọc iact ngoài vùng đã ghi → X | **Đã tìm ra nguyên nhân 2026-11-10**; ép raw mode trong mô phỏng → PASS. Upstream có cùng RTL và Python còn bỏ word 0 (lỗi ẩn vì weight ngẫu nhiên của họ không có cặp 0). **Đề xuất** (chưa áp dụng): làm như `data_pipeline_iact.v` của upstream (DenLeb `9c143b7` / `1a8864d`): thêm `| !SPARSITY_EN` vào 3 điều kiện ghi (3 dòng); Python giữ word 0 ở dense (đã có trong cây làm việc). Thử trên bản sao tạm cùng #46: model MNIST dense **khớp từng bit** |
+| 48 | **Chế độ dense**: số filter mỗi PE **lẻ** (M0 = 3, ví dụ 8×4×4 → 6) sai lặng lẽ (ở sparse Python từ chối: `encoded columns need 24 words, the PE block has 18`) | Python: FSM dense dùng `ceil(M0 / 2)` word mỗi iact (có ô đệm), khối weight Python chỉ có `ceil(used_wght_per_PE / 2)` word | **Phát hiện 2026-11-10**. Đề xuất (chỉ Python): chặn M0 lẻ ở dense trong `LayerParameters`, sau đó thêm ô đệm cho mỗi cột iact như `encode_columns` |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-11-02)
 
@@ -1755,6 +1810,7 @@ Cột "Tài liệu" là kết quả đọc lại các file trong `doc/` để xe
 | 42 | Conv không phải "same" (padding 0, đệm lệch; TF "same" với stride 2 trên ảnh chẵn) | LeNet-5; Conv stride 2 xuất từ TF | RTL chỉ đệm `(kernel_size − 1) / 2` → **giới hạn thiết kế**, lỗi là toolchain không báo | `check_conv_geometry`: padding của model phải bằng `kernel // 2` |
 | 43 | Op ngoài Conv / Gemm / MaxPool (`Add` residual, `AveragePool`, `GlobalAveragePool`, `Concat`, `Softmax`), conv nhóm / depthwise / dilated, input khác 1 × 1 × 28 × 28 | ResNet, MobileNet | `model_formats.rst` ghi các op này không hỗ trợ và hứa lỗi "Unsupported layer type" → **giới hạn thiết kế**, lỗi là bị bỏ lặng lẽ | `onnx2model.check_supported_graph`; `pytorch2model` từ chối Conv2d / MaxPool2d nó không chuyển được và module lạ; `DWMapper` báo không có depthwise |
 | 7 | Ảnh **3 channel** (RGB) | CIFAR-10, mạng ảnh màu | Tài liệu có ví dụ đóng gói 3 channel và input RGB → **lỗi thật** | `check_conv_geometry`: số channel lẻ > 1 |
+| 45 | Hơn 4 channel không chia hết cho 4 (6, 10) | Layer giữa có số filter như vậy | **Lỗi thật** (phát hiện 2026-11-09) | **Chưa chặn** (đề xuất thêm vào `check_conv_geometry`) |
 | 21 | Dense **làm layer cuối** có hơn 32 output | Bộ phân loại 100 / 1.000 lớp | Không có giới hạn trong tài liệu → **lỗi thật** | `check_dense_readout`: layer cuối cần > 1 lượt psum |
 | 27 | Pooling có input rộng ≤ 4 (đo 2026-11-07: rộng 2, 4 sai; 6, 8 đúng) | Bản đồ đặc trưng nhỏ cuối mạng | "2×2 max-pooling on-chip", không giới hạn kích thước → **lỗi thật** | `check_pooling_geometry`: rộng ≤ 4, cửa sổ khác 2 × 2 / stride 2 |
 | 23 | Activation thưa dạng bàn cờ với `NUM_GLB_IACT = 3` | Phụ thuộc cấu hình | Phụ thuộc dữ liệu, chưa rõ nguyên nhân | **Chưa chặn được** (không có điều kiện tĩnh) |
@@ -3846,3 +3902,33 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   197 PASS + 4 xfail, 12 ca mốc và Bảng 3 giống hệt (0 chu kỳ), lint 0 cảnh báo mới. Đổi mặc định trong `open_eye_parameters.py` và
   `OpenEye_FPGA.v`; kiểm lại không đặt biến: export Vivado giống hệt, unit test 474 pass, Conv 7×7 stride 2 PASS. Cập nhật mục 3c (biến môi trường),
   5.10, 6d (cấu hình, mốc, lịch sử), 8b (#41), 8e, 9.
+- **Rà soát upstream `9a742fb`** (5 commit ngày 06/11, nhánh mới `dev_asic_sg13g2`; không lấy gì, không sửa code; `doc/experiments/2026-11-09_upstream_9a742fb_review.md`).
+  Hướng của upstream: chế độ dense, 1 × 1 cluster, ASIC; bộ đệm iact theo nhóm 2 channel, nhiều bank chia xen, ghi ngược nhóm 2 channel gắn cứng.
+  Chạy 13 ca trên upstream mới, upstream cũ và `dev`, cả sparse lẫn dense: upstream mới hỏng toàn bộ ở sparse (Python 96 bit / RTL 64 bit), ở dense
+  Conv đơn đúng kể cả `NUM_GLB_IACT=3` nhưng mọi chuỗi ghi ngược ở 2 × 2 cluster sai; `dev` đúng ở sparse (trừ 3/6/10 channel), chưa từng chạy dense
+  (13/13 FAIL). So thuật toán: chia xen bank của upstream tốt hơn về bộ nhớ (một bản dữ liệu, bus 16 bit) khi `NUM_GLB_IACT > 1`, cùng số chu kỳ; nhóm
+  4 channel và ghi ngược tổng quát của `dev` đúng ở nhiều cấu hình hơn. Lỗi mới **#45** của `dev`: 6 / 10 channel tính sai lặng lẽ. Cập nhật mục 2, 8b, 8e.
+- **Phân tích sparse / dense** (không sửa code; mục 2 "Sparse và dense"): upstream giữ sparse làm mặc định và dùng sparse cho chip ASIC (cấu hình giống
+  `dev`); dense chỉ là cấu hình phát triển trên `main`. Lợi ích đo được của sparse trên MNIST: các số 0 sau ReLU giảm 8,7 % tổng chu kỳ; định dạng sparse
+  tốn 0,5–7 % khi không có số 0. `dev` không sai hướng, nhưng nên đo dense / sparse trên cùng model và có đường dense chạy được.
+- **Đo dense / sparse trên cùng model** (`doc/experiments/2026-11-09_dense_vs_sparse.md`; mục 2 "Sparse và dense"; không sửa RTL). Python: luồng
+  weight Conv ở dense không còn mã hoá cột #22 và không bỏ word 0 (`wght_stream_mapper.py`, 3 test mới trong `test_conv_wght_encoding.py`; sparse không
+  đổi, model MNIST sparse vẫn khớp từng bit). Sau đó Conv đơn 16 filter đúng ở dense; còn hai lỗi RTL của chế độ dense, chưa sửa: **#46**
+  (`used_psum_per_PE` = 4, upstream cũng bị) và **#47** (16 channel: filter chẵn = X, chỉ fork bị). MNIST ảnh 0: Conv1 + Pool1 khớp từng bit ở dense,
+  Conv2 / Conv3 / Dense sai. Chu kỳ (FSM dense không phụ thuộc giá trị): dense 225.221 so với sparse 218.564 (**+3,0 %**): compute +17,7 % (mất các
+  số 0 sau ReLU), nạp weight −40 % (8 bit thay vì 12 bit mỗi weight). Vivado cấu hình mốc với `SPARSITY_EN=0` (`doc/synth/2026-11-09_route4ns_dense_zu7ev/`,
+  không phải mốc mới): **LUT −26,9 %, FF −27,0 %**, BRAM 184, URAM 10, cùng 250 MHz. Ước lượng chế độ trộn (iact sparse, weight 8 bit) −7,1 % chu kỳ
+  so với sparse. Thấy thêm: `load_bias` chiếm 10,7 % tổng chu kỳ (bias gửi thành cả bản đồ psum). Thêm biến `OPENEYE_X_CONTINUE`, `SPARSITY_EN` (mục 3c),
+  công cụ `dense_diag.py`, `lp_diff.py`, profile ở `doc/perf/dense_vs_sparse_2026-11-09/`. Cập nhật mục 2, 3c, 6d, 8b.
+
+### 2026-11-10
+
+- **Điều tra #46, #47 của chế độ dense** (không sửa code trong repo; `doc/experiments/2026-11-10_bug46_47.md`; công cụ `probe47.py` (theo dõi một PE),
+  `run47.py`, `cases.sh`). **#47**: `data_pipeline_wght.v` coi word weight toàn 0 là "không có dữ liệu" khi không ở raw mode (raw chỉ bật cho FC / GEMM):
+  bỏ word và đặt địa chỉ ghi SPad về 0, phần weight còn lại ghi đè, PE đọc iact chưa ghi → X; phụ thuộc dữ liệu (cặp weight 0), ép raw mode trong mô phỏng
+  → PASS. **#46**: FSM dense thiếu khối chuyển tiếp psum (đọc-sau-ghi) mà FSM sparse có (bản sửa `4e8402c` của upstream), sai khi ≤ 4 filter mỗi PE;
+  thêm: với ≤ 2 filter địa chỉ psum không về gốc. Upstream (`b1e02a0`, `9a742fb`, 40 commit chưa lấy) có cùng hai lỗi, không có bản sửa; hướng sửa theo
+  upstream: #47 như `data_pipeline_iact.v` của DenLeb (`| !SPARSITY_EN`, 3 dòng), #46 chép khối chuyển tiếp của Hendrik (`PE.v`, 1 + 22 dòng). Thử bản
+  sửa trên bản sao tạm (`proposal_46_47.patch`): 14/15 ca dense PASS kể cả mọi chuỗi layer, **model MNIST dense khớp từng bit** (225.221 chu kỳ, đúng
+  số đo hôm trước), sparse không đổi (cùng số ns), lint 0 cảnh báo mới. Lỗi mới **#48**: số filter mỗi PE lẻ sai lặng lẽ ở dense (Python). Chờ đồng ý
+  để sửa RTL. Cập nhật mục 2, 3c, 8b.

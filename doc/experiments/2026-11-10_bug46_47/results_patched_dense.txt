@@ -1,0 +1,16 @@
+fx f2 | 15540.00 ns | fx_f2 Convolution_Single 8x4x4->2 CR2 GLB_PSUM4: FAIL (SystemExit); ['result check failed: values differ, reference file differs', '2 of 2 feature map
+fx f6 | 15260.00 ns | fx_f6 Convolution_Single 8x4x4->6 CR2 GLB_PSUM4: FAIL (SystemExit); ['result check failed: values differ, reference file differs', '6 of 6 feature map
+fx f4 | 17640.00 ns | fx_f4 Convolution_Single 8x4x4->4 CR2 GLB_PSUM4: PASS; []
+fx f8 | 22960.00 ns | fx_f8 Convolution_Single 8x4x8->8 CR2 GLB_PSUM4: PASS; []
+fx f16 | 20960.00 ns | fx_f16 Convolution_Single 8x4x4->16 CR2 GLB_PSUM4: PASS; []
+fx c16 | 44840.00 ns | fx_c16 Convolution_Single 8x4x16->16 CR2 GLB_PSUM4: PASS; []
+fx c16s2 | 44840.00 ns | fx_c16s2 Convolution_Single 8x4x16->16 CR2 GLB_PSUM4: PASS; []
+fx g3 | 29860.00 ns | fx_g3 Convolution_Single 8x8x4->16 CR2 GLB_PSUM4: PASS; []
+fx c32 | 116120.00 ns | fx_c32 Convolution_Single 8x4x32->32 CR2 GLB_PSUM4: PASS; []
+fx stk4 | 34560.00 ns | fx_stk4 Convolution_Stack 8x4x4->4 CR2 GLB_PSUM4: PASS; []
+fx stk4p2 | 28800.00 ns | fx_stk4p2 Convolution_Stack 8x4x4->4 CR2 GLB_PSUM2: PASS; []
+fx p28 | 400090.00 ns | fx_p28 Convolution_Single 28x28x1->32 CR2 GLB_PSUM4: PASS; []
+fx cpc | 37040.00 ns | fx_cpc Conv_Pool_Conv 8x4x2->8 CR2 GLB_PSUM4: PASS; []
+fx stk8 | 45040.00 ns | fx_stk8 Convolution_Stack 8x4x8->8 CR2 GLB_PSUM4: PASS; []
+fx stk16 | 63960.00 ns | fx_stk16 Convolution_Stack 8x4x4->16 CR2 GLB_PSUM4: PASS; []
+DONE

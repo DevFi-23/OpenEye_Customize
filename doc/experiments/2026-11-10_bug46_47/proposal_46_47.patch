@@ -1,0 +1,71 @@
+diff --git a/hdl/PE.v b/hdl/PE.v
+index de45e4b..a987a4d 100644
+--- a/hdl/PE.v
++++ b/hdl/PE.v
+@@ -2014,12 +2014,34 @@ module PE #(
+                 end
+               end
+             end
+-            if (wght_filter == PARALLEL_MACS) begin
++            // The filter loop restarts every cycle when the PE has at most
++            // PARALLEL_MACS filters (wght_filter stays 0): keep the base address.
++            if ((wght_filter == PARALLEL_MACS) | (filters_reg_M0 <= $bits(filters_reg_M0)'(PARALLEL_MACS))) begin
+               for (mac_i = 0; mac_i < PARALLEL_MACS; mac_i=mac_i+1) begin
+                 psum_spad_addr_mem[mac_i] <= mac_i[PSUM_ADDR_BITWIDTH-1:0];
+               end
+             end
+ 
++            // Psum read-after-write forwarding, as in the sparse FSM (4e8402c):
++            // a write whose address equals the read address is suppressed
++            // (psum_data_SPad_en_w_i), so the value comes from the adder.
++            for (mac_i = 0; mac_i < PARALLEL_MACS; mac_i=mac_i+1) begin
++              if (psum_spad_addr_r[mac_i] == psum_spad_addr_w[mac_i]) begin
++                reuse_psum_spad[mac_i] <= 1;
++                reused_data[mac_i]     <= adder_o_w[mac_i];
++              end
++            end
++            if (!SERIAL) begin
++              for (mac_j = 0; mac_j < PARALLEL_MACS; mac_j=mac_j+1) begin
++                for (mac_k = 0; mac_k < PARALLEL_MACS; mac_k=mac_k+1) begin
++                  if (psum_spad_addr_r[mac_j] == psum_spad_addr_w[mac_k]) begin
++                    reuse_psum_spad[mac_j] <= 1;
++                    reused_data[mac_j]     <= adder_o_w[mac_k];
++                  end
++                end
++              end
++            end
++
+             // ---------------------------------------------------------------
+             // Adder enable and psum memory tracking (identical to sparse FSM)
+             // ---------------------------------------------------------------
+diff --git a/hdl/data_pipeline_wght.v b/hdl/data_pipeline_wght.v
+index cc7291b..1b64eae 100644
+--- a/hdl/data_pipeline_wght.v
++++ b/hdl/data_pipeline_wght.v
+@@ -508,7 +508,7 @@ module data_pipeline_wght #(
+       //     includes the word being written now).
+       //   - When enable_delay is low: reset second_spad_addr_o to 0.
+       // -----------------------------------------------------------------------
+-      if (enable_delay & ((data_storage_2 != 0) | raw_mode_i)) begin
++      if (enable_delay & ((data_storage_2 != 0) | raw_mode_i | !SPARSITY_EN)) begin
+         first_spad_en_o       <= 1;
+         second_spad_en_o      <= 1;
+         second_spad_data_o    <= premade_spad_2_output;
+@@ -517,7 +517,7 @@ module data_pipeline_wght #(
+           first_spad_addr_o  <= first_spad_addr_o + 1;
+           first_spad_words_o <= first_spad_addr_o + 2;
+         end
+-        if ((second_spad_data_o != 0) | (raw_mode_i & second_spad_en_o)) begin
++        if ((second_spad_data_o != 0) | ((raw_mode_i | !SPARSITY_EN) & second_spad_en_o)) begin
+           // Advance write address when the previous cycle stored a word.
+           // Sparse: non-zero output is the previous-write indicator (zero
+           // words are never stored). Raw: zero words are stored too, so the
+@@ -571,7 +571,7 @@ module data_pipeline_wght #(
+       //   Reset data_storage_1 to -filters_w (sentinel so next burst starts
+       //   at the right offset) and overhead_pos to filters_w.
+       // -----------------------------------------------------------------------
+-      if (enable_i == 1 & ((data_i != 0) | raw_mode_i)) begin
++      if (enable_i == 1 & ((data_i != 0) | raw_mode_i | !SPARSITY_EN)) begin
+         compute_sent       <= 0;
+         overhead_delay_reg <= overhead_reg;  // snapshot before this cycle's update
+         if (compute_sent) begin

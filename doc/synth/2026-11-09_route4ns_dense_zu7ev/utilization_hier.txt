@@ -1,0 +1,168 @@
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2024.2 (win64) Build 5239630 Fri Nov 08 22:35:27 MST 2024
+| Date         : Mon Nov  9 21:53:06 2026
+| Host         : TruongPhi running 64-bit major release  (build 9200)
+| Command      : report_utilization -hierarchical -hierarchical_depth 4 -file reports/utilization_hier.txt
+| Design       : OpenEye_FPGA
+| Device       : xczu7ev-ffvc1156-2-e
+| Speed File   : -2
+| Design State : Synthesized
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Utilization Design Information
+
+Table of Contents
+-----------------
+1. Utilization by Hierarchy
+
+1. Utilization by Hierarchy
+---------------------------
+
++-----------------------------------------------------------------------+-------------------------------------+------------+------------+---------+------+-------+--------+--------+------+------------+
+|                                Instance                               |                Module               | Total LUTs | Logic LUTs | LUTRAMs | SRLs |  FFs  | RAMB36 | RAMB18 | URAM | DSP Blocks |
++-----------------------------------------------------------------------+-------------------------------------+------------+------------+---------+------+-------+--------+--------+------+------------+
+| OpenEye_FPGA                                                          |                               (top) |      44141 |      41976 |    1812 |  353 | 28676 |    160 |     48 |   10 |          4 |
+|   (OpenEye_FPGA)                                                      |                               (top) |        616 |        616 |       0 |    0 |  1875 |      0 |      0 |    0 |          0 |
+|   BUFFER_A[0].iact_layer_buffer                                       |                              RAM_SP |         40 |         40 |       0 |    0 |     0 |      0 |      0 |    1 |          0 |
+|     impl                                                              |                 RAM_SP_generic_1046 |         40 |         40 |       0 |    0 |     0 |      0 |      0 |    1 |          0 |
+|   BUFFER_A[1].iact_layer_buffer                                       |                            RAM_SP_0 |         96 |         96 |       0 |    0 |     0 |      0 |      0 |    1 |          0 |
+|     impl                                                              |                 RAM_SP_generic_1045 |         96 |         96 |       0 |    0 |     0 |      0 |      0 |    1 |          0 |
+|   BUFFER_A[2].iact_layer_buffer                                       |                            RAM_SP_1 |         36 |         36 |       0 |    0 |     0 |      0 |      0 |    1 |          0 |
+|     impl                                                              |                 RAM_SP_generic_1044 |         36 |         36 |       0 |    0 |     0 |      0 |      0 |    1 |          0 |
+|   BUFFER_A[3].iact_layer_buffer                                       |                            RAM_SP_2 |         69 |         69 |       0 |    0 |     0 |      0 |      0 |    1 |          0 |
+|     impl                                                              |                      RAM_SP_generic |         69 |         69 |       0 |    0 |     0 |      0 |      0 |    1 |          0 |
+|   IACT_CONVERTER_X[0].IACT_CONVERTER_Y[0].iact_stream_constructor     |             iact_stream_constructor |        567 |        567 |       0 |    0 |   331 |      4 |      0 |    0 |          0 |
+|     (IACT_CONVERTER_X[0].IACT_CONVERTER_Y[0].iact_stream_constructor) |             iact_stream_constructor |        549 |        549 |       0 |    0 |   331 |      0 |      0 |    0 |          0 |
+|     BUFFER[0].iact_buffer_SP                                          |         RAM_SP__parameterized0_1042 |         18 |         18 |       0 |    0 |     0 |      4 |      0 |    0 |          0 |
+|       impl                                                            | RAM_SP_generic__parameterized0_1043 |         18 |         18 |       0 |    0 |     0 |      4 |      0 |    0 |          0 |
+|   IACT_CONVERTER_X[0].IACT_CONVERTER_Y[1].iact_stream_constructor     |           iact_stream_constructor_3 |        569 |        569 |       0 |    0 |   325 |      4 |      0 |    0 |          0 |
+|     (IACT_CONVERTER_X[0].IACT_CONVERTER_Y[1].iact_stream_constructor) |           iact_stream_constructor_3 |        551 |        551 |       0 |    0 |   325 |      0 |      0 |    0 |          0 |
+|     BUFFER[0].iact_buffer_SP                                          |         RAM_SP__parameterized0_1040 |         18 |         18 |       0 |    0 |     0 |      4 |      0 |    0 |          0 |
+|       impl                                                            | RAM_SP_generic__parameterized0_1041 |         18 |         18 |       0 |    0 |     0 |      4 |      0 |    0 |          0 |
+|   IACT_CONVERTER_X[1].IACT_CONVERTER_Y[0].iact_stream_constructor     |           iact_stream_constructor_4 |        555 |        555 |       0 |    0 |   326 |      4 |      0 |    0 |          0 |
+|     (IACT_CONVERTER_X[1].IACT_CONVERTER_Y[0].iact_stream_constructor) |           iact_stream_constructor_4 |        537 |        537 |       0 |    0 |   326 |      0 |      0 |    0 |          0 |
+|     BUFFER[0].iact_buffer_SP                                          |         RAM_SP__parameterized0_1038 |         18 |         18 |       0 |    0 |     0 |      4 |      0 |    0 |          0 |
+|       impl                                                            | RAM_SP_generic__parameterized0_1039 |         18 |         18 |       0 |    0 |     0 |      4 |      0 |    0 |          0 |
+|   IACT_CONVERTER_X[1].IACT_CONVERTER_Y[1].iact_stream_constructor     |           iact_stream_constructor_5 |        556 |        556 |       0 |    0 |   326 |      4 |      0 |    0 |          0 |
+|     (IACT_CONVERTER_X[1].IACT_CONVERTER_Y[1].iact_stream_constructor) |           iact_stream_constructor_5 |        538 |        538 |       0 |    0 |   326 |      0 |      0 |    0 |          0 |
+|     BUFFER[0].iact_buffer_SP                                          |              RAM_SP__parameterized0 |         18 |         18 |       0 |    0 |     0 |      4 |      0 |    0 |          0 |
+|       impl                                                            |      RAM_SP_generic__parameterized0 |         18 |         18 |       0 |    0 |     0 |      4 |      0 |    0 |          0 |
+|   OpenEye_Parallel                                                    |                    OpenEye_Parallel |      32054 |      30189 |    1536 |  329 | 22385 |      0 |     48 |    0 |          0 |
+|     (OpenEye_Parallel)                                                |                    OpenEye_Parallel |        281 |        281 |       0 |    0 |   555 |      0 |      0 |    0 |          0 |
+|     gen_x[0].gen_y[0].OpenEye_Cluster                                 |                     OpenEye_Cluster |       7577 |       7110 |     384 |   83 |  5457 |      0 |     12 |    0 |          0 |
+|       delay_cluster_gen[0].delay_cluster                              |                   delay_cluster_780 |         22 |          0 |       0 |   22 |    44 |      0 |      0 |    0 |          0 |
+|       delay_cluster_gen[1].delay_cluster                              |                   delay_cluster_781 |         20 |          0 |       0 |   20 |    40 |      0 |      0 |    0 |          0 |
+|       delay_cluster_gen[2].delay_cluster                              |                   delay_cluster_782 |         21 |          0 |       0 |   21 |    42 |      0 |      0 |    0 |          0 |
+|       delay_cluster_gen[3].delay_cluster                              |                   delay_cluster_783 |         20 |          0 |       0 |   20 |    40 |      0 |      0 |    0 |          0 |
+|       pe_cluster                                                      |                      PE_cluster_784 |       7494 |       7110 |     384 |    0 |  5289 |      0 |     12 |    0 |          0 |
+|         (pe_cluster)                                                  |                      PE_cluster_784 |         12 |         12 |       0 |    0 |     0 |      0 |      0 |    0 |          0 |
+|         gen_X[0].gen_Y[0].pe                                          |                              PE_786 |        631 |        599 |      32 |    0 |   442 |      0 |      1 |    0 |          0 |
+|         gen_X[0].gen_Y[1].pe                                          |                              PE_787 |        612 |        580 |      32 |    0 |   442 |      0 |      1 |    0 |          0 |
+|         gen_X[0].gen_Y[2].pe                                          |                              PE_788 |        614 |        582 |      32 |    0 |   442 |      0 |      1 |    0 |          0 |
+|         gen_X[1].gen_Y[0].pe                                          |                              PE_789 |        630 |        598 |      32 |    0 |   441 |      0 |      1 |    0 |          0 |
+|         gen_X[1].gen_Y[1].pe                                          |                              PE_790 |        610 |        578 |      32 |    0 |   441 |      0 |      1 |    0 |          0 |
+|         gen_X[1].gen_Y[2].pe                                          |                              PE_791 |        613 |        581 |      32 |    0 |   441 |      0 |      1 |    0 |          0 |
+|         gen_X[2].gen_Y[0].pe                                          |                              PE_792 |        653 |        621 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[2].gen_Y[1].pe                                          |                              PE_793 |        632 |        600 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[2].gen_Y[2].pe                                          |                              PE_794 |        634 |        602 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[3].gen_Y[0].pe                                          |                              PE_795 |        630 |        598 |      32 |    0 |   441 |      0 |      1 |    0 |          0 |
+|         gen_X[3].gen_Y[1].pe                                          |                              PE_796 |        610 |        578 |      32 |    0 |   441 |      0 |      1 |    0 |          0 |
+|         gen_X[3].gen_Y[2].pe                                          |                              PE_797 |        613 |        581 |      32 |    0 |   441 |      0 |      1 |    0 |          0 |
+|       rst_sync_top                                                    |                        RST_SYNC_785 |          0 |          0 |       0 |    0 |     2 |      0 |      0 |    0 |          0 |
+|     gen_x[0].gen_y[1].OpenEye_Cluster                                 |     OpenEye_Cluster__parameterized0 |       7628 |       7162 |     384 |   82 |  5442 |      0 |     12 |    0 |          0 |
+|       delay_cluster_gen[0].delay_cluster                              |                   delay_cluster_523 |         21 |          0 |       0 |   21 |    42 |      0 |      0 |    0 |          0 |
+|       delay_cluster_gen[1].delay_cluster                              |                   delay_cluster_524 |         20 |          0 |       0 |   20 |    40 |      0 |      0 |    0 |          0 |
+|       delay_cluster_gen[2].delay_cluster                              |                   delay_cluster_525 |         21 |          0 |       0 |   21 |    42 |      0 |      0 |    0 |          0 |
+|       delay_cluster_gen[3].delay_cluster                              |                   delay_cluster_526 |         20 |          0 |       0 |   20 |    40 |      0 |      0 |    0 |          0 |
+|       pe_cluster                                                      |      PE_cluster__parameterized0_527 |       7546 |       7162 |     384 |    0 |  5278 |      0 |     12 |    0 |          0 |
+|         (pe_cluster)                                                  |      PE_cluster__parameterized0_527 |         12 |         12 |       0 |    0 |     1 |      0 |      0 |    0 |          0 |
+|         gen_X[0].gen_Y[0].pe                                          |                              PE_528 |        634 |        602 |      32 |    0 |   440 |      0 |      1 |    0 |          0 |
+|         gen_X[0].gen_Y[1].pe                                          |                              PE_529 |        633 |        601 |      32 |    0 |   440 |      0 |      1 |    0 |          0 |
+|         gen_X[0].gen_Y[2].pe                                          |                              PE_530 |        634 |        602 |      32 |    0 |   440 |      0 |      1 |    0 |          0 |
+|         gen_X[1].gen_Y[0].pe                                          |                              PE_531 |        611 |        579 |      32 |    0 |   441 |      0 |      1 |    0 |          0 |
+|         gen_X[1].gen_Y[1].pe                                          |                              PE_532 |        610 |        578 |      32 |    0 |   441 |      0 |      1 |    0 |          0 |
+|         gen_X[1].gen_Y[2].pe                                          |                              PE_533 |        611 |        579 |      32 |    0 |   441 |      0 |      1 |    0 |          0 |
+|         gen_X[2].gen_Y[0].pe                                          |                              PE_534 |        634 |        602 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[2].gen_Y[1].pe                                          |                              PE_535 |        633 |        601 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[2].gen_Y[2].pe                                          |                              PE_536 |        637 |        605 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[3].gen_Y[0].pe                                          |                              PE_537 |        633 |        601 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[3].gen_Y[1].pe                                          |                              PE_538 |        632 |        600 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[3].gen_Y[2].pe                                          |                              PE_539 |        632 |        600 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|     gen_x[1].gen_y[0].OpenEye_Cluster                                 |     OpenEye_Cluster__parameterized1 |       9062 |       8596 |     384 |   82 |  5484 |      0 |     12 |    0 |          0 |
+|       delay_cluster_gen[0].delay_cluster                              |                   delay_cluster_267 |         21 |          0 |       0 |   21 |    42 |      0 |      0 |    0 |          0 |
+|       delay_cluster_gen[1].delay_cluster                              |                   delay_cluster_268 |         20 |          0 |       0 |   20 |    40 |      0 |      0 |    0 |          0 |
+|       delay_cluster_gen[2].delay_cluster                              |                   delay_cluster_269 |         22 |          1 |       0 |   21 |    42 |      0 |      0 |    0 |          0 |
+|       delay_cluster_gen[3].delay_cluster                              |                   delay_cluster_270 |         20 |          0 |       0 |   20 |    40 |      0 |      0 |    0 |          0 |
+|       pe_cluster                                                      |                          PE_cluster |       8979 |       8595 |     384 |    0 |  5320 |      0 |     12 |    0 |          0 |
+|         (pe_cluster)                                                  |                          PE_cluster |         12 |         12 |       0 |    0 |     0 |      0 |      0 |    0 |          0 |
+|         gen_X[0].gen_Y[0].pe                                          |                              PE_271 |        623 |        591 |      32 |    0 |   442 |      0 |      1 |    0 |          0 |
+|         gen_X[0].gen_Y[1].pe                                          |                              PE_272 |        604 |        572 |      32 |    0 |   442 |      0 |      1 |    0 |          0 |
+|         gen_X[0].gen_Y[2].pe                                          |                              PE_273 |        607 |        575 |      32 |    0 |   442 |      0 |      1 |    0 |          0 |
+|         gen_X[1].gen_Y[0].pe                                          |                              PE_274 |        651 |        619 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[1].gen_Y[1].pe                                          |                              PE_275 |        603 |        571 |      32 |    0 |   441 |      0 |      1 |    0 |          0 |
+|         gen_X[1].gen_Y[2].pe                                          |                              PE_276 |        606 |        574 |      32 |    0 |   441 |      0 |      1 |    0 |          0 |
+|         gen_X[2].gen_Y[0].pe                                          |                              PE_277 |        634 |        602 |      32 |    0 |   441 |      0 |      1 |    0 |          0 |
+|         gen_X[2].gen_Y[1].pe                                          |                              PE_278 |        613 |        581 |      32 |    0 |   441 |      0 |      1 |    0 |          0 |
+|         gen_X[2].gen_Y[2].pe                                          |                              PE_279 |       2176 |       2144 |      32 |    0 |   474 |      0 |      1 |    0 |          0 |
+|         gen_X[3].gen_Y[0].pe                                          |                              PE_280 |        633 |        601 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[3].gen_Y[1].pe                                          |                              PE_281 |        614 |        582 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[3].gen_Y[2].pe                                          |                              PE_282 |        614 |        582 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|     gen_x[1].gen_y[1].OpenEye_Cluster                                 |     OpenEye_Cluster__parameterized2 |       7540 |       7074 |     384 |   82 |  5445 |      0 |     12 |    0 |          0 |
+|       delay_cluster_gen[0].delay_cluster                              |                       delay_cluster |         22 |          1 |       0 |   21 |    42 |      0 |      0 |    0 |          0 |
+|       delay_cluster_gen[1].delay_cluster                              |                    delay_cluster_27 |         20 |          0 |       0 |   20 |    40 |      0 |      0 |    0 |          0 |
+|       delay_cluster_gen[2].delay_cluster                              |                    delay_cluster_28 |         22 |          1 |       0 |   21 |    42 |      0 |      0 |    0 |          0 |
+|       delay_cluster_gen[3].delay_cluster                              |                    delay_cluster_29 |         20 |          0 |       0 |   20 |    40 |      0 |      0 |    0 |          0 |
+|       pe_cluster                                                      |          PE_cluster__parameterized0 |       7456 |       7072 |     384 |    0 |  5281 |      0 |     12 |    0 |          0 |
+|         (pe_cluster)                                                  |          PE_cluster__parameterized0 |         12 |         12 |       0 |    0 |     1 |      0 |      0 |    0 |          0 |
+|         gen_X[0].gen_Y[0].pe                                          |                                  PE |        613 |        581 |      32 |    0 |   442 |      0 |      1 |    0 |          0 |
+|         gen_X[0].gen_Y[1].pe                                          |                               PE_30 |        629 |        597 |      32 |    0 |   445 |      0 |      1 |    0 |          0 |
+|         gen_X[0].gen_Y[2].pe                                          |                               PE_31 |        613 |        581 |      32 |    0 |   442 |      0 |      1 |    0 |          0 |
+|         gen_X[1].gen_Y[0].pe                                          |                               PE_32 |        633 |        601 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[1].gen_Y[1].pe                                          |                               PE_33 |        633 |        601 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[1].gen_Y[2].pe                                          |                               PE_34 |        633 |        601 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[2].gen_Y[0].pe                                          |                               PE_35 |        616 |        584 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[2].gen_Y[1].pe                                          |                               PE_36 |        615 |        583 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[2].gen_Y[2].pe                                          |                               PE_37 |        618 |        586 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[3].gen_Y[0].pe                                          |                               PE_38 |        613 |        581 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[3].gen_Y[1].pe                                          |                               PE_39 |        614 |        582 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|         gen_X[3].gen_Y[2].pe                                          |                               PE_40 |        614 |        582 |      32 |    0 |   439 |      0 |      1 |    0 |          0 |
+|     rst_sync_top                                                      |                         RST_SYNC_26 |          1 |          1 |       0 |    0 |     2 |      0 |      0 |    0 |          0 |
+|   PSUM_RAM_X[0].PSUM_RAM_Y[0].PSUM_RAM_GLB[0].psum_buffer             |              RAM_SP__parameterized1 |         36 |         36 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|     impl                                                              |   RAM_SP_generic__parameterized1_25 |         36 |         36 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|   PSUM_RAM_X[0].PSUM_RAM_Y[0].PSUM_RAM_GLB[1].psum_buffer             |            RAM_SP__parameterized1_6 |         36 |         36 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|     impl                                                              |   RAM_SP_generic__parameterized1_24 |         36 |         36 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|   PSUM_RAM_X[0].PSUM_RAM_Y[1].PSUM_RAM_GLB[0].psum_buffer             |            RAM_SP__parameterized1_7 |         36 |         36 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|     impl                                                              |   RAM_SP_generic__parameterized1_23 |         36 |         36 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|   PSUM_RAM_X[0].PSUM_RAM_Y[1].PSUM_RAM_GLB[1].psum_buffer             |            RAM_SP__parameterized1_8 |         36 |         36 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|     impl                                                              |   RAM_SP_generic__parameterized1_22 |         36 |         36 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|   PSUM_RAM_X[1].PSUM_RAM_Y[0].PSUM_RAM_GLB[0].psum_buffer             |            RAM_SP__parameterized1_9 |         36 |         36 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|     impl                                                              |   RAM_SP_generic__parameterized1_21 |         36 |         36 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|   PSUM_RAM_X[1].PSUM_RAM_Y[0].PSUM_RAM_GLB[1].psum_buffer             |           RAM_SP__parameterized1_10 |         36 |         36 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|     impl                                                              |   RAM_SP_generic__parameterized1_20 |         36 |         36 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|   PSUM_RAM_X[1].PSUM_RAM_Y[1].PSUM_RAM_GLB[0].psum_buffer             |           RAM_SP__parameterized1_11 |         36 |         36 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|     impl                                                              |   RAM_SP_generic__parameterized1_19 |         36 |         36 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|   PSUM_RAM_X[1].PSUM_RAM_Y[1].PSUM_RAM_GLB[1].psum_buffer             |           RAM_SP__parameterized1_12 |         56 |         56 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|     impl                                                              |      RAM_SP_generic__parameterized1 |         56 |         56 |       0 |    0 |    37 |     18 |      0 |    0 |          0 |
+|   dma_storage                                                         |                         dma_storage |       2271 |       2247 |       0 |   24 |   795 |      0 |      0 |    0 |          0 |
+|   psum_pipeline_inst                                                  |                       psum_pipeline |       3918 |       3662 |     256 |    0 |  1648 |      0 |      0 |    0 |          4 |
+|     (psum_pipeline_inst)                                              |                       psum_pipeline |       1917 |       1917 |       0 |    0 |  1191 |      0 |      0 |    0 |          0 |
+|     gen_quant_unit[0].gen_act_table.u_act_table                       |                    activation_table |         88 |         24 |      64 |    0 |     0 |      0 |      0 |    0 |          0 |
+|     gen_quant_unit[0].u_quant_unit                                    |                   quantization_unit |        412 |        412 |       0 |    0 |   114 |      0 |      0 |    0 |          1 |
+|     gen_quant_unit[1].gen_act_table.u_act_table                       |                 activation_table_13 |         88 |         24 |      64 |    0 |     0 |      0 |      0 |    0 |          0 |
+|     gen_quant_unit[1].u_quant_unit                                    |                quantization_unit_14 |        412 |        412 |       0 |    0 |   114 |      0 |      0 |    0 |          1 |
+|     gen_quant_unit[2].gen_act_table.u_act_table                       |                 activation_table_15 |         88 |         24 |      64 |    0 |     0 |      0 |      0 |    0 |          0 |
+|     gen_quant_unit[2].u_quant_unit                                    |                quantization_unit_16 |        412 |        412 |       0 |    0 |   114 |      0 |      0 |    0 |          1 |
+|     gen_quant_unit[3].gen_act_table.u_act_table                       |                 activation_table_17 |         89 |         25 |      64 |    0 |     0 |      0 |      0 |    0 |          0 |
+|     gen_quant_unit[3].u_quant_unit                                    |                quantization_unit_18 |        412 |        412 |       0 |    0 |   115 |      0 |      0 |    0 |          1 |
+|   ring_buffer_pipelined_inst                                          |               ring_buffer_pipelined |         73 |         53 |      20 |    0 |    42 |      0 |      0 |    0 |          0 |
+|     (ring_buffer_pipelined_inst)                                      |               ring_buffer_pipelined |          6 |          6 |       0 |    0 |    10 |      0 |      0 |    0 |          0 |
+|     ram_inst                                                          |                              RAM_DP |         67 |         47 |      20 |    0 |    32 |      0 |      0 |    0 |          0 |
+|       impl                                                            |                      RAM_DP_generic |         67 |         47 |      20 |    0 |    32 |      0 |      0 |    0 |          0 |
+|   router_configurator_inst                                            |                 router_configurator |       1966 |       1966 |       0 |    0 |   133 |      0 |      0 |    0 |          0 |
+|   rst_sync_wrapper                                                    |                            RST_SYNC |          2 |          2 |       0 |    0 |     2 |      0 |      0 |    0 |          0 |
+|   wght_buffer                                                         |              RAM_SP__parameterized2 |        489 |        489 |       0 |    0 |   192 |      0 |      0 |    6 |          0 |
+|     impl                                                              |      RAM_SP_generic__parameterized2 |        489 |        489 |       0 |    0 |   192 |      0 |      0 |    6 |          0 |
++-----------------------------------------------------------------------+-------------------------------------+------------+------------+---------+------+-------+--------+--------+------+------------+
+
+

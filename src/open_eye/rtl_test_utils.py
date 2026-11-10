@@ -2016,10 +2016,13 @@ async def compare_stream_Conv(ptp, dut, layer_number, layer_repetition, layer_pa
                     try:
                         txt_file.write(bin(int(dut.data_dma_o.value))[2:].zfill(oep.DMA_BITWIDTH) + "\n")
                     except:
-                        txt_file.close()
-                        storage_file.close()
-                        logger.error("Error writing output txt-file")
-                        raise Exception("X detected.")
+                        if os.environ.get("OPENEYE_X_CONTINUE"):
+                            txt_file.write(str(dut.data_dma_o.value) + "\n")
+                        else:
+                            txt_file.close()
+                            storage_file.close()
+                            logger.error("Error writing output txt-file")
+                            raise Exception("X detected.")
                 for i in range(words):
                     position = stream_order[word_index] if word_index < len(stream_order) else None
                     word_index = word_index + 1
@@ -2035,7 +2038,8 @@ async def compare_stream_Conv(ptp, dut, layer_number, layer_repetition, layer_pa
                         if (dram.fmap[layer_number + 1][f][x][y] >= 2**(oep.DATA_PSUM_BITWIDTH-1)):
                             dram.fmap[layer_number + 1][f][x][y] = dram.fmap[layer_number + 1][f][x][y] - 2**oep.DATA_PSUM_BITWIDTH
                     except:
-                        pass
+                        if os.environ.get("OPENEYE_X_CONTINUE"):
+                            logger.error("XPOS word %d lane %d f %d x %d y %d", word_index - 1, i, f, x, y)
 
             if write_channel is not None:
                 write_channel.end_cycle(bool(read_data))

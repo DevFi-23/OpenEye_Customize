@@ -562,7 +562,8 @@ class WghtStreamMapper(object):
             # shifts every following weight to a wrong SPad address (wrong
             # results or a hang in GET_WGHT). Dense mappers therefore
             # disable the skip (see DenseWghtStreamMapper).
-            if (temp_trans != 0) or not self.SKIP_ZERO_WORDS:
+            # dense hardware: an all-zero word is two zero weights, never padding
+            if (temp_trans != 0) or not self.SKIP_ZERO_WORDS or not getattr(params, "SPARSITY_EN", 1):
                 stream.append(temp_trans)
 
             line_counter = line_counter + 1
@@ -625,6 +626,10 @@ class ConvWghtStreamMapper(WghtStreamMapper):
         layer_params = self.layer_params
         macs = self.params.PARALLEL_MACS
         dense = self.write_dense_wght_data_storage(cl_x, cl_y, router)
+        if not getattr(self.params, "SPARSITY_EN", 1):
+            # Dense hardware (SPARSITY_EN = 0): the PE reads every weight in its slot, no zero compression and no
+            # overhead field (WGHT_WOH_Bitwidth = WGHT_Bitwidth); the column encoding of bug #22 is for the sparse PE
+            return dense
         column_length = math.ceil(layer_params.used_wght_per_PE / layer_params.used_iact_per_PE)
         words_per_column = math.ceil(column_length / macs)      # every column starts at a word boundary
         columns = [[entry[0] for word in dense[k * words_per_column:(k + 1) * words_per_column] for entry in word]

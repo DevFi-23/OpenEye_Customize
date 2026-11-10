@@ -138,3 +138,34 @@ def test_mapper_blocks_decode_to_the_weights(width, channels, filters, zeros, mo
                     assert data_words >= pointers[L.used_iact_per_PE - 1]
                     if zeros == 0.0:
                         assert mapper.write_wght_data_storage(cx, cy, router) == dense   # unchanged stream
+
+
+@pytest.mark.parametrize("width,channels,filters", [(8, 4, 16), (8, 8, 16), (28, 1, 32)])
+def test_dense_hardware_gets_the_plain_layout(width, channels, filters, monkeypatch):
+    """SPARSITY_EN=0: the dense PE reads every weight in its slot. No column encoding (bug #22 is the sparse format),
+    8-bit entries without overhead, and all-zero words are two zero weights, so they stay in the stream
+    (doc/experiments/2026-11-09_dense_vs_sparse.md)."""
+    monkeypatch.setenv("SPARSITY_EN", "0")
+    params, L = mapper_layer(width, channels, filters, monkeypatch)
+    assert params.WGHT_WOH_Bitwidth == params.WGHT_Bitwidth == 8
+    rng = random.Random(5)
+    w = [[[[0 if (c == 0 and channels > 1) else rng.choice([v for v in range(-127, 128) if v]) for x in range(3)] for y in range(3)]
+          for f in range(filters)] for c in range(channels)]
+    block = math.ceil(L.used_wght_per_PE / params.PARALLEL_MACS)
+    zero_words = 0
+    for rep in range(L.needed_wght_transmissions):
+        mapper = wsm.ConvWghtStreamMapper(params, L, rep, w, 0)
+        for cx in range(params.Clusters_X):
+            for cy in range(params.Clusters_Y):
+                for router in range(params.Wght_Routers):
+                    if L.computing_mx[cx][cy][router][0] != 1:
+                        continue
+                    dense = mapper.write_dense_wght_data_storage(cx, cy, router)
+                    assert mapper.write_wght_data_storage(cx, cy, router) == dense
+                    words = mapper.create_pe_data_wght_stream(dense)
+                    assert len(words) == block
+                    zero_words += words.count(0)
+                    got = [[(word >> (8 * i)) & 0xFF for i in range(params.PARALLEL_MACS)] for word in words]
+                    want = [[e[0] & 0xFF for e in word] for word in dense[:block]]
+                    assert got == want
+    assert channels == 1 or zero_words > 0          # channel 0 is all zero: its words are sent, not skipped

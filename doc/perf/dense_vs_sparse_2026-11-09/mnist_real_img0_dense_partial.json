@@ -1,0 +1,301 @@
+{
+ "config": {
+  "LAYER": "MNIST_REAL",
+  "NUM_FILTERS": "4",
+  "KERNEL_SIZE_X": "3",
+  "KERNEL_SIZE_Y": "3",
+  "INPUT_SIZE_X": "8",
+  "INPUT_SIZE_Y": "28",
+  "INPUT_CHANNELS": "1",
+  "STRIDE": "1",
+  "OPENEYE_SEED": null,
+  "DMA_BITWIDTH": 64,
+  "DATA_PSUM_BITWIDTH": 20,
+  "CLUSTER_ROWS": 2,
+  "CLUSTER_COLUMNS": 2,
+  "NUM_GLB_IACT": 1,
+  "NUM_GLB_WGHT": 3,
+  "NUM_GLB_PSUM": 4,
+  "QUANT_AMOUNT": "64",
+  "CLOCK_NS": 10,
+  "MEMORY": {
+   "name": "ideal (legacy driver)"
+  }
+ },
+ "total_cycles": 0,
+ "layer_starts": [
+  0,
+  32246,
+  37459,
+  151839,
+  154700,
+  214488
+ ],
+ "phases": {},
+ "layers": [
+  {
+   "index": 0,
+   "start_cycle": 0,
+   "phases": {},
+   "total_cycles": 0,
+   "info": {
+    "name": "Convolution2D",
+    "iact_size_x": 28,
+    "iact_size_y": 28,
+    "channels": 1,
+    "filters": 32,
+    "kernel": [
+     3,
+     3
+    ],
+    "stride": 1,
+    "skip_iact": 0,
+    "send_values_out": 0,
+    "pad_channels": 0,
+    "activation": {
+     "mode": "relu",
+     "round": false,
+     "keep_table": false
+    },
+    "input": {
+     "values": 784,
+     "zeros": 0,
+     "negatives": 680
+    }
+   },
+   "activation_cycles": 7174
+  },
+  {
+   "index": 1,
+   "start_cycle": 32246,
+   "phases": {},
+   "total_cycles": 0,
+   "info": {
+    "name": "Pooling",
+    "iact_size_x": 28,
+    "iact_size_y": 28,
+    "channels": 32,
+    "filters": 1,
+    "kernel": [],
+    "stride": 2,
+    "skip_iact": 1,
+    "send_values_out": 1,
+    "pad_channels": 0,
+    "activation": {
+     "mode": "none",
+     "round": false,
+     "keep_table": false
+    },
+    "input": {
+     "values": 25088,
+     "zeros": 13563,
+     "negatives": 0
+    }
+   }
+  },
+  {
+   "index": 2,
+   "start_cycle": 37459,
+   "phases": {},
+   "total_cycles": 0,
+   "info": {
+    "name": "Convolution2D",
+    "iact_size_x": 14,
+    "iact_size_y": 14,
+    "channels": 32,
+    "filters": 64,
+    "kernel": [
+     3,
+     3
+    ],
+    "stride": 1,
+    "skip_iact": 1,
+    "send_values_out": 0,
+    "pad_channels": 0,
+    "activation": {
+     "mode": "relu",
+     "round": false,
+     "keep_table": false
+    },
+    "input": {
+     "values": 6272,
+     "zeros": 2729,
+     "negatives": 0
+    }
+   },
+   "activation_cycles": 3590
+  },
+  {
+   "index": 3,
+   "start_cycle": 151839,
+   "phases": {},
+   "total_cycles": 0,
+   "info": {
+    "name": "Pooling",
+    "iact_size_x": 14,
+    "iact_size_y": 14,
+    "channels": 64,
+    "filters": 1,
+    "kernel": [],
+    "stride": 2,
+    "skip_iact": 1,
+    "send_values_out": 1,
+    "pad_channels": 0,
+    "activation": {
+     "mode": "none",
+     "round": false,
+     "keep_table": false
+    },
+    "input": {
+     "values": 12544,
+     "zeros": 11838,
+     "negatives": 0
+    }
+   }
+  },
+  {
+   "index": 4,
+   "start_cycle": 154700,
+   "phases": {},
+   "total_cycles": 0,
+   "info": {
+    "name": "Convolution2D",
+    "iact_size_x": 7,
+    "iact_size_y": 7,
+    "channels": 64,
+    "filters": 64,
+    "kernel": [
+     3,
+     3
+    ],
+    "stride": 1,
+    "skip_iact": 1,
+    "send_values_out": 0,
+    "pad_channels": 0,
+    "activation": {
+     "mode": "relu",
+     "round": false,
+     "keep_table": false
+    },
+    "input": {
+     "values": 3136,
+     "zeros": 2738,
+     "negatives": 0
+    }
+   },
+   "activation_cycles": 902
+  },
+  {
+   "index": 5,
+   "start_cycle": 214488,
+   "phases": {},
+   "total_cycles": 0,
+   "info": {
+    "name": "Dense",
+    "iact_size_x": 3136,
+    "iact_size_y": 1,
+    "channels": 1,
+    "filters": 10,
+    "kernel": [
+     0
+    ],
+    "stride": 1,
+    "skip_iact": 1,
+    "send_values_out": 1,
+    "pad_channels": 0,
+    "activation": {
+     "mode": "none",
+     "round": false,
+     "keep_table": false
+    },
+    "input": {
+     "values": 3136,
+     "zeros": 2329,
+     "negatives": 0
+    }
+   }
+  }
+ ],
+ "pending": {
+  "load_config": {
+   "cycles": 123,
+   "in_offered": 108,
+   "in_accepted": 108,
+   "out_words": 0,
+   "in_stall": 10,
+   "out_stall": 0
+  },
+  "load_iact": {
+   "cycles": 100,
+   "in_offered": 100,
+   "in_accepted": 100,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "load_wght": {
+   "cycles": 23328,
+   "in_offered": 23328,
+   "in_accepted": 23328,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "load_bias": {
+   "cycles": 23308,
+   "in_offered": 23308,
+   "in_accepted": 23308,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "load_quant": {
+   "cycles": 240,
+   "in_offered": 240,
+   "in_accepted": 160,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "convert_iact": {
+   "cycles": 10376,
+   "in_offered": 4,
+   "in_accepted": 0,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "writeback": {
+   "cycles": 11924,
+   "in_offered": 0,
+   "in_accepted": 0,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "compute": {
+   "cycles": 147856,
+   "in_offered": 0,
+   "in_accepted": 0,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "pooling": {
+   "cycles": 7952,
+   "in_offered": 2,
+   "in_accepted": 0,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  },
+  "readout": {
+   "cycles": 1,
+   "in_offered": 0,
+   "in_accepted": 0,
+   "out_words": 0,
+   "in_stall": 0,
+   "out_stall": 0
+  }
+ }
+}
