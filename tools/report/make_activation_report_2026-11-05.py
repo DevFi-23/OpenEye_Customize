@@ -9,7 +9,7 @@ image 0 after the fixes of bugs #38, #37, #17 and #39), from the step documents 
 Formatting helpers are shared with make_progress_report.py (the 2026-10-10 report).
 
     ~/tools/docenv/bin/python tools/report/make_activation_report_2026-11-05.py
-Output: doc/reports/BaoCao_HamKichHoat_OpenEye_2026-11-05.docx (+ four figure PNGs next to it)
+Output: doc/reports/2026-11-05_HamKichHoat/BaoCao_HamKichHoat_OpenEye_2026-11-05.docx (+ four figure PNGs next to it)
 """
 
 import json
@@ -32,7 +32,7 @@ from make_progress_report import bullets, fmt, para, table  # noqa: E402
 
 REPO = base_report.REPO
 ACT = os.path.join(REPO, "doc", "perf", "activation_2026-11-04_rowO")
-OUT_DIR = os.path.join(REPO, "doc", "reports")
+OUT_DIR = os.path.join(REPO, "doc", "reports", "2026-11-05_HamKichHoat")   # one folder per report (2026-11-10)
 DATE = "05/11/2026"
 OUT = os.path.join(OUT_DIR, "BaoCao_HamKichHoat_OpenEye_2026-11-05.docx")
 FIG_PATH = os.path.join(OUT_DIR, "duong_ham_kich_hoat_2026-11-05.png")

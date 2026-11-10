@@ -10,7 +10,7 @@ configurations), and from doc/synth/2026-10-30_route4ns_fix31_zu7ev/ (Vivado). F
 make_progress_report.py (the 2026-10-10 report).
 
     ~/tools/docenv/bin/python tools/report/make_progress_report_2026-10-31.py
-Output: doc/reports/BaoCao_TienDo_OpenEye_2026-10-31.docx (+ five figure PNGs next to it)
+Output: doc/reports/2026-10-31_TienDo/BaoCao_TienDo_OpenEye_2026-10-31.docx (+ five figure PNGs next to it)
 """
 
 import json
@@ -36,7 +36,7 @@ PERF = os.path.join(REPO, "doc", "perf")
 BASELINE = os.path.join(PERF, "baseline_2026-10-24")
 TRAINED = os.path.join(PERF, "trained_mnist_2026-10-31")
 PAPER = os.path.join(PERF, "paper_table3_2026-10-26_fix25")
-OUT_DIR = os.path.join(REPO, "doc", "reports")
+OUT_DIR = os.path.join(REPO, "doc", "reports", "2026-10-31_TienDo")   # one folder per report (2026-11-10)
 DATE = "31/10/2026"
 OUT = os.path.join(OUT_DIR, "BaoCao_TienDo_OpenEye_2026-10-31.docx")
 FIG_FLOW = os.path.join(OUT_DIR, "luong_model_that_2026-10-31.png")

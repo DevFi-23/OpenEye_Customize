@@ -494,9 +494,10 @@ OpenEye_orig/
 │   ├── experiments/           ★  Báo cáo thí nghiệm và điều tra lỗi (#13, #6/#7, #18, #14, #19, cherry-pick upstream, model nhiều layer,
 │   │                             #17 đệm channel, #22 mã hoá weight, #26 Dense nối tiếp Dense, #25 NUM_GLB_PSUM=2, int8/kẹp/ReLU #30 + bộ giả lập model int8, #31 lượt rỗng, #32 thứ tự bias + #35, đường model thật của toolchain, rà soát upstream 2026-10-31, hàm kích hoạt A/B/C 2026-11-02, 3 cấu hình CR 1 của Bảng 3 #28/#29/#36 2026-11-03, mantissa #38, upstream `36395dd`, hàng O #37/#17 và #39 2026-11-04) kèm script probe/lockstep để chạy lại
 │   ├── lint/                  ★  Output lint gốc
-│   ├── reports/               ★  Báo cáo tiến độ (Word): BaoCao_TienDo_OpenEye_2026-10-10.docx, BaoCao_TienDo_OpenEye_2026-10-15.docx,
-│   │                             BaoCao_TienDo_OpenEye_2026-10-31.docx (+ 5 hình PNG), BaoCao_HamKichHoat_OpenEye_2026-11-05.docx
-│   │                             (hàm kích hoạt, + 4 hình PNG)
+│   ├── reports/               ★  Báo cáo tiến độ (Word), mỗi báo cáo một thư mục cùng các hình của nó (từ 2026-11-10):
+│   │                             2026-10-10_TienDo/ (1 hình), 2026-10-15_TienDo/ (2 hình), 2026-10-31_TienDo/ (5 hình),
+│   │                             2026-11-05_HamKichHoat/ (4 hình), 2026-11-10_TienDo/ (lần 5, hàm kích hoạt chi tiết, 5 hình);
+│   │                             sinh bằng tools/report/make_*.py (~/tools/docenv), mỗi script ghi vào thư mục của nó
 │   ├── OpenEye_FPGA_documentation.md, test_status_handover.md   Tài liệu của upstream
 │   └── demo_notebooks/           Notebook demo của upstream
 ├── yosys/, nextpnr/              Flow tổng hợp mã nguồn mở của upstream (FPGA GateMate)
@@ -3422,7 +3423,7 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
 - **Sửa RTL `GET_BIAS`** (`hdl/OpenEye_FPGA.v`, 1 điều kiện `& enable_dma_i_reg`, được bạn đồng ý). Kiểm chứng: 15/15 kịch bản khoảng trống PASS,
   `--mem slow` 8/8 PASS, baseline 9 case 0 chu kỳ chênh lệch, Conv 16 test và GEMM/Dense 63 test không có hồi quy (các FAIL đều có sẵn trên RTL gốc),
   lint 0 warning mới. Tài nguyên: 0 flip-flop, LUT không tăng (Yosys `synth_xilinx`). Chi tiết mục 9.
-- **Báo cáo tiến độ** (Word) cho giáo viên hướng dẫn: `doc/reports/BaoCao_TienDo_OpenEye_2026-10-10.docx`, tạo bằng
+- **Báo cáo tiến độ** (Word) cho giáo viên hướng dẫn: `doc/reports/2026-10-10_TienDo/BaoCao_TienDo_OpenEye_2026-10-10.docx`, tạo bằng
   `~/tools/docenv/bin/python tools/report/make_progress_report.py` (đọc số liệu từ `doc/perf/`; môi trường `~/tools/docenv` có python-docx,
   matplotlib, nodejs, cài qua micromamba để không động vào venv của project).
 - README: mục 5.8 (độ rộng DMA), 8b (tổng hợp lỗi), 8c (kế hoạch gần).
@@ -3496,7 +3497,7 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   Thêm `tools/verify_conv_output.py` + `OPENEYE_DUMP_VERIFY=1` (kiểm tra độc lập từng word), tham số `random_data` cho `_run_conv_const`, test dữ liệu ngẫu nhiên.
 - **Vivado sau bản sửa #6/#7** (bạn chạy `fix67_impl`): 0 CRITICAL WARNING, đạt 250 MHz (WNS +0,048 ns), +103 FF, +201 LUT. Mốc phần cứng hiện tại:
   `doc/synth/2026-10-15_route4ns_fix67_zu7ev/`.
-- **Báo cáo tiến độ lần 2** (Word): `doc/reports/BaoCao_TienDo_OpenEye_2026-10-15.docx` (+ `phan_bo_do_tre_2026-10-15.png`,
+- **Báo cáo tiến độ lần 2** (Word): `doc/reports/2026-10-15_TienDo/BaoCao_TienDo_OpenEye_2026-10-15.docx` (+ `phan_bo_do_tre_2026-10-15.png`,
   `so_sanh_chu_ky_2026-10-15.png`), tạo bằng `~/tools/docenv/bin/python tools/report/make_progress_report_2026-10-15.py` (dùng chung hàm định dạng
   với script của báo cáo 10/10; số liệu đọc từ `doc/perf/baseline_2026-10-15/` và `baseline_2026-10-10/`, số Vivado lấy từ
   `doc/synth/2026-10-15_route4ns_fix67_zu7ev/`). Nội dung: tóm tắt, công cụ mới, kết quả Vivado, mốc đo mới và so sánh trước/sau lỗi #18, kiểm tra độc
@@ -3713,7 +3714,7 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
 - **Phân tích lượng tử động của `onnx2model` cũ / upstream** (2026-10-31, không sửa gì, mục 8d, `doc/experiments/2026-10-30_onnx_model_flow.md` mục 7): scale
   activation tính lúc chạy (uint8, zero point khác 0) nên không đưa xuống phần cứng được; model int8 động mà đường cũ tạo ra ONNX Runtime không chạy được; `has_relu`
   tìm thấy nhưng không dùng; thêm các lỗi trích xuất: `input_scale` = 1,0, kernel chuyển vị sai chiều, Dense đảo `in`/`out`, code tham chiếu chết.
-- **Báo cáo tiến độ lần 3** (Word, 2026-10-31): `doc/reports/BaoCao_TienDo_OpenEye_2026-10-31.docx`, tạo bằng
+- **Báo cáo tiến độ lần 3** (Word, 2026-10-31): `doc/reports/2026-10-31_TienDo/BaoCao_TienDo_OpenEye_2026-10-31.docx`, tạo bằng
   `~/tools/docenv/bin/python tools/report/make_progress_report_2026-10-31.py` từ số đo (`doc/perf/baseline_2026-10-24`, `doc/perf/trained_mnist_2026-10-31`,
   `doc/perf/paper_table3_2026-10-26_fix25`) và Vivado. 5 hình: đường model thật qua toolchain, chu kỳ theo layer của 7 ca model, pha theo layer của model đã huấn
   luyện, bỏ qua số 0 (ngẫu nhiên so với thật), mạng Bảng 3 trên 16 cấu hình. Khi lấy số cho hình đã sửa 2 chỗ ghi sai: Bảng 3 là **13/16** cấu hình đúng (không phải
@@ -3879,7 +3880,7 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
 - **Phép kiểm tra `check_full_passes` cho #40** (hướng 1, được bạn đồng ý; mục 9, `doc/experiments/2026-11-05_b10db82_hang.md` mục 7): Python, từ chối
   Conv có số ô filter ≠ số filter; 34 unit test mới (403 pass); quét tĩnh 78 layer Conv của Bảng 3, ca mốc và model hàm kích hoạt: 0 bị chặn; hồi quy
   189 test = 185 PASS + 4 xfail, 0 FAIL. Cập nhật mục 3c, 8b (#40), 9.
-- **Báo cáo Word lần 4 về hàm kích hoạt** (`doc/reports/BaoCao_HamKichHoat_OpenEye_2026-11-05.docx` + 4 hình, sinh bằng
+- **Báo cáo Word lần 4 về hàm kích hoạt** (`doc/reports/2026-11-05_HamKichHoat/BaoCao_HamKichHoat_OpenEye_2026-11-05.docx` + 4 hình, sinh bằng
   `~/tools/docenv/bin/python tools/report/make_activation_report_2026-11-05.py` từ `doc/perf/activation_2026-11-04_rowO/` và các tài liệu bước A/B/C):
   cách tính từng hàm, bước A (toolchain, độ chính xác 10.000 ảnh), bước B (RTL, kiểm chứng, tài nguyên), bước C/D (đo chu kỳ, số 0), các việc khác
   từ báo cáo 31/10, định hướng.
@@ -3970,3 +3971,13 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   `check_dense_wght_slots` (#48), test `test_dense_mode.py` (10) và 8 unit test. Phần cứng dense nay đúng: 10/10 PASS kể cả model MNIST khớp từng bit
   (trên RTL cũ 8/9 ca FAIL). Sparse không đổi: hồi quy 211 = 207 PASS + 4 xfail, 12 ca mốc và Bảng 3 giống hệt, lint 0 mới, Vivado sparse cùng netlist
   với mốc `stride1`; Vivado dense đã sửa 43.523 LUT (−26,9 % so với sparse), WNS +0,123 ns. Cập nhật mục 2, 3c, 6d, 8b, 9.
+- **Báo cáo tiến độ lần 5** (Word, `doc/reports/2026-11-10_TienDo/BaoCao_TienDo_OpenEye_2026-11-10.docx` + 5 hình, sinh bằng
+  `~/tools/docenv/bin/python tools/report/make_progress_report_2026-11-10.py`; hệ số thật của 4 model lấy bằng
+  `venv/bin/python tools/report/extract_activation_params_2026-11-10.py`): hàm kích hoạt chi tiết (lượng tử hoá int8 đối xứng, hệ số
+  mant / 2^shift, làm tròn, gộp đổi scale; thuật toán ReLU / Leaky ReLU / bảng 256 ô; 3 tầng bộ lượng tử và bảng LUTRAM trên chip; ví dụ tính tay
+  với số thật), kiểm chứng, độ chính xác, các việc khác từ 05/11. Đo mới (`doc/perf/activation_2026-11-10_sparse_dense/`, 8/8 PASS khớp từng bit):
+  4 model trên phần cứng sparse và dense, sparse giống hệt số đo 04/11 (218.564 / 237.689 / 239.870 / 239.927 chu kỳ), dense 225.221 (ReLU, Leaky ReLU)
+  và 225.317 (SiLU, hard-swish): dense chậm hơn 3,0 % với ReLU nhưng nhanh hơn 5,2–6,1 % với ba hàm còn lại.
+- **Sắp xếp `doc/reports/`**: mỗi báo cáo một thư mục cùng các hình của nó (`2026-10-10_TienDo/`, `2026-10-15_TienDo/`, `2026-10-31_TienDo/`,
+  `2026-11-05_HamKichHoat/`, `2026-11-10_TienDo/`; `git mv`, nội dung không đổi); các script `tools/report/make_*.py` ghi vào thư mục của mình.
+  Cập nhật mục 4 và các đường dẫn trong nhật ký.

@@ -9,7 +9,7 @@ doc/synth/2026-10-15_route4ns_fix67_zu7ev/. Formatting helpers are shared with
 make_progress_report.py (the 2026-10-10 report).
 
     ~/tools/docenv/bin/python tools/report/make_progress_report_2026-10-15.py
-Output: doc/reports/BaoCao_TienDo_OpenEye_2026-10-15.docx (+ two chart PNGs next to it)
+Output: doc/reports/2026-10-15_TienDo/BaoCao_TienDo_OpenEye_2026-10-15.docx (+ two chart PNGs next to it)
 """
 
 import os
@@ -31,7 +31,7 @@ from make_progress_report import CASE_LABEL, CASE_ORDER, bullets, fmt, load, par
 REPO = base_report.REPO
 NEW = os.path.join(REPO, "doc", "perf", "baseline_2026-10-15")
 OLD = os.path.join(REPO, "doc", "perf", "baseline_2026-10-10")
-OUT_DIR = os.path.join(REPO, "doc", "reports")
+OUT_DIR = os.path.join(REPO, "doc", "reports", "2026-10-15_TienDo")   # one folder per report (2026-11-10)
 DATE = "15/10/2026"
 OUT = os.path.join(OUT_DIR, "BaoCao_TienDo_OpenEye_2026-10-15.docx")
 CHART_PHASES = os.path.join(OUT_DIR, "phan_bo_do_tre_2026-10-15.png")

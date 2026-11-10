@@ -8,7 +8,7 @@ so rerunning the script after new measurements updates tables and chart.
 
 Needs python-docx and matplotlib (not in the project venv; a separate env is used):
     ~/tools/docenv/bin/python tools/report/make_progress_report.py
-Output: doc/reports/BaoCao_TienDo_OpenEye_2026-10-10.docx (+ the chart PNG next to it)
+Output: doc/reports/2026-10-10_TienDo/BaoCao_TienDo_OpenEye_2026-10-10.docx (+ the chart PNG next to it)
 """
 
 import glob
@@ -28,7 +28,7 @@ from docx.shared import Cm, Pt, RGBColor  # noqa: E402
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BASE = os.path.join(REPO, "doc", "perf", "baseline_2026-10-10")
 TYPICAL = os.path.join(REPO, "doc", "perf", "mem_typical_2026-10-10")
-OUT_DIR = os.path.join(REPO, "doc", "reports")
+OUT_DIR = os.path.join(REPO, "doc", "reports", "2026-10-10_TienDo")   # one folder per report (2026-11-10)
 DATE = "10/10/2026"
 OUT = os.path.join(OUT_DIR, "BaoCao_TienDo_OpenEye_2026-10-10.docx")
 CHART = os.path.join(OUT_DIR, "phan_bo_do_tre_2026-10-10.png")
