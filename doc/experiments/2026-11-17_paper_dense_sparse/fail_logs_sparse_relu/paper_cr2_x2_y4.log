@@ -1,0 +1,1061 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________________ test_paper_relu[paper_cr2_x2_y4] _______________________
+
+case = 'paper_cr2_x2_y4'
+request = <FixtureRequest for <Function test_paper_relu[paper_cr2_x2_y4]>>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7e8da056ee60>
+
+    @pytest.mark.parametrize("case", list(PAPER_CONFIGS))
+    def test_paper_relu(case, request, monkeypatch):
+        cluster_rows, pes_x, pes_y = PAPER_CONFIGS[case]
+        monkeypatch.setenv("OPENEYE_PROFILE", "1")
+        monkeypatch.setenv("OPENEYE_SEED", "1")
+        monkeypatch.setenv("OPENEYE_FAIL_ON_STALL", "400000")
+        monkeypatch.setenv("OPENEYE_KEEP_GOING", "1")
+        monkeypatch.setattr(conv, "NUM_GLB_PSUM", pes_x)
+        monkeypatch.setattr(conv, "NUM_GLB_WGHT", pes_y)
+>       conv._run_conv_const(os.environ.get("P_LAYER", "PAPER_MNIST_RELU"), 8, cluster_rows, num_glb_iact=1,
+                             input_channels=1, request=request, input_height=28, quant_amount=32, dma_bitwidth=64,
+                             random_data=True, expect_layers=7)
+
+doc/experiments/2026-11-17_paper_dense_sparse/test_paper_relu.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+layer_mode = 'PAPER_MNIST_RELU', const_value = 8, cluster_rows = 2
+num_glb_iact = 1, input_channels = 1
+request = <FixtureRequest for <Function test_paper_relu[paper_cr2_x2_y4]>>
+ramp_iacts = False, psum_width = 20, trans_words = 8, bias_step = 0
+input_height = 28, asymmetric_kernel = False, quant_amount = 32
+dma_bitwidth = 64, random_data = True, expect_layers = 7
+
+    def _run_conv_const(layer_mode, const_value, cluster_rows, num_glb_iact,
+                        input_channels, request, ramp_iacts=False,
+                        psum_width=20, trans_words=8, bias_step=0,
+                        input_height=INPUT_SIZE_Y, asymmetric_kernel=False,
+                        quant_amount=1024, dma_bitwidth=None, random_data=False, expect_layers=None):
+        """Build and simulate one constant-operand conv configuration."""
+        # OpenEyeParameters and parameters.vh read these from the environment at
+        # generation time, so they have to be set before create_vh_file_from_envvars.
+        os.environ["CLUSTER_ROWS"] = str(cluster_rows)
+        os.environ["NUM_GLB_IACT"] = str(num_glb_iact)
+        os.environ["NUM_GLB_PSUM"] = str(NUM_GLB_PSUM)
+        os.environ["NUM_GLB_WGHT"] = str(NUM_GLB_WGHT)
+        os.environ["DATA_PSUM_BITWIDTH"] = str(psum_width)
+        os.environ["TRANS_WORDS"] = str(trans_words)
+        # Fixed platform configuration, matching the other cocotb_fpga runners.
+        # Use the standard quantization table: 1024 entries of 40 bits produce
+        # 640 DMA words, matching GET_QUANTIZE's derived transfer count.
+        os.environ["BRANCHES"]        = "1"
+        os.environ["BUFFER_WIDTH"]    = "12"
+        os.environ["QUANT_AMOUNT"]    = str(quant_amount)
+        if dma_bitwidth is not None:
+            os.environ["DMA_BITWIDTH"] = str(dma_bitwidth)
+        os.environ["RAM_CELLS"]       = "32"
+        os.environ["CLUSTER_COLUMNS"] = "2"
+    
+        toplevel = "OpenEye_FPGA"
+        module   = "OpenEye_FPGA_tb"
+    
+        nodeid = request.node.nodeid.replace("::", "_").replace("/", "_") \
+                                    .replace("[", "_").replace("]", "_")
+        target_dir = os.path.join(test_dir, ".temp", nodeid)
+        os.makedirs(target_dir, exist_ok=True)
+    
+        regmap_dir = os.path.join(test_dir, "cocotb_fpga")
+        vh_file_creator.create_vh_file_from_envvars(
+            target_dir, hdl_dir + "/", toplevel=toplevel)
+        generator.create_regmap_params_vh_file(regmap_dir, target_dir, target_dir)
+    
+        # The checked-in hdl/dma_storage.v predates registers that this directory's
+        # regmap.yaml defines, so compile the decoder just generated into sim_build.
+        verilog_sources = [
+            src for src in ptu.get_verilog_sources(hdl_dir)
+            if os.path.basename(src) != "dma_storage.v"
+        ]
+        verilog_sources.append(os.path.join(target_dir, "dma_storage.v"))
+    
+>       cocotb_test.simulator.run(
+            python_search=[test_dir],
+            verilog_sources=verilog_sources,
+            toplevel=toplevel,
+            module=module,
+            sim_build=target_dir,
+            testcase="start_test_fpga",
+            defines={"NO_TRACE": "TRUE", "USE_INTERNAL_PARAMS_PE": "TRUE"},
+            force_compile=True,
+            simulator="icarus",
+            extra_env={
+                "CLOCK_LEN":               str(clk_cycle),
+                "CLOCK_UNIT":              clk_cycle_unit,
+                "CLOCK_DELAY_INPUT":       str(clk_delay_in),
+                "CLOCK_DELAY_UNIT_INPUT":  clk_delay_unit_in,
+                "CLOCK_DELAY_OUTPUT":      str(clk_delay_out),
+                "CLOCK_DELAY_UNIT_OUTPUT": clk_delay_unit_out,
+                "LAYER":             layer_mode,
+                # Layer count of the model the testbench builds (6 for the MNIST nets).
+                "OPENEYE_EXPECT_LAYERS": str(expect_layers) if expect_layers else
+                                         ("1" if layer_mode == "Convolution_Single" else "2"),
+                "NUM_FILTERS":       str(NUM_FILTERS),
+                "STRIDE":            str(STRIDE),
+                "KERNEL_SIZE_X":     str(KERNEL_SIZE_X),
+                "KERNEL_SIZE_Y":     str(KERNEL_SIZE_Y),
+                "INPUT_SIZE_X":      str(INPUT_SIZE_X),
+                "INPUT_SIZE_Y":      str(input_height),
+                "INPUT_CHANNELS":    str(input_channels),
+                # Dense (non-sparse) data: zero-skipping would make the product
+                # count depend on the sparsity pattern and defeat the whole point.
+                "USE_RANDOM_VALUES": "1",
+                "USE_SPARSE_IACTS":  "0",
+                "USE_SPARSE_WGHTS":  "0",
+                "USE_SPARSE_WEIGHTS": "0",
+                # The two hooks that make the arithmetic interpretable. The
+                # reference is recomputed from the same DRAM, so it stays exact.
+                # random_data=True keeps the random activations and weights of
+                # DRAMContents: constant weights give every channel and filter the
+                # same values and hid a wrong weight-chunk order (bug #18).
+                "OPENEYE_CONST_IACTS": "" if random_data else str(const_value),
+                "OPENEYE_CONST_WGHTS": "" if random_data else str(const_value),
+                "OPENEYE_ASYMMETRIC_KERNEL": "1" if asymmetric_kernel else "",
+                "OPENEYE_RAMP_IACTS": "1" if ramp_iacts else "",
+                "OPENEYE_BIAS_STEP": str(bias_step) if bias_step else "",
+                # Fail a hang in minutes instead of running to the 15 ms sim
+                # timeout; the stall report names the FSM states and per-PE counts.
+                "OPENEYE_PROBE_FSM":      "1",
+                "OPENEYE_FAIL_ON_STALL":  os.environ.get("OPENEYE_FAIL_ON_STALL", "100000"),
+                "CLUSTER_ROWS": str(cluster_rows),
+                "NUM_GLB_IACT": str(num_glb_iact),
+                "NUM_GLB_PSUM": str(NUM_GLB_PSUM),
+                "NUM_GLB_WGHT": str(NUM_GLB_WGHT),
+                "LOGGER_LEVEL": "10",
+                "COCOTB_LOG_FILE_PATH": os.path.join(target_dir, "cocotb_sim.log"),
+                "COCOTB_TRACE": "1",
+            },
+        )
+E       SystemExit: FAILED 1 tests.
+
+test/cocotb_fpga/test_conv_const.py:130: SystemExit
+----------------------------- Captured stdout call -----------------------------
+OpenEye_FPGA
+Error: [Errno 2] No such file or directory: '/home/truongphi/OpenEye_orig/test/.temp/doc_experiments_2026-11-17_paper_dense_sparse_test_paper_relu.py_test_paper_relu_paper_cr2_x2_y4_/parameters_FPGA.vh'
+Touching /home/truongphi/OpenEye_orig/hdl/OpenEye_FPGA.v
+Different vh-file for OpenEye_FPGA, updated vh-file
+Error: [Errno 2] No such file or directory: '/home/truongphi/OpenEye_orig/test/.temp/doc_experiments_2026-11-17_paper_dense_sparse_test_paper_relu.py_test_paper_relu_paper_cr2_x2_y4_/parameters_PE_cluster.vh'
+Touching /home/truongphi/OpenEye_orig/hdl/PE_cluster.v
+Different vh-file for PE_cluster, updated vh-file
+Error: [Errno 2] No such file or directory: '/home/truongphi/OpenEye_orig/test/.temp/doc_experiments_2026-11-17_paper_dense_sparse_test_paper_relu.py_test_paper_relu_paper_cr2_x2_y4_/parameters_PE.vh'
+Touching /home/truongphi/OpenEye_orig/hdl/PE.v
+Different vh-file for PE, updated vh-file
+[OK] Verilog parameters written to /home/truongphi/OpenEye_orig/test/.temp/doc_experiments_2026-11-17_paper_dense_sparse_test_paper_relu.py_test_paper_relu_paper_cr2_x2_y4_/regmap_params.vh.
+[OK] Python pack/unpack written to /home/truongphi/OpenEye_orig/src/open_eye/regmap_pack.py.
+[OK] Pipelined dma_storage module written to /home/truongphi/OpenEye_orig/test/.temp/doc_experiments_2026-11-17_paper_dense_sparse_test_paper_relu.py_test_paper_relu_paper_cr2_x2_y4_/dma_storage.v.
+------------------------------ Captured log call -------------------------------
+INFO     cocotb:simulator.py:295 Running command: iverilog -o /home/truongphi/OpenEye_orig/test/.temp/doc_experiments_2026-11-17_paper_dense_sparse_test_paper_relu.py_test_paper_relu_paper_cr2_x2_y4_/OpenEye_FPGA.vvp -D COCOTB_SIM=1 -g2012 -s OpenEye_FPGA -DNO_TRACE -DUSE_INTERNAL_PARAMS_PE /home/truongphi/OpenEye_orig/hdl/OpenEye_FPGA.v /home/truongphi/OpenEye_orig/hdl/RAM_SP.v /home/truongphi/OpenEye_orig/hdl/PE_simple.v /home/truongphi/OpenEye_orig/hdl/PE.v /home/truongphi/OpenEye_orig/hdl/psum_pipeline.v /home/truongphi/OpenEye_orig/hdl/RST_SYNC.v /home/truongphi/OpenEye_orig/hdl/data_pipeline_iact.v /home/truongphi/OpenEye_orig/hdl/adder.v /home/truongphi/OpenEye_orig/hdl/delay_cluster.v /home/truongphi/OpenEye_orig/hdl/mux2.v /home/truongphi/OpenEye_orig/hdl/router_iact.v /home/truongphi/OpenEye_orig/hdl/RAM_SP_generic.v /home/truongphi/OpenEye_orig/hdl/router_wght.v /home/truongphi/OpenEye_orig/hdl/SPad_SP.v /home/truongphi/OpenEye_orig/hdl/data_pipeline_wght.v /home/truongphi/OpenEye_orig/hdl/router_configurator.v /home/truongphi/OpenEye_orig/hdl/quantization_unit.v /home/truongphi/OpenEye_orig/hdl/demux2.v /home/truongphi/OpenEye_orig/hdl/dsp_unit.v /home/truongphi/OpenEye_orig/hdl/adder_tree.v /home/truongphi/OpenEye_orig/hdl/RAM_DP.v /home/truongphi/OpenEye_orig/hdl/mux_iact.v /home/truongphi/OpenEye_orig/hdl/PE_cluster.v /home/truongphi/OpenEye_orig/hdl/multiplier.v /home/truongphi/OpenEye_orig/hdl/SPad_DP_RW.v /home/truongphi/OpenEye_orig/hdl/RAM_DP_RW.v /home/truongphi/OpenEye_orig/hdl/OpenEye_Cluster.v /home/truongphi/OpenEye_orig/hdl/ring_buffer_pipelined.v /home/truongphi/OpenEye_orig/hdl/data_pipeline.v /home/truongphi/OpenEye_orig/hdl/RAM_DP_RW_generic.v /home/truongphi/OpenEye_orig/hdl/activation_table.v /home/truongphi/OpenEye_orig/hdl/iact_stream_constructor.v /home/truongphi/OpenEye_orig/hdl/OpenEye_Parallel.v /home/truongphi/OpenEye_orig/hdl/router_psum.v /home/truongphi/OpenEye_orig/hdl/SPad_DP.v /home/truongphi/OpenEye_orig/hdl/varlenFIFO.v /home/truongphi/OpenEye_orig/hdl/RAM_DP_generic.v /home/truongphi/OpenEye_orig/hdl/af_cluster.v /home/truongphi/OpenEye_orig/hdl/GLB_cluster.v /home/truongphi/OpenEye_orig/hdl/debug/PE_IO_debug.v /home/truongphi/OpenEye_orig/hdl/debug/PE_AXI_wrapper.v /home/truongphi/OpenEye_orig/test/.temp/doc_experiments_2026-11-17_paper_dense_sparse_test_paper_relu.py_test_paper_relu_paper_cr2_x2_y4_/dma_storage.v
+INFO     cocotb:simulator.py:295 Running command: vvp -M /home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/libs -m libcocotbvpi_icarus /home/truongphi/OpenEye_orig/test/.temp/doc_experiments_2026-11-17_paper_dense_sparse_test_paper_relu.py_test_paper_relu_paper_cr2_x2_y4_/OpenEye_FPGA.vvp
+INFO     cocotb:simulator.py:266      -.--ns INFO     gpi                                ..mbed/gpi_embed.cpp:93   in _embed_init_python              Using Python 3.10.14 interpreter at /home/truongphi/OpenEye_orig/venv/bin/python
+INFO     cocotb:simulator.py:266      -.--ns INFO     gpi                                ../gpi/GpiCommon.cpp:79   in gpi_print_registered_impl       VPI registered
+INFO     cocotb:simulator.py:266      0.00ns INFO     cocotb                             Running on Icarus Verilog version 11.0 (stable)
+INFO     cocotb:simulator.py:266      0.00ns WARNING  gpi                                vpi_iterate returned NULL for type vpiInstance for object NULL
+INFO     cocotb:simulator.py:266      0.00ns INFO     cocotb                             Seeding Python random module with 1794893492
+INFO     cocotb:simulator.py:266      0.00ns INFO     cocotb                             Initialized cocotb v2.0.1 from /home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb
+ERROR    cocotb:simulator.py:266 WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+ERROR    cocotb:simulator.py:266 I0000 00:00:1794893492.851486   75296 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+ERROR    cocotb:simulator.py:266 I0000 00:00:1794893492.851951   75296 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+ERROR    cocotb:simulator.py:266 I0000 00:00:1794893492.905517   75296 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+ERROR    cocotb:simulator.py:266 To enable the following instructions: AVX2 AVX_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+ERROR    cocotb:simulator.py:266 WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+ERROR    cocotb:simulator.py:266 I0000 00:00:1794893495.754591   75296 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+ERROR    cocotb:simulator.py:266 I0000 00:00:1794893495.755400   75296 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+INFO     cocotb:simulator.py:266      0.00ns INFO     cocotb                             Running tests
+INFO     cocotb:simulator.py:266      0.00ns INFO     cocotb.regression                  running OpenEye_FPGA_tb.start_test_fpga (1/1)
+INFO     cocotb:simulator.py:266                                                             Main cocotb test entry point for FPGA verification.
+INFO     cocotb:simulator.py:266      0.00ns INFO     cocotb                             File logging started at sim time 0.0 ns
+INFO     cocotb:simulator.py:266 try use random
+INFO     cocotb:simulator.py:266      0.00ns INFO     cocotb                             OPENEYE_SEED: random model and data seeded with 1
+ERROR    cocotb:simulator.py:266 E0000 00:00:1794893501.844835   75296 cuda_platform.cc:52] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: CUDA_ERROR_NO_DEVICE: no CUDA-capable device is detected
+INFO     cocotb:simulator.py:266      0.00ns WARNING  py.warnings                        /home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/keras/src/layers/convolutional/base_conv.py:113: UserWarning: Do not pass an `input_shape`/`input_dim` argument to a layer. When using Sequential models, prefer using an `Input(shape)` object as the first layer in the model instead.
+INFO     cocotb:simulator.py:266                                                           super().__init__(activity_regularizer=activity_regularizer, **kwargs)
+INFO     cocotb:simulator.py:266      0.00ns INFO     cocotb                             OpenEye parameters set. 1.6267192363739014
+INFO     cocotb:simulator.py:266      0.00ns INFO     cocotb.OpenEye_FPGA                Clock is 10 ns
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             layer 0/7 Convolution2D: in=28x28 ch=1 filters=16 send_values_out=0 store_in_psum=0 transmissions=1 output_cycles=112.0 psum_output_words=7168 used_Y_cluster=1 used_X_cluster=4
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             layer 1/7 Pooling: in=28x28 ch=16 filters=1 send_values_out=1 store_in_psum=0 transmissions=1 output_cycles=0 psum_output_words=1 used_Y_cluster=1 used_X_cluster=1
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             layer 2/7 Convolution2D: in=14x14 ch=16 filters=32 send_values_out=0 store_in_psum=0 transmissions=1 output_cycles=28.0 psum_output_words=3584 used_Y_cluster=1 used_X_cluster=4
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             layer 3/7 Pooling: in=14x14 ch=32 filters=1 send_values_out=1 store_in_psum=0 transmissions=1 output_cycles=0 psum_output_words=1 used_Y_cluster=1 used_X_cluster=1
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             layer 4/7 Convolution2D: in=7x7 ch=32 filters=32 send_values_out=0 store_in_psum=0 transmissions=1 output_cycles=7.0 psum_output_words=896 used_Y_cluster=1 used_X_cluster=4
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             layer 5/7 Dense: in=1568x1 ch=1 filters=32 send_values_out=0 store_in_psum=0 transmissions=1 output_cycles=1 psum_output_words=32 used_Y_cluster=2 used_X_cluster=1
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             layer 6/7 Dense: in=32x1 ch=1 filters=10 send_values_out=1 store_in_psum=0 transmissions=1 output_cycles=1 psum_output_words=12 used_Y_cluster=2 used_X_cluster=1
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             Initialized DRAM. 0.02700328826904297
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             Layer parameters created. 9.51294755935669
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             All weight-files written
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             All iact-files written
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             All results calculated
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             All psum-files written
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             Stream 0 / 1 calculated.
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             Reference Output calculated.
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             Reference data created. 9.672199487686157
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             Start creating stream. 0.00032782554626464844
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             Stream finished: 1 of 1
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             Streams set. 0.7476158142089844
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             Send stream No. 1
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             FSM state -> 1 at 40.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=0)
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             DMA stream sections (words each): [18, 100, 144, 7168, 20, 0, 0]
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             DUT expects trans_cycles_iact = 0
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             DUT expects trans_cycles_wght = 0
+INFO     cocotb:simulator.py:266     40.00ns INFO     cocotb                             DUT expects trans_cycles_psum = 0
+INFO     cocotb:simulator.py:266    210.00ns INFO     cocotb                             FSM state -> 2 at 210.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+INFO     cocotb:simulator.py:266    220.00ns INFO     cocotb                             DUT expects trans_cycles_iact = 100
+INFO     cocotb:simulator.py:266    220.00ns INFO     cocotb                             DUT expects trans_cycles_wght = 144
+INFO     cocotb:simulator.py:266    220.00ns INFO     cocotb                             DUT expects trans_cycles_psum = 7168
+INFO     cocotb:simulator.py:266    220.00ns INFO     cocotb                             DUT compute_mask_reg = 0x3f3f3f3f
+INFO     cocotb:simulator.py:266    220.00ns INFO     cocotb                             DUT send_data_out = 0
+INFO     cocotb:simulator.py:266    220.00ns INFO     cocotb                             DUT store_in_psum = 0
+INFO     cocotb:simulator.py:266    220.00ns INFO     cocotb                             DUT fully_connected_layer = 0
+INFO     cocotb:simulator.py:266    220.00ns INFO     cocotb                             Host will send: iact 100, wght 144, psum 7168, quantize 20 words
+INFO     cocotb:simulator.py:266    240.00ns INFO     cocotb                             FSM state -> 3 at 240.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+INFO     cocotb:simulator.py:266   1240.00ns INFO     cocotb                             FSM state -> 4 at 1240.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+INFO     cocotb:simulator.py:266   2680.00ns INFO     cocotb                             FSM state -> 5 at 2680.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+INFO     cocotb:simulator.py:266  74360.00ns INFO     cocotb                             FSM state -> 6 at 74360.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+INFO     cocotb:simulator.py:266  74550.00ns INFO     cocotb                             Stream is sent.
+INFO     cocotb:simulator.py:266  74560.00ns INFO     cocotb                             FSM state -> 7 at 74560.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+INFO     cocotb:simulator.py:266  74600.00ns INFO     cocotb                             FSM state -> 8 at 74600.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+INFO     cocotb:simulator.py:266  84820.00ns INFO     cocotb                             FSM state -> 9 at 84820.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+INFO     cocotb:simulator.py:266  85470.00ns INFO     cocotb                             FSM state -> 11 at 85470.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+INFO     cocotb:simulator.py:266 256770.00ns INFO     cocotb                             FSM state -> 1 at 256770.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             Ready signal detected. Start new stream 79.07748579978943
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             Results are transmitted.
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             Iact check context: layer 0, repetition 0 of 1
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             Iact storages are checked.
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             Iact reference: shape (16, 28, 28), used_channels 4, IACT_RAM_CELLS 4
+INFO     cocotb:simulator.py:266 256780.00ns WARNING  cocotb                             No iact buffer layout known for layer 'Pooling'; skipping the check.
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             Layer parameters created. 2.998288631439209
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             All weight-files written
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             All iact-files written
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             All results calculated
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             All psum-files written
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             Reference Output calculated.
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             Reference data created. 0.026535987854003906
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             Start creating stream. 0.0002090930938720703
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             Stream finished: 1 of 1
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             Streams set. 0.14954543113708496
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             Send stream No. 2
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             DMA stream sections (words each): [18, 0, 0, 0, 20, 0, 0]
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             DUT expects trans_cycles_iact = 100
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             DUT expects trans_cycles_wght = 144
+INFO     cocotb:simulator.py:266 256780.00ns INFO     cocotb                             DUT expects trans_cycles_psum = 7168
+INFO     cocotb:simulator.py:266 256950.00ns INFO     cocotb                             FSM state -> 2 at 256950.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 256960.00ns INFO     cocotb                             DUT expects trans_cycles_iact = 1
+INFO     cocotb:simulator.py:266 256960.00ns INFO     cocotb                             DUT expects trans_cycles_wght = 1
+INFO     cocotb:simulator.py:266 256960.00ns INFO     cocotb                             DUT expects trans_cycles_psum = 1
+INFO     cocotb:simulator.py:266 256960.00ns INFO     cocotb                             DUT compute_mask_reg = 0xffffffff
+INFO     cocotb:simulator.py:266 256960.00ns INFO     cocotb                             DUT send_data_out = 1
+INFO     cocotb:simulator.py:266 256960.00ns INFO     cocotb                             DUT store_in_psum = 0
+INFO     cocotb:simulator.py:266 256960.00ns INFO     cocotb                             DUT fully_connected_layer = 0
+INFO     cocotb:simulator.py:266 256960.00ns INFO     cocotb                             Host will send: iact 0, wght 0, psum 0, quantize 20 words
+INFO     cocotb:simulator.py:266 256980.00ns INFO     cocotb                             FSM state -> 6 at 256980.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 257170.00ns INFO     cocotb                             Stream is sent.
+INFO     cocotb:simulator.py:266 257180.00ns INFO     cocotb                             FSM state -> 12 at 257180.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 257500.00ns INFO     cocotb                             FSM state -> 13 at 257500.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 257640.00ns INFO     cocotb                             FSM state -> 14 at 257640.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 257670.00ns INFO     cocotb                             FSM state -> 12 at 257670.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 257960.00ns INFO     cocotb                             FSM state -> 13 at 257960.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 258100.00ns INFO     cocotb                             FSM state -> 14 at 258100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 258130.00ns INFO     cocotb                             FSM state -> 12 at 258130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 258420.00ns INFO     cocotb                             FSM state -> 13 at 258420.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 258560.00ns INFO     cocotb                             FSM state -> 14 at 258560.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 258590.00ns INFO     cocotb                             FSM state -> 12 at 258590.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 258880.00ns INFO     cocotb                             FSM state -> 13 at 258880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 259020.00ns INFO     cocotb                             FSM state -> 14 at 259020.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 259050.00ns INFO     cocotb                             FSM state -> 12 at 259050.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 259340.00ns INFO     cocotb                             FSM state -> 13 at 259340.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 259480.00ns INFO     cocotb                             FSM state -> 14 at 259480.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 259510.00ns INFO     cocotb                             FSM state -> 12 at 259510.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 259800.00ns INFO     cocotb                             FSM state -> 13 at 259800.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 259940.00ns INFO     cocotb                             FSM state -> 14 at 259940.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 259970.00ns INFO     cocotb                             FSM state -> 12 at 259970.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 260260.00ns INFO     cocotb                             FSM state -> 13 at 260260.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 260400.00ns INFO     cocotb                             FSM state -> 14 at 260400.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 260430.00ns INFO     cocotb                             FSM state -> 12 at 260430.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 260720.00ns INFO     cocotb                             FSM state -> 13 at 260720.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 260860.00ns INFO     cocotb                             FSM state -> 14 at 260860.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 260890.00ns INFO     cocotb                             FSM state -> 12 at 260890.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 261180.00ns INFO     cocotb                             FSM state -> 13 at 261180.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 261320.00ns INFO     cocotb                             FSM state -> 14 at 261320.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 261350.00ns INFO     cocotb                             FSM state -> 12 at 261350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 261640.00ns INFO     cocotb                             FSM state -> 13 at 261640.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 261780.00ns INFO     cocotb                             FSM state -> 14 at 261780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 261810.00ns INFO     cocotb                             FSM state -> 12 at 261810.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 262100.00ns INFO     cocotb                             FSM state -> 13 at 262100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 262240.00ns INFO     cocotb                             FSM state -> 14 at 262240.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 262270.00ns INFO     cocotb                             FSM state -> 12 at 262270.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 262560.00ns INFO     cocotb                             FSM state -> 13 at 262560.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 262700.00ns INFO     cocotb                             FSM state -> 14 at 262700.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 262730.00ns INFO     cocotb                             FSM state -> 12 at 262730.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 263020.00ns INFO     cocotb                             FSM state -> 13 at 263020.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 263160.00ns INFO     cocotb                             FSM state -> 14 at 263160.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 263190.00ns INFO     cocotb                             FSM state -> 12 at 263190.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 263480.00ns INFO     cocotb                             FSM state -> 13 at 263480.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 263620.00ns INFO     cocotb                             FSM state -> 14 at 263620.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 263650.00ns INFO     cocotb                             FSM state -> 12 at 263650.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 263940.00ns INFO     cocotb                             FSM state -> 13 at 263940.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 264080.00ns INFO     cocotb                             FSM state -> 14 at 264080.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 264110.00ns INFO     cocotb                             FSM state -> 12 at 264110.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 264400.00ns INFO     cocotb                             FSM state -> 13 at 264400.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 264540.00ns INFO     cocotb                             FSM state -> 14 at 264540.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 264570.00ns INFO     cocotb                             FSM state -> 12 at 264570.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 264860.00ns INFO     cocotb                             FSM state -> 13 at 264860.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 265000.00ns INFO     cocotb                             FSM state -> 14 at 265000.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 265030.00ns INFO     cocotb                             FSM state -> 12 at 265030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 265320.00ns INFO     cocotb                             FSM state -> 13 at 265320.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 265460.00ns INFO     cocotb                             FSM state -> 14 at 265460.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 265490.00ns INFO     cocotb                             FSM state -> 12 at 265490.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 265780.00ns INFO     cocotb                             FSM state -> 13 at 265780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 265920.00ns INFO     cocotb                             FSM state -> 14 at 265920.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 265950.00ns INFO     cocotb                             FSM state -> 12 at 265950.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 266240.00ns INFO     cocotb                             FSM state -> 13 at 266240.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 266380.00ns INFO     cocotb                             FSM state -> 14 at 266380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 266410.00ns INFO     cocotb                             FSM state -> 12 at 266410.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 266700.00ns INFO     cocotb                             FSM state -> 13 at 266700.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 266840.00ns INFO     cocotb                             FSM state -> 14 at 266840.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 266870.00ns INFO     cocotb                             FSM state -> 12 at 266870.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 267160.00ns INFO     cocotb                             FSM state -> 13 at 267160.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 267300.00ns INFO     cocotb                             FSM state -> 14 at 267300.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 267330.00ns INFO     cocotb                             FSM state -> 12 at 267330.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 267620.00ns INFO     cocotb                             FSM state -> 13 at 267620.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 267760.00ns INFO     cocotb                             FSM state -> 14 at 267760.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 267790.00ns INFO     cocotb                             FSM state -> 12 at 267790.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 268080.00ns INFO     cocotb                             FSM state -> 13 at 268080.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 268220.00ns INFO     cocotb                             FSM state -> 14 at 268220.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 268250.00ns INFO     cocotb                             FSM state -> 12 at 268250.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 268540.00ns INFO     cocotb                             FSM state -> 13 at 268540.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 268680.00ns INFO     cocotb                             FSM state -> 14 at 268680.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 268710.00ns INFO     cocotb                             FSM state -> 12 at 268710.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 269000.00ns INFO     cocotb                             FSM state -> 13 at 269000.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 269140.00ns INFO     cocotb                             FSM state -> 14 at 269140.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 269170.00ns INFO     cocotb                             FSM state -> 12 at 269170.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 269460.00ns INFO     cocotb                             FSM state -> 13 at 269460.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 269600.00ns INFO     cocotb                             FSM state -> 14 at 269600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 269630.00ns INFO     cocotb                             FSM state -> 12 at 269630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 269920.00ns INFO     cocotb                             FSM state -> 13 at 269920.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 270060.00ns INFO     cocotb                             FSM state -> 14 at 270060.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 270090.00ns INFO     cocotb                             FSM state -> 12 at 270090.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 270380.00ns INFO     cocotb                             FSM state -> 13 at 270380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 270520.00ns INFO     cocotb                             FSM state -> 14 at 270520.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 270550.00ns INFO     cocotb                             FSM state -> 12 at 270550.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 270840.00ns INFO     cocotb                             FSM state -> 13 at 270840.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 270980.00ns INFO     cocotb                             FSM state -> 14 at 270980.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 271010.00ns INFO     cocotb                             FSM state -> 12 at 271010.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 271300.00ns INFO     cocotb                             FSM state -> 13 at 271300.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 271440.00ns INFO     cocotb                             FSM state -> 14 at 271440.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 271470.00ns INFO     cocotb                             FSM state -> 12 at 271470.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 271760.00ns INFO     cocotb                             FSM state -> 13 at 271760.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 271900.00ns INFO     cocotb                             FSM state -> 14 at 271900.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 271930.00ns INFO     cocotb                             FSM state -> 12 at 271930.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 272220.00ns INFO     cocotb                             FSM state -> 13 at 272220.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 272360.00ns INFO     cocotb                             FSM state -> 14 at 272360.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 272390.00ns INFO     cocotb                             FSM state -> 12 at 272390.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 272680.00ns INFO     cocotb                             FSM state -> 13 at 272680.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 272820.00ns INFO     cocotb                             FSM state -> 14 at 272820.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 272850.00ns INFO     cocotb                             FSM state -> 12 at 272850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 273140.00ns INFO     cocotb                             FSM state -> 13 at 273140.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 273280.00ns INFO     cocotb                             FSM state -> 14 at 273280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 273310.00ns INFO     cocotb                             FSM state -> 12 at 273310.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 273600.00ns INFO     cocotb                             FSM state -> 13 at 273600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 273740.00ns INFO     cocotb                             FSM state -> 14 at 273740.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 273770.00ns INFO     cocotb                             FSM state -> 12 at 273770.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 274060.00ns INFO     cocotb                             FSM state -> 13 at 274060.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 274200.00ns INFO     cocotb                             FSM state -> 14 at 274200.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 274230.00ns INFO     cocotb                             FSM state -> 12 at 274230.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 274520.00ns INFO     cocotb                             FSM state -> 13 at 274520.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 274660.00ns INFO     cocotb                             FSM state -> 14 at 274660.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 274690.00ns INFO     cocotb                             FSM state -> 12 at 274690.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 274980.00ns INFO     cocotb                             FSM state -> 13 at 274980.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 275120.00ns INFO     cocotb                             FSM state -> 14 at 275120.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 275150.00ns INFO     cocotb                             FSM state -> 12 at 275150.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 275440.00ns INFO     cocotb                             FSM state -> 13 at 275440.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 275580.00ns INFO     cocotb                             FSM state -> 14 at 275580.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 275610.00ns INFO     cocotb                             FSM state -> 12 at 275610.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 275900.00ns INFO     cocotb                             FSM state -> 13 at 275900.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 276040.00ns INFO     cocotb                             FSM state -> 14 at 276040.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 276070.00ns INFO     cocotb                             FSM state -> 12 at 276070.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 276360.00ns INFO     cocotb                             FSM state -> 13 at 276360.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 276500.00ns INFO     cocotb                             FSM state -> 14 at 276500.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 276530.00ns INFO     cocotb                             FSM state -> 12 at 276530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 276820.00ns INFO     cocotb                             FSM state -> 13 at 276820.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 276960.00ns INFO     cocotb                             FSM state -> 14 at 276960.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 276990.00ns INFO     cocotb                             FSM state -> 12 at 276990.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 277280.00ns INFO     cocotb                             FSM state -> 13 at 277280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 277420.00ns INFO     cocotb                             FSM state -> 14 at 277420.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 277450.00ns INFO     cocotb                             FSM state -> 12 at 277450.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 277740.00ns INFO     cocotb                             FSM state -> 13 at 277740.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 277880.00ns INFO     cocotb                             FSM state -> 14 at 277880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 277910.00ns INFO     cocotb                             FSM state -> 12 at 277910.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 278200.00ns INFO     cocotb                             FSM state -> 13 at 278200.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 278340.00ns INFO     cocotb                             FSM state -> 14 at 278340.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 278370.00ns INFO     cocotb                             FSM state -> 12 at 278370.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 278660.00ns INFO     cocotb                             FSM state -> 13 at 278660.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 278800.00ns INFO     cocotb                             FSM state -> 14 at 278800.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 278830.00ns INFO     cocotb                             FSM state -> 12 at 278830.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 279120.00ns INFO     cocotb                             FSM state -> 13 at 279120.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 279260.00ns INFO     cocotb                             FSM state -> 14 at 279260.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 279290.00ns INFO     cocotb                             FSM state -> 12 at 279290.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 279580.00ns INFO     cocotb                             FSM state -> 13 at 279580.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 279720.00ns INFO     cocotb                             FSM state -> 14 at 279720.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 279750.00ns INFO     cocotb                             FSM state -> 12 at 279750.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 280040.00ns INFO     cocotb                             FSM state -> 13 at 280040.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 280180.00ns INFO     cocotb                             FSM state -> 14 at 280180.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 280210.00ns INFO     cocotb                             FSM state -> 12 at 280210.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 280500.00ns INFO     cocotb                             FSM state -> 13 at 280500.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 280640.00ns INFO     cocotb                             FSM state -> 14 at 280640.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 280670.00ns INFO     cocotb                             FSM state -> 12 at 280670.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 280960.00ns INFO     cocotb                             FSM state -> 13 at 280960.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 281100.00ns INFO     cocotb                             FSM state -> 14 at 281100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 281130.00ns INFO     cocotb                             FSM state -> 12 at 281130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 281420.00ns INFO     cocotb                             FSM state -> 13 at 281420.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 281560.00ns INFO     cocotb                             FSM state -> 14 at 281560.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 281590.00ns INFO     cocotb                             FSM state -> 12 at 281590.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 281880.00ns INFO     cocotb                             FSM state -> 13 at 281880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 282020.00ns INFO     cocotb                             FSM state -> 14 at 282020.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 282050.00ns INFO     cocotb                             FSM state -> 12 at 282050.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 282340.00ns INFO     cocotb                             FSM state -> 13 at 282340.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 282480.00ns INFO     cocotb                             FSM state -> 14 at 282480.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 282510.00ns INFO     cocotb                             FSM state -> 12 at 282510.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 282800.00ns INFO     cocotb                             FSM state -> 13 at 282800.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 282940.00ns INFO     cocotb                             FSM state -> 1 at 282940.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             Ready signal detected. Start new stream 6.619974851608276
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             Results are transmitted.
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             Iact check context: layer 1, repetition 0 of 1
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             Iact storages are checked.
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             Iact reference: shape (16, 14, 14), used_channels 4, IACT_RAM_CELLS 4
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             Iact buffer check: 392 expected words, 4 cells per group, depth 4096 (layer 'Convolution2D')
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             Layer parameters created. 0.014368534088134766
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             All weight-files written
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             All iact-files written
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             All results calculated
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             All psum-files written
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             Stream 0 / 1 calculated.
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             Reference Output calculated.
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             Reference data created. 3.9848036766052246
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             Start creating stream. 0.00037980079650878906
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             Stream finished: 1 of 1
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             Streams set. 0.20021891593933105
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             Send stream No. 3
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             DMA stream sections (words each): [18, 0, 4608, 3584, 20, 0, 0]
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             DUT expects trans_cycles_iact = 1
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             DUT expects trans_cycles_wght = 1
+INFO     cocotb:simulator.py:266 282950.00ns INFO     cocotb                             DUT expects trans_cycles_psum = 1
+INFO     cocotb:simulator.py:266 283120.00ns INFO     cocotb                             FSM state -> 2 at 283120.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+INFO     cocotb:simulator.py:266 283130.00ns INFO     cocotb                             DUT expects trans_cycles_iact = 392
+INFO     cocotb:simulator.py:266 283130.00ns INFO     cocotb                             DUT expects trans_cycles_wght = 4608
+INFO     cocotb:simulator.py:266 283130.00ns INFO     cocotb                             DUT expects trans_cycles_psum = 3584
+INFO     cocotb:simulator.py:266 283130.00ns INFO     cocotb                             DUT compute_mask_reg = 0x3f3f3f3f
+INFO     cocotb:simulator.py:266 283130.00ns INFO     cocotb                             DUT send_data_out = 0
+INFO     cocotb:simulator.py:266 283130.00ns INFO     cocotb                             DUT store_in_psum = 0
+INFO     cocotb:simulator.py:266 283130.00ns INFO     cocotb                             DUT fully_connected_layer = 0
+INFO     cocotb:simulator.py:266 283130.00ns INFO     cocotb                             Host will send: iact 0, wght 4608, psum 3584, quantize 20 words
+INFO     cocotb:simulator.py:266 283150.00ns INFO     cocotb                             FSM state -> 4 at 283150.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+INFO     cocotb:simulator.py:266 329230.00ns INFO     cocotb                             FSM state -> 5 at 329230.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+INFO     cocotb:simulator.py:266 365070.00ns INFO     cocotb                             FSM state -> 6 at 365070.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+INFO     cocotb:simulator.py:266 365260.00ns INFO     cocotb                             Stream is sent.
+INFO     cocotb:simulator.py:266 365270.00ns INFO     cocotb                             FSM state -> 7 at 365270.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+INFO     cocotb:simulator.py:266 365310.00ns INFO     cocotb                             FSM state -> 8 at 365310.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+INFO     cocotb:simulator.py:266 388370.00ns INFO     cocotb                             FSM state -> 9 at 388370.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+INFO     cocotb:simulator.py:266 389020.00ns INFO     cocotb                             FSM state -> 11 at 389020.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                             FSM stuck in state 11 for 20000 cycles: fsm_cycle=0, fsm_psum_cycle=0, fsm_psum_current_state=2, trans_cycles_iact=392, trans_cycles_wght=4608, trans_cycles_psum=3584, current_cycle=101, needed_cycles=224, single_iteration=1
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               psum_ready_i_reg = 11111111
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               psum_enable_i_reg = 00000000
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               results_ready = 0
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               finished_cycles_psum = 000000000001100100
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               psum_choose_i_reg = 11111111
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               cluster(0,0) pe_router_psum_ready_out=00 enable_in=00
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               cluster(0,0) PE states by row: ['1001', '0110', '0110', '0110', '0110', '0110', '0000', '0000']
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               cluster(0,0) first PE psum_enable_i=0 psum_select=1
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               cluster(0,1) pe_router_psum_ready_out=00 enable_in=00
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               cluster(0,1) PE states by row: ['0110', '0110', '0110', '0110', '0110', '0110', '0000', '0000']
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               cluster(0,1) first PE psum_enable_i=0 psum_select=0
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               cluster(1,0) pe_router_psum_ready_out=00 enable_in=00
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               cluster(1,0) PE states by row: ['0110', '0110', '0110', '0110', '0110', '0110', '0000', '0000']
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               cluster(1,0) first PE psum_enable_i=0 psum_select=0
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               cluster(1,1) pe_router_psum_ready_out=00 enable_in=00
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               cluster(1,1) PE states by row: ['0110', '0110', '0110', '0110', '0110', '0110', '0000', '0000']
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               cluster(1,1) first PE psum_enable_i=0 psum_select=0
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               psum_enable_o = 00000000
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               psum_ready_o_reg = 00000000
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               router_mode_psum = 100100100100100100100100
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               iact_ready_o_oep_w = 0000
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               iact_enable_i_oep_w = 0000
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               DUT router_mode_iact = 000001000001000001000001
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               DUT router_mode_wght = 1111111100000000
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               DUT router_mode_psum = 100100100100100100100100
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                             iact handoff over 58897 cycles: enable cycles per bit {0: 6192, 1: 6192, 2: 6192, 3: 6192}, handshakes per bit {0: 6192, 1: 6192, 2: 6192, 3: 6192}
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               1548 valid cycles with enable=0xf choose=0xfefefefe -> cl0[c0r0<-g0] cl1[c0r0<-g0] cl2[c0r0<-g0] cl3[c0r0<-g0]
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               1548 valid cycles with enable=0xf choose=0xf9f9f9f9 -> cl0[c1r0<-g0,c0r1<-g0] cl1[c1r0<-g0,c0r1<-g0] cl2[c1r0<-g0,c0r1<-g0] cl3[c1r0<-g0,c0r1<-g0]
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               1548 valid cycles with enable=0xf choose=0xe7e7e7e7 -> cl0[c1r1<-g0,c0r2<-g0] cl1[c1r1<-g0,c0r2<-g0] cl2[c1r1<-g0,c0r2<-g0] cl3[c1r1<-g0,c0r2<-g0]
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                               1548 valid cycles with enable=0xf choose=0x9f9f9f9f -> cl0[c1r2<-g0,c0r3<-g0] cl1[c1r2<-g0,c0r3<-g0] cl2[c1r2<-g0,c0r3<-g0] cl3[c1r2<-g0,c0r3<-g0]
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                             iact path BUFFER_A written words per cell (first 64 addrs): [64, 64, 64, 64]
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                             occupancy cluster(0,0) iact/wght/psum0: c0r0:12/32/17 c0r1:12/32/17 c0r2:12/32/17 c0r3:16/0/0 c1r0:12/32/17 c1r1:12/32/17 c1r2:12/32/17 c1r3:0/0/0
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                             occupancy cluster(0,1) iact/wght/psum0: c0r0:12/32/17 c0r1:12/32/17 c0r2:12/32/17 c0r3:16/0/0 c1r0:12/32/17 c1r1:12/32/17 c1r2:12/32/17 c1r3:0/0/0
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                             occupancy cluster(1,0) iact/wght/psum0: c0r0:12/32/17 c0r1:12/32/17 c0r2:12/32/17 c0r3:16/0/0 c1r0:12/32/17 c1r1:12/32/17 c1r2:12/32/17 c1r3:0/0/0
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    gpi                                Invalid Index - Index 16 is not in the range of [0:15]
+INFO     cocotb:simulator.py:266 589020.00ns WARNING  gpi                                Failed to find a handle at index 16 via any registered implementation
+INFO     cocotb:simulator.py:266 589020.00ns ERROR    cocotb                             occupancy cluster(1,1) iact/wght/psum0: c0r0:12/32/17 c0r1:12/32/17 c0r2:12/32/17 c0r3:16/0/0 c1r0:12/32/17 c1r1:12/32/17 c1r2:12/32/17 c1r3:0/0/0
+INFO     cocotb:simulator.py:266 870690.00ns INFO     cocotb                             FSM state -> 1 at 870690.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             Ready signal detected. Start new stream 218.70466113090515
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             Results are transmitted.
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             Iact check context: layer 2, repetition 0 of 1
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             Iact storages are checked.
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             Iact reference: shape (32, 14, 14), used_channels 4, IACT_RAM_CELLS 4
+INFO     cocotb:simulator.py:266 870700.00ns WARNING  cocotb                             No iact buffer layout known for layer 'Pooling'; skipping the check.
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             Layer parameters created. 1.3049936294555664
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             All weight-files written
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             All iact-files written
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             All results calculated
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             All psum-files written
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             Reference Output calculated.
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             Reference data created. 0.03104114532470703
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             Start creating stream. 0.0003364086151123047
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             Stream finished: 1 of 1
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             Streams set. 0.15033960342407227
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             Send stream No. 4
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             DMA stream sections (words each): [18, 0, 0, 0, 20, 0, 0]
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             DUT expects trans_cycles_iact = 392
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             DUT expects trans_cycles_wght = 4608
+INFO     cocotb:simulator.py:266 870700.00ns INFO     cocotb                             DUT expects trans_cycles_psum = 3584
+INFO     cocotb:simulator.py:266 870870.00ns INFO     cocotb                             FSM state -> 2 at 870870.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 870880.00ns INFO     cocotb                             DUT expects trans_cycles_iact = 1
+INFO     cocotb:simulator.py:266 870880.00ns INFO     cocotb                             DUT expects trans_cycles_wght = 1
+INFO     cocotb:simulator.py:266 870880.00ns INFO     cocotb                             DUT expects trans_cycles_psum = 1
+INFO     cocotb:simulator.py:266 870880.00ns INFO     cocotb                             DUT compute_mask_reg = 0xffffffff
+INFO     cocotb:simulator.py:266 870880.00ns INFO     cocotb                             DUT send_data_out = 1
+INFO     cocotb:simulator.py:266 870880.00ns INFO     cocotb                             DUT store_in_psum = 0
+INFO     cocotb:simulator.py:266 870880.00ns INFO     cocotb                             DUT fully_connected_layer = 0
+INFO     cocotb:simulator.py:266 870880.00ns INFO     cocotb                             Host will send: iact 0, wght 0, psum 0, quantize 20 words
+INFO     cocotb:simulator.py:266 870900.00ns INFO     cocotb                             FSM state -> 6 at 870900.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 871090.00ns INFO     cocotb                             Stream is sent.
+INFO     cocotb:simulator.py:266 871100.00ns INFO     cocotb                             FSM state -> 12 at 871100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 871280.00ns INFO     cocotb                             FSM state -> 13 at 871280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 871350.00ns INFO     cocotb                             FSM state -> 14 at 871350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 871380.00ns INFO     cocotb                             FSM state -> 12 at 871380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 871530.00ns INFO     cocotb                             FSM state -> 13 at 871530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 871600.00ns INFO     cocotb                             FSM state -> 14 at 871600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 871630.00ns INFO     cocotb                             FSM state -> 12 at 871630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 871780.00ns INFO     cocotb                             FSM state -> 13 at 871780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 871850.00ns INFO     cocotb                             FSM state -> 14 at 871850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 871880.00ns INFO     cocotb                             FSM state -> 12 at 871880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 872030.00ns INFO     cocotb                             FSM state -> 13 at 872030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 872100.00ns INFO     cocotb                             FSM state -> 14 at 872100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 872130.00ns INFO     cocotb                             FSM state -> 12 at 872130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 872280.00ns INFO     cocotb                             FSM state -> 13 at 872280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 872350.00ns INFO     cocotb                             FSM state -> 14 at 872350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 872380.00ns INFO     cocotb                             FSM state -> 12 at 872380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 872530.00ns INFO     cocotb                             FSM state -> 13 at 872530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 872600.00ns INFO     cocotb                             FSM state -> 14 at 872600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 872630.00ns INFO     cocotb                             FSM state -> 12 at 872630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 872780.00ns INFO     cocotb                             FSM state -> 13 at 872780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 872850.00ns INFO     cocotb                             FSM state -> 14 at 872850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 872880.00ns INFO     cocotb                             FSM state -> 12 at 872880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 873030.00ns INFO     cocotb                             FSM state -> 13 at 873030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 873100.00ns INFO     cocotb                             FSM state -> 14 at 873100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 873130.00ns INFO     cocotb                             FSM state -> 12 at 873130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 873280.00ns INFO     cocotb                             FSM state -> 13 at 873280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 873350.00ns INFO     cocotb                             FSM state -> 14 at 873350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 873380.00ns INFO     cocotb                             FSM state -> 12 at 873380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 873530.00ns INFO     cocotb                             FSM state -> 13 at 873530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 873600.00ns INFO     cocotb                             FSM state -> 14 at 873600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 873630.00ns INFO     cocotb                             FSM state -> 12 at 873630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 873780.00ns INFO     cocotb                             FSM state -> 13 at 873780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 873850.00ns INFO     cocotb                             FSM state -> 14 at 873850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 873880.00ns INFO     cocotb                             FSM state -> 12 at 873880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 874030.00ns INFO     cocotb                             FSM state -> 13 at 874030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 874100.00ns INFO     cocotb                             FSM state -> 14 at 874100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 874130.00ns INFO     cocotb                             FSM state -> 12 at 874130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 874280.00ns INFO     cocotb                             FSM state -> 13 at 874280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 874350.00ns INFO     cocotb                             FSM state -> 14 at 874350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 874380.00ns INFO     cocotb                             FSM state -> 12 at 874380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 874530.00ns INFO     cocotb                             FSM state -> 13 at 874530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 874600.00ns INFO     cocotb                             FSM state -> 14 at 874600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 874630.00ns INFO     cocotb                             FSM state -> 12 at 874630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 874780.00ns INFO     cocotb                             FSM state -> 13 at 874780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 874850.00ns INFO     cocotb                             FSM state -> 14 at 874850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 874880.00ns INFO     cocotb                             FSM state -> 12 at 874880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 875030.00ns INFO     cocotb                             FSM state -> 13 at 875030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 875100.00ns INFO     cocotb                             FSM state -> 14 at 875100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 875130.00ns INFO     cocotb                             FSM state -> 12 at 875130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 875280.00ns INFO     cocotb                             FSM state -> 13 at 875280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 875350.00ns INFO     cocotb                             FSM state -> 14 at 875350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 875380.00ns INFO     cocotb                             FSM state -> 12 at 875380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 875530.00ns INFO     cocotb                             FSM state -> 13 at 875530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 875600.00ns INFO     cocotb                             FSM state -> 14 at 875600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 875630.00ns INFO     cocotb                             FSM state -> 12 at 875630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 875780.00ns INFO     cocotb                             FSM state -> 13 at 875780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 875850.00ns INFO     cocotb                             FSM state -> 14 at 875850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 875880.00ns INFO     cocotb                             FSM state -> 12 at 875880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 876030.00ns INFO     cocotb                             FSM state -> 13 at 876030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 876100.00ns INFO     cocotb                             FSM state -> 14 at 876100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 876130.00ns INFO     cocotb                             FSM state -> 12 at 876130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 876280.00ns INFO     cocotb                             FSM state -> 13 at 876280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 876350.00ns INFO     cocotb                             FSM state -> 14 at 876350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 876380.00ns INFO     cocotb                             FSM state -> 12 at 876380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 876530.00ns INFO     cocotb                             FSM state -> 13 at 876530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 876600.00ns INFO     cocotb                             FSM state -> 14 at 876600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 876630.00ns INFO     cocotb                             FSM state -> 12 at 876630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 876780.00ns INFO     cocotb                             FSM state -> 13 at 876780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 876850.00ns INFO     cocotb                             FSM state -> 14 at 876850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 876880.00ns INFO     cocotb                             FSM state -> 12 at 876880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 877030.00ns INFO     cocotb                             FSM state -> 13 at 877030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 877100.00ns INFO     cocotb                             FSM state -> 14 at 877100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 877130.00ns INFO     cocotb                             FSM state -> 12 at 877130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 877280.00ns INFO     cocotb                             FSM state -> 13 at 877280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 877350.00ns INFO     cocotb                             FSM state -> 14 at 877350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 877380.00ns INFO     cocotb                             FSM state -> 12 at 877380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 877530.00ns INFO     cocotb                             FSM state -> 13 at 877530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 877600.00ns INFO     cocotb                             FSM state -> 14 at 877600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 877630.00ns INFO     cocotb                             FSM state -> 12 at 877630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 877780.00ns INFO     cocotb                             FSM state -> 13 at 877780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 877850.00ns INFO     cocotb                             FSM state -> 14 at 877850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 877880.00ns INFO     cocotb                             FSM state -> 12 at 877880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 878030.00ns INFO     cocotb                             FSM state -> 13 at 878030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 878100.00ns INFO     cocotb                             FSM state -> 14 at 878100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 878130.00ns INFO     cocotb                             FSM state -> 12 at 878130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 878280.00ns INFO     cocotb                             FSM state -> 13 at 878280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 878350.00ns INFO     cocotb                             FSM state -> 14 at 878350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 878380.00ns INFO     cocotb                             FSM state -> 12 at 878380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 878530.00ns INFO     cocotb                             FSM state -> 13 at 878530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 878600.00ns INFO     cocotb                             FSM state -> 14 at 878600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 878630.00ns INFO     cocotb                             FSM state -> 12 at 878630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 878780.00ns INFO     cocotb                             FSM state -> 13 at 878780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 878850.00ns INFO     cocotb                             FSM state -> 14 at 878850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 878880.00ns INFO     cocotb                             FSM state -> 12 at 878880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 879030.00ns INFO     cocotb                             FSM state -> 13 at 879030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 879100.00ns INFO     cocotb                             FSM state -> 14 at 879100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 879130.00ns INFO     cocotb                             FSM state -> 12 at 879130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 879280.00ns INFO     cocotb                             FSM state -> 13 at 879280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 879350.00ns INFO     cocotb                             FSM state -> 14 at 879350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 879380.00ns INFO     cocotb                             FSM state -> 12 at 879380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 879530.00ns INFO     cocotb                             FSM state -> 13 at 879530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 879600.00ns INFO     cocotb                             FSM state -> 14 at 879600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 879630.00ns INFO     cocotb                             FSM state -> 12 at 879630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 879780.00ns INFO     cocotb                             FSM state -> 13 at 879780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 879850.00ns INFO     cocotb                             FSM state -> 14 at 879850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 879880.00ns INFO     cocotb                             FSM state -> 12 at 879880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 880030.00ns INFO     cocotb                             FSM state -> 13 at 880030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 880100.00ns INFO     cocotb                             FSM state -> 14 at 880100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 880130.00ns INFO     cocotb                             FSM state -> 12 at 880130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 880280.00ns INFO     cocotb                             FSM state -> 13 at 880280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 880350.00ns INFO     cocotb                             FSM state -> 14 at 880350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 880380.00ns INFO     cocotb                             FSM state -> 12 at 880380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 880530.00ns INFO     cocotb                             FSM state -> 13 at 880530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 880600.00ns INFO     cocotb                             FSM state -> 14 at 880600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 880630.00ns INFO     cocotb                             FSM state -> 12 at 880630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 880780.00ns INFO     cocotb                             FSM state -> 13 at 880780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 880850.00ns INFO     cocotb                             FSM state -> 14 at 880850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 880880.00ns INFO     cocotb                             FSM state -> 12 at 880880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 881030.00ns INFO     cocotb                             FSM state -> 13 at 881030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 881100.00ns INFO     cocotb                             FSM state -> 14 at 881100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 881130.00ns INFO     cocotb                             FSM state -> 12 at 881130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 881280.00ns INFO     cocotb                             FSM state -> 13 at 881280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 881350.00ns INFO     cocotb                             FSM state -> 14 at 881350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 881380.00ns INFO     cocotb                             FSM state -> 12 at 881380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 881530.00ns INFO     cocotb                             FSM state -> 13 at 881530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 881600.00ns INFO     cocotb                             FSM state -> 14 at 881600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 881630.00ns INFO     cocotb                             FSM state -> 12 at 881630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 881780.00ns INFO     cocotb                             FSM state -> 13 at 881780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 881850.00ns INFO     cocotb                             FSM state -> 14 at 881850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 881880.00ns INFO     cocotb                             FSM state -> 12 at 881880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 882030.00ns INFO     cocotb                             FSM state -> 13 at 882030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 882100.00ns INFO     cocotb                             FSM state -> 14 at 882100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 882130.00ns INFO     cocotb                             FSM state -> 12 at 882130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 882280.00ns INFO     cocotb                             FSM state -> 13 at 882280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 882350.00ns INFO     cocotb                             FSM state -> 14 at 882350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 882380.00ns INFO     cocotb                             FSM state -> 12 at 882380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 882530.00ns INFO     cocotb                             FSM state -> 13 at 882530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 882600.00ns INFO     cocotb                             FSM state -> 14 at 882600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 882630.00ns INFO     cocotb                             FSM state -> 12 at 882630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 882780.00ns INFO     cocotb                             FSM state -> 13 at 882780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 882850.00ns INFO     cocotb                             FSM state -> 14 at 882850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 882880.00ns INFO     cocotb                             FSM state -> 12 at 882880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 883030.00ns INFO     cocotb                             FSM state -> 13 at 883030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 883100.00ns INFO     cocotb                             FSM state -> 14 at 883100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 883130.00ns INFO     cocotb                             FSM state -> 12 at 883130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 883280.00ns INFO     cocotb                             FSM state -> 13 at 883280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 883350.00ns INFO     cocotb                             FSM state -> 14 at 883350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 883380.00ns INFO     cocotb                             FSM state -> 12 at 883380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 883530.00ns INFO     cocotb                             FSM state -> 13 at 883530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 883600.00ns INFO     cocotb                             FSM state -> 14 at 883600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 883630.00ns INFO     cocotb                             FSM state -> 12 at 883630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 883780.00ns INFO     cocotb                             FSM state -> 13 at 883780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 883850.00ns INFO     cocotb                             FSM state -> 14 at 883850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 883880.00ns INFO     cocotb                             FSM state -> 12 at 883880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 884030.00ns INFO     cocotb                             FSM state -> 13 at 884030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 884100.00ns INFO     cocotb                             FSM state -> 14 at 884100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 884130.00ns INFO     cocotb                             FSM state -> 12 at 884130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 884280.00ns INFO     cocotb                             FSM state -> 13 at 884280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 884350.00ns INFO     cocotb                             FSM state -> 14 at 884350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 884380.00ns INFO     cocotb                             FSM state -> 12 at 884380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 884530.00ns INFO     cocotb                             FSM state -> 13 at 884530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 884600.00ns INFO     cocotb                             FSM state -> 14 at 884600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 884630.00ns INFO     cocotb                             FSM state -> 12 at 884630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 884780.00ns INFO     cocotb                             FSM state -> 13 at 884780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 884850.00ns INFO     cocotb                             FSM state -> 14 at 884850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 884880.00ns INFO     cocotb                             FSM state -> 12 at 884880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 885030.00ns INFO     cocotb                             FSM state -> 13 at 885030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 885100.00ns INFO     cocotb                             FSM state -> 1 at 885100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             Ready signal detected. Start new stream 3.59787917137146
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             Results are transmitted.
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             Iact check context: layer 3, repetition 0 of 1
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             Iact storages are checked.
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             Iact reference: shape (32, 7, 7), used_channels 4, IACT_RAM_CELLS 4
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             Iact buffer check: 196 expected words, 4 cells per group, depth 4096 (layer 'Convolution2D')
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Error found in Iact storage; word: 1 cell: 1 addr: 0
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Ref-Value: 0x20800020307 DUT-Value: 0x100020800020307
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Error found in Iact storage; word: 54 cell: 2 addr: 13
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Ref-Value: 0x4000000050000 DUT-Value: 0x4000000080000
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Error found in Iact storage; word: 75 cell: 3 addr: 18
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Ref-Value: 0xa0005000300 DUT-Value: 0xa0002000400
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Error found in Iact storage; word: 124 cell: 0 addr: 31
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Ref-Value: 0x80000000700 DUT-Value: 0x80000000900
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Error found in Iact storage; word: 127 cell: 3 addr: 31
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Ref-Value: 0x60000000600 DUT-Value: 0x10000000600
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Error found in Iact storage; word: 148 cell: 0 addr: 37
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Ref-Value: 0x508030501050303 DUT-Value: 0x708030501050303
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Error found in Iact storage; word: 152 cell: 0 addr: 38
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Ref-Value: 0x2030400010302 DUT-Value: 0x2030404010302
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Error found in Iact storage; word: 173 cell: 1 addr: 43
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Ref-Value: 0x500000005000002 DUT-Value: 0x500000004000002
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact value comparison: 188/196 words match exactly, 0 of 196 expected words unwritten; over the 196 written words the byte multisets DIFFER - the values themselves are wrong
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: send_data_out = 1
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: fsm_current_state = 1
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: choose_iact_buffer = 0
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: iact_channels_per_pe_next_layer = 4
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: fsm_cycle = 0
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: skipIact_reg = 1
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: max_pooling unavailable (AttributeError)
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: FSM_CEIL_IACT_RTR_CCLS = 1
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: FSM_CEIL_WGHT_RTR_CCLS = 1
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: FSM_CEIL_PSUM_RTR_CCLS = 1
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: CLUSTERS = 4
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: NUM_GLB_IACT = 1
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: NUM_GLB_WGHT = 4
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: NUM_GLB_PSUM = 2
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: fsm_psum_cycle = 0
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: trans_cycles_psum = 1
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: fsm_psum_current_state = 0
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: filters = 1
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: needed_cycles = 56
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: finished_cycles_psum unavailable (AttributeError)
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: main FSM states visited = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14] over 88508 samples (RECEIVE_PSUMS_TO_IACT is 11)
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer context: FSM transitions (ns, state) = [('40.0', 1), ('210.0', 2), ('240.0', 3), ('1240.0', 4), ('2680.0', 5), ('74360.0', 6), ('74560.0', 7), ('74600.0', 8), ('84820.0', 9), ('85470.0', 11), ('256770.0', 1), ('256950.0', 2), ('256980.0', 6), ('257180.0', 12), ('257500.0', 13), ('257640.0', 14), ('257670.0', 12), ('257960.0', 13), ('258100.0', 14), ('258130.0', 12), ('258420.0', 13), ('258560.0', 14), ('258590.0', 12), ('258880.0', 13), ('259020.0', 14), ('259050.0', 12), ('259340.0', 13), ('259480.0', 14), ('259510.0', 12), ('259800.0', 13), ('259940.0', 14), ('259970.0', 12), ('260260.0', 13), ('260400.0', 14), ('260430.0', 12), ('260720.0', 13), ('260860.0', 14), ('260890.0', 12), ('261180.0', 13), ('261320.0', 14), ('261350.0', 12), ('261640.0', 13), ('261780.0', 14), ('261810.0', 12), ('262100.0', 13), ('262240.0', 14), ('262270.0', 12), ('262560.0', 13), ('262700.0', 14), ('262730.0', 12), ('263020.0', 13), ('263160.0', 14), ('263190.0', 12), ('263480.0', 13), ('263620.0', 14), ('263650.0', 12), ('263940.0', 13), ('264080.0', 14), ('264110.0', 12), ('264400.0', 13), ('264540.0', 14), ('264570.0', 12), ('264860.0', 13), ('265000.0', 14), ('265030.0', 12), ('265320.0', 13), ('265460.0', 14), ('265490.0', 12), ('265780.0', 13), ('265920.0', 14), ('265950.0', 12), ('266240.0', 13), ('266380.0', 14), ('266410.0', 12), ('266700.0', 13), ('266840.0', 14), ('266870.0', 12), ('267160.0', 13), ('267300.0', 14), ('267330.0', 12), ('267620.0', 13), ('267760.0', 14), ('267790.0', 12), ('268080.0', 13), ('268220.0', 14), ('268250.0', 12), ('268540.0', 13), ('268680.0', 14), ('268710.0', 12), ('269000.0', 13), ('269140.0', 14), ('269170.0', 12), ('269460.0', 13), ('269600.0', 14), ('269630.0', 12), ('269920.0', 13), ('270060.0', 14), ('270090.0', 12), ('270380.0', 13), ('270520.0', 14), ('270550.0', 12), ('270840.0', 13), ('270980.0', 14), ('271010.0', 12), ('271300.0', 13), ('271440.0', 14), ('271470.0', 12), ('271760.0', 13), ('271900.0', 14), ('271930.0', 12), ('272220.0', 13), ('272360.0', 14), ('272390.0', 12), ('272680.0', 13), ('272820.0', 14), ('272850.0', 12), ('273140.0', 13), ('273280.0', 14), ('273310.0', 12), ('273600.0', 13), ('273740.0', 14), ('273770.0', 12), ('274060.0', 13), ('274200.0', 14), ('274230.0', 12), ('274520.0', 13), ('274660.0', 14), ('274690.0', 12), ('274980.0', 13), ('275120.0', 14), ('275150.0', 12), ('275440.0', 13), ('275580.0', 14), ('275610.0', 12), ('275900.0', 13), ('276040.0', 14), ('276070.0', 12), ('276360.0', 13), ('276500.0', 14), ('276530.0', 12), ('276820.0', 13), ('276960.0', 14), ('276990.0', 12), ('277280.0', 13), ('277420.0', 14), ('277450.0', 12), ('277740.0', 13), ('277880.0', 14), ('277910.0', 12), ('278200.0', 13), ('278340.0', 14), ('278370.0', 12), ('278660.0', 13), ('278800.0', 14), ('278830.0', 12), ('279120.0', 13), ('279260.0', 14), ('279290.0', 12), ('279580.0', 13), ('279720.0', 14), ('279750.0', 12), ('280040.0', 13), ('280180.0', 14), ('280210.0', 12), ('280500.0', 13), ('280640.0', 14), ('280670.0', 12), ('280960.0', 13), ('281100.0', 14), ('281130.0', 12), ('281420.0', 13), ('281560.0', 14), ('281590.0', 12), ('281880.0', 13), ('282020.0', 14), ('282050.0', 12), ('282340.0', 13), ('282480.0', 14), ('282510.0', 12), ('282800.0', 13), ('282940.0', 1), ('283120.0', 2), ('283150.0', 4), ('329230.0', 5), ('365070.0', 6), ('365270.0', 7), ('365310.0', 8), ('388370.0', 9), ('389020.0', 11), ('870690.0', 1), ('870870.0', 2), ('870900.0', 6), ('871100.0', 12), ('871280.0', 13), ('871350.0', 14), ('871380.0', 12), ('871530.0', 13), ('871600.0', 14), ('871630.0', 12), ('871780.0', 13)]
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer occupancy: 256 written words, cells [0, 1, 2, 3], first entries [(0, 0, '0x20400000005'), (0, 1, '0x700000107'), (0, 2, '0x10500000103'), (0, 3, '0x10400000304')]
+INFO     cocotb:simulator.py:266 885110.00ns ERROR    cocotb                             Iact buffer check failed after layer 3 (OPENEYE_KEEP_GOING: the model runs on)
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             Layer parameters created. 0.01756429672241211
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             All weight-files written
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             All iact-files written
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             All results calculated
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             All psum-files written
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             Stream 0 / 1 calculated.
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             Reference Output calculated.
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             Reference data created. 5.675583839416504
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             Start creating stream. 0.00040841102600097656
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             Stream finished: 1 of 1
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             Streams set. 0.24832487106323242
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             Send stream No. 5
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             DMA stream sections (words each): [18, 0, 9216, 896, 20, 0, 0]
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             DUT expects trans_cycles_iact = 1
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             DUT expects trans_cycles_wght = 1
+INFO     cocotb:simulator.py:266 885110.00ns INFO     cocotb                             DUT expects trans_cycles_psum = 1
+INFO     cocotb:simulator.py:266 885280.00ns INFO     cocotb                             FSM state -> 2 at 885280.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+INFO     cocotb:simulator.py:266 885290.00ns INFO     cocotb                             DUT expects trans_cycles_iact = 196
+INFO     cocotb:simulator.py:266 885290.00ns INFO     cocotb                             DUT expects trans_cycles_wght = 9216
+INFO     cocotb:simulator.py:266 885290.00ns INFO     cocotb                             DUT expects trans_cycles_psum = 896
+INFO     cocotb:simulator.py:266 885290.00ns INFO     cocotb                             DUT compute_mask_reg = 0x3f3f3f3f
+INFO     cocotb:simulator.py:266 885290.00ns INFO     cocotb                             DUT send_data_out = 0
+INFO     cocotb:simulator.py:266 885290.00ns INFO     cocotb                             DUT store_in_psum = 0
+INFO     cocotb:simulator.py:266 885290.00ns INFO     cocotb                             DUT fully_connected_layer = 0
+INFO     cocotb:simulator.py:266 885290.00ns INFO     cocotb                             Host will send: iact 0, wght 9216, psum 896, quantize 20 words
+INFO     cocotb:simulator.py:266 885310.00ns INFO     cocotb                             FSM state -> 4 at 885310.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+INFO     cocotb:simulator.py:266 977470.00ns INFO     cocotb                             FSM state -> 5 at 977470.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+INFO     cocotb:simulator.py:266 986430.00ns INFO     cocotb                             FSM state -> 6 at 986430.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+INFO     cocotb:simulator.py:266 986620.00ns INFO     cocotb                             Stream is sent.
+INFO     cocotb:simulator.py:266 986630.00ns INFO     cocotb                             FSM state -> 7 at 986630.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+INFO     cocotb:simulator.py:266 986670.00ns INFO     cocotb                             FSM state -> 8 at 986670.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+INFO     cocotb:simulator.py:266 1001090.00ns INFO     cocotb                             FSM state -> 9 at 1001090.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+INFO     cocotb:simulator.py:266 1001740.00ns INFO     cocotb                             FSM state -> 11 at 1001740.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+INFO     cocotb:simulator.py:266 1192030.00ns INFO     cocotb                             FSM state -> 1 at 1192030.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             Ready signal detected. Start new stream 107.34055304527283
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             Results are transmitted.
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             Iact check context: layer 4, repetition 0 of 1
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             Iact storages are checked.
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             Iact reference: shape (1568,), used_channels 784, IACT_RAM_CELLS 4
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             Iact buffer check: 196 expected words, 4 cells per group, depth 4096 (layer 'Dense')
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Error found in Iact storage; word: 1 cell: 1 addr: 0
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Ref-Value: 0x1000100000000 DUT-Value: 0x1000200000000
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Error found in Iact storage; word: 29 cell: 1 addr: 7
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Ref-Value: 0x200000002 DUT-Value: 0x200000003
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Error found in Iact storage; word: 32 cell: 0 addr: 8
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Ref-Value: 0x500000001 DUT-Value: 0x400000001
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Error found in Iact storage; word: 33 cell: 1 addr: 8
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Ref-Value: 0x300000002 DUT-Value: 0x300000001
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Error found in Iact storage; word: 57 cell: 1 addr: 14
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Ref-Value: 0x0 DUT-Value: 0x100
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Error found in Iact storage; word: 78 cell: 2 addr: 19
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Ref-Value: 0x10000 DUT-Value: 0x100000000010000
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Error found in Iact storage; word: 100 cell: 0 addr: 25
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Ref-Value: 0x200 DUT-Value: 0x300
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Error found in Iact storage; word: 102 cell: 2 addr: 25
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Ref-Value: 0x3000000030200 DUT-Value: 0x4000000030200
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Error found in Iact storage; word: 106 cell: 2 addr: 26
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Ref-Value: 0x2010000020000 DUT-Value: 0x2020000020000
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Error found in Iact storage; word: 130 cell: 2 addr: 32
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Ref-Value: 0x1010000000000 DUT-Value: 0x10000000000
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Error found in Iact storage; word: 173 cell: 1 addr: 43
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Ref-Value: 0x10500000104 DUT-Value: 0x400000205
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Error found in Iact storage; word: 176 cell: 0 addr: 44
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Ref-Value: 0x200000103 DUT-Value: 0x20200000004
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Error found in Iact storage; word: 177 cell: 1 addr: 44
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Ref-Value: 0x300000102 DUT-Value: 0x300000203
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Error found in Iact storage; word: 179 cell: 3 addr: 44
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Ref-Value: 0x600000102 DUT-Value: 0x500000102
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact value comparison: 182/196 words match exactly, 0 of 196 expected words unwritten; over the 196 written words the byte multisets DIFFER - the values themselves are wrong
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: send_data_out = 0
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: fsm_current_state = 1
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: choose_iact_buffer = 0
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: iact_channels_per_pe_next_layer = 4
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: fsm_cycle = 0
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: skipIact_reg = 1
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: max_pooling unavailable (AttributeError)
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: FSM_CEIL_IACT_RTR_CCLS = 1
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: FSM_CEIL_WGHT_RTR_CCLS = 1
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: FSM_CEIL_PSUM_RTR_CCLS = 1
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: CLUSTERS = 4
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: NUM_GLB_IACT = 1
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: NUM_GLB_WGHT = 4
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: NUM_GLB_PSUM = 2
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: fsm_psum_cycle = 0
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: trans_cycles_psum = 896
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: fsm_psum_current_state = 0
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: filters = 16
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: needed_cycles = 112
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: finished_cycles_psum unavailable (AttributeError)
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: main FSM states visited = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14] over 119201 samples (RECEIVE_PSUMS_TO_IACT is 11)
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer context: FSM transitions (ns, state) = [('40.0', 1), ('210.0', 2), ('240.0', 3), ('1240.0', 4), ('2680.0', 5), ('74360.0', 6), ('74560.0', 7), ('74600.0', 8), ('84820.0', 9), ('85470.0', 11), ('256770.0', 1), ('256950.0', 2), ('256980.0', 6), ('257180.0', 12), ('257500.0', 13), ('257640.0', 14), ('257670.0', 12), ('257960.0', 13), ('258100.0', 14), ('258130.0', 12), ('258420.0', 13), ('258560.0', 14), ('258590.0', 12), ('258880.0', 13), ('259020.0', 14), ('259050.0', 12), ('259340.0', 13), ('259480.0', 14), ('259510.0', 12), ('259800.0', 13), ('259940.0', 14), ('259970.0', 12), ('260260.0', 13), ('260400.0', 14), ('260430.0', 12), ('260720.0', 13), ('260860.0', 14), ('260890.0', 12), ('261180.0', 13), ('261320.0', 14), ('261350.0', 12), ('261640.0', 13), ('261780.0', 14), ('261810.0', 12), ('262100.0', 13), ('262240.0', 14), ('262270.0', 12), ('262560.0', 13), ('262700.0', 14), ('262730.0', 12), ('263020.0', 13), ('263160.0', 14), ('263190.0', 12), ('263480.0', 13), ('263620.0', 14), ('263650.0', 12), ('263940.0', 13), ('264080.0', 14), ('264110.0', 12), ('264400.0', 13), ('264540.0', 14), ('264570.0', 12), ('264860.0', 13), ('265000.0', 14), ('265030.0', 12), ('265320.0', 13), ('265460.0', 14), ('265490.0', 12), ('265780.0', 13), ('265920.0', 14), ('265950.0', 12), ('266240.0', 13), ('266380.0', 14), ('266410.0', 12), ('266700.0', 13), ('266840.0', 14), ('266870.0', 12), ('267160.0', 13), ('267300.0', 14), ('267330.0', 12), ('267620.0', 13), ('267760.0', 14), ('267790.0', 12), ('268080.0', 13), ('268220.0', 14), ('268250.0', 12), ('268540.0', 13), ('268680.0', 14), ('268710.0', 12), ('269000.0', 13), ('269140.0', 14), ('269170.0', 12), ('269460.0', 13), ('269600.0', 14), ('269630.0', 12), ('269920.0', 13), ('270060.0', 14), ('270090.0', 12), ('270380.0', 13), ('270520.0', 14), ('270550.0', 12), ('270840.0', 13), ('270980.0', 14), ('271010.0', 12), ('271300.0', 13), ('271440.0', 14), ('271470.0', 12), ('271760.0', 13), ('271900.0', 14), ('271930.0', 12), ('272220.0', 13), ('272360.0', 14), ('272390.0', 12), ('272680.0', 13), ('272820.0', 14), ('272850.0', 12), ('273140.0', 13), ('273280.0', 14), ('273310.0', 12), ('273600.0', 13), ('273740.0', 14), ('273770.0', 12), ('274060.0', 13), ('274200.0', 14), ('274230.0', 12), ('274520.0', 13), ('274660.0', 14), ('274690.0', 12), ('274980.0', 13), ('275120.0', 14), ('275150.0', 12), ('275440.0', 13), ('275580.0', 14), ('275610.0', 12), ('275900.0', 13), ('276040.0', 14), ('276070.0', 12), ('276360.0', 13), ('276500.0', 14), ('276530.0', 12), ('276820.0', 13), ('276960.0', 14), ('276990.0', 12), ('277280.0', 13), ('277420.0', 14), ('277450.0', 12), ('277740.0', 13), ('277880.0', 14), ('277910.0', 12), ('278200.0', 13), ('278340.0', 14), ('278370.0', 12), ('278660.0', 13), ('278800.0', 14), ('278830.0', 12), ('279120.0', 13), ('279260.0', 14), ('279290.0', 12), ('279580.0', 13), ('279720.0', 14), ('279750.0', 12), ('280040.0', 13), ('280180.0', 14), ('280210.0', 12), ('280500.0', 13), ('280640.0', 14), ('280670.0', 12), ('280960.0', 13), ('281100.0', 14), ('281130.0', 12), ('281420.0', 13), ('281560.0', 14), ('281590.0', 12), ('281880.0', 13), ('282020.0', 14), ('282050.0', 12), ('282340.0', 13), ('282480.0', 14), ('282510.0', 12), ('282800.0', 13), ('282940.0', 1), ('283120.0', 2), ('283150.0', 4), ('329230.0', 5), ('365070.0', 6), ('365270.0', 7), ('365310.0', 8), ('388370.0', 9), ('389020.0', 11), ('870690.0', 1), ('870870.0', 2), ('870900.0', 6), ('871100.0', 12), ('871280.0', 13), ('871350.0', 14), ('871380.0', 12), ('871530.0', 13), ('871600.0', 14), ('871630.0', 12), ('871780.0', 13)]
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer occupancy: 256 written words, cells [0, 1, 2, 3], first entries [(0, 0, '0x1000000000001'), (0, 1, '0x0'), (0, 2, '0x0'), (0, 3, '0x0')]
+INFO     cocotb:simulator.py:266 1192040.00ns ERROR    cocotb                             Iact buffer check failed after layer 4 (OPENEYE_KEEP_GOING: the model runs on)
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             Layer parameters created. 0.3527357578277588
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             All weight-files written
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             All iact-files written
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             All results calculated
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             All psum-files written
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             Reference Output calculated.
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             Reference data created. 0.048456430435180664
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             Start creating stream. 0.00013184547424316406
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             Stream finished: 1 of 1
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             Streams set. 0.7773647308349609
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             Send stream No. 6
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             DMA stream sections (words each): [18, 0, 9792, 32, 20, 0, 0]
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             DUT expects trans_cycles_iact = 196
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             DUT expects trans_cycles_wght = 9216
+INFO     cocotb:simulator.py:266 1192040.00ns INFO     cocotb                             DUT expects trans_cycles_psum = 896
+INFO     cocotb:simulator.py:266 1192210.00ns INFO     cocotb                             FSM state -> 2 at 1192210.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+INFO     cocotb:simulator.py:266 1192220.00ns INFO     cocotb                             DUT expects trans_cycles_iact = 0
+INFO     cocotb:simulator.py:266 1192220.00ns INFO     cocotb                             DUT expects trans_cycles_wght = 9792
+INFO     cocotb:simulator.py:266 1192220.00ns INFO     cocotb                             DUT expects trans_cycles_psum = 32
+INFO     cocotb:simulator.py:266 1192220.00ns INFO     cocotb                             DUT compute_mask_reg = 0x55555555
+INFO     cocotb:simulator.py:266 1192220.00ns INFO     cocotb                             DUT send_data_out = 0
+INFO     cocotb:simulator.py:266 1192220.00ns INFO     cocotb                             DUT store_in_psum = 0
+INFO     cocotb:simulator.py:266 1192220.00ns INFO     cocotb                             DUT fully_connected_layer = 1
+INFO     cocotb:simulator.py:266 1192220.00ns INFO     cocotb                             Host will send: iact 0, wght 9792, psum 32, quantize 20 words
+INFO     cocotb:simulator.py:266 1192240.00ns INFO     cocotb                             FSM state -> 4 at 1192240.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+INFO     cocotb:simulator.py:266 1290160.00ns INFO     cocotb                             FSM state -> 5 at 1290160.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+INFO     cocotb:simulator.py:266 1290480.00ns INFO     cocotb                             FSM state -> 6 at 1290480.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+INFO     cocotb:simulator.py:266 1290670.00ns INFO     cocotb                             Stream is sent.
+INFO     cocotb:simulator.py:266 1290680.00ns INFO     cocotb                             FSM state -> 7 at 1290680.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+INFO     cocotb:simulator.py:266 1290720.00ns INFO     cocotb                             FSM state -> 8 at 1290720.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+INFO     cocotb:simulator.py:266 1298900.00ns INFO     cocotb                             FSM state -> 9 at 1298900.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+INFO     cocotb:simulator.py:266 1299550.00ns INFO     cocotb                             FSM state -> 11 at 1299550.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+INFO     cocotb:simulator.py:266 1324750.00ns INFO     cocotb                             FSM state -> 1 at 1324750.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             Ready signal detected. Start new stream 43.91729807853699
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             Results are transmitted.
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             Iact check context: layer 5, repetition 0 of 1
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             Iact storages are checked.
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             Iact reference: shape (32,), used_channels 16, IACT_RAM_CELLS 4
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             Iact buffer check: first 32 activations only (the rest is padding)
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             Iact buffer check: 4 expected words, 4 cells per group, depth 4096 (layer 'Dense')
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Error found in Iact storage; word: 1 cell: 1 addr: 0
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Ref-Value: 0x0 DUT-Value: 0x1000000
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Error found in Iact storage; word: 2 cell: 2 addr: 0
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Ref-Value: 0x100010100010002 DUT-Value: 0x100010100020002
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Error found in Iact storage; word: 3 cell: 3 addr: 0
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Ref-Value: 0x20402000100 DUT-Value: 0x20502000100
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact value comparison: 1/4 words match exactly, 0 of 4 expected words unwritten; over the 4 written words the byte multisets DIFFER - the values themselves are wrong
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: send_data_out = 0
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: fsm_current_state = 1
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: choose_iact_buffer = 0
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: iact_channels_per_pe_next_layer = 1
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: fsm_cycle = 0
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: skipIact_reg = 1
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: max_pooling unavailable (AttributeError)
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: FSM_CEIL_IACT_RTR_CCLS = 1
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: FSM_CEIL_WGHT_RTR_CCLS = 1
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: FSM_CEIL_PSUM_RTR_CCLS = 1
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: CLUSTERS = 4
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: NUM_GLB_IACT = 1
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: NUM_GLB_WGHT = 4
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: NUM_GLB_PSUM = 2
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: fsm_psum_cycle = 0
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: trans_cycles_psum = 32
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: fsm_psum_current_state = 0
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: filters = 16
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: needed_cycles = 17
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: finished_cycles_psum unavailable (AttributeError)
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: main FSM states visited = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14] over 132473 samples (RECEIVE_PSUMS_TO_IACT is 11)
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer context: FSM transitions (ns, state) = [('40.0', 1), ('210.0', 2), ('240.0', 3), ('1240.0', 4), ('2680.0', 5), ('74360.0', 6), ('74560.0', 7), ('74600.0', 8), ('84820.0', 9), ('85470.0', 11), ('256770.0', 1), ('256950.0', 2), ('256980.0', 6), ('257180.0', 12), ('257500.0', 13), ('257640.0', 14), ('257670.0', 12), ('257960.0', 13), ('258100.0', 14), ('258130.0', 12), ('258420.0', 13), ('258560.0', 14), ('258590.0', 12), ('258880.0', 13), ('259020.0', 14), ('259050.0', 12), ('259340.0', 13), ('259480.0', 14), ('259510.0', 12), ('259800.0', 13), ('259940.0', 14), ('259970.0', 12), ('260260.0', 13), ('260400.0', 14), ('260430.0', 12), ('260720.0', 13), ('260860.0', 14), ('260890.0', 12), ('261180.0', 13), ('261320.0', 14), ('261350.0', 12), ('261640.0', 13), ('261780.0', 14), ('261810.0', 12), ('262100.0', 13), ('262240.0', 14), ('262270.0', 12), ('262560.0', 13), ('262700.0', 14), ('262730.0', 12), ('263020.0', 13), ('263160.0', 14), ('263190.0', 12), ('263480.0', 13), ('263620.0', 14), ('263650.0', 12), ('263940.0', 13), ('264080.0', 14), ('264110.0', 12), ('264400.0', 13), ('264540.0', 14), ('264570.0', 12), ('264860.0', 13), ('265000.0', 14), ('265030.0', 12), ('265320.0', 13), ('265460.0', 14), ('265490.0', 12), ('265780.0', 13), ('265920.0', 14), ('265950.0', 12), ('266240.0', 13), ('266380.0', 14), ('266410.0', 12), ('266700.0', 13), ('266840.0', 14), ('266870.0', 12), ('267160.0', 13), ('267300.0', 14), ('267330.0', 12), ('267620.0', 13), ('267760.0', 14), ('267790.0', 12), ('268080.0', 13), ('268220.0', 14), ('268250.0', 12), ('268540.0', 13), ('268680.0', 14), ('268710.0', 12), ('269000.0', 13), ('269140.0', 14), ('269170.0', 12), ('269460.0', 13), ('269600.0', 14), ('269630.0', 12), ('269920.0', 13), ('270060.0', 14), ('270090.0', 12), ('270380.0', 13), ('270520.0', 14), ('270550.0', 12), ('270840.0', 13), ('270980.0', 14), ('271010.0', 12), ('271300.0', 13), ('271440.0', 14), ('271470.0', 12), ('271760.0', 13), ('271900.0', 14), ('271930.0', 12), ('272220.0', 13), ('272360.0', 14), ('272390.0', 12), ('272680.0', 13), ('272820.0', 14), ('272850.0', 12), ('273140.0', 13), ('273280.0', 14), ('273310.0', 12), ('273600.0', 13), ('273740.0', 14), ('273770.0', 12), ('274060.0', 13), ('274200.0', 14), ('274230.0', 12), ('274520.0', 13), ('274660.0', 14), ('274690.0', 12), ('274980.0', 13), ('275120.0', 14), ('275150.0', 12), ('275440.0', 13), ('275580.0', 14), ('275610.0', 12), ('275900.0', 13), ('276040.0', 14), ('276070.0', 12), ('276360.0', 13), ('276500.0', 14), ('276530.0', 12), ('276820.0', 13), ('276960.0', 14), ('276990.0', 12), ('277280.0', 13), ('277420.0', 14), ('277450.0', 12), ('277740.0', 13), ('277880.0', 14), ('277910.0', 12), ('278200.0', 13), ('278340.0', 14), ('278370.0', 12), ('278660.0', 13), ('278800.0', 14), ('278830.0', 12), ('279120.0', 13), ('279260.0', 14), ('279290.0', 12), ('279580.0', 13), ('279720.0', 14), ('279750.0', 12), ('280040.0', 13), ('280180.0', 14), ('280210.0', 12), ('280500.0', 13), ('280640.0', 14), ('280670.0', 12), ('280960.0', 13), ('281100.0', 14), ('281130.0', 12), ('281420.0', 13), ('281560.0', 14), ('281590.0', 12), ('281880.0', 13), ('282020.0', 14), ('282050.0', 12), ('282340.0', 13), ('282480.0', 14), ('282510.0', 12), ('282800.0', 13), ('282940.0', 1), ('283120.0', 2), ('283150.0', 4), ('329230.0', 5), ('365070.0', 6), ('365270.0', 7), ('365310.0', 8), ('388370.0', 9), ('389020.0', 11), ('870690.0', 1), ('870870.0', 2), ('870900.0', 6), ('871100.0', 12), ('871280.0', 13), ('871350.0', 14), ('871380.0', 12), ('871530.0', 13), ('871600.0', 14), ('871630.0', 12), ('871780.0', 13)]
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer occupancy: 256 written words, cells [0, 1, 2, 3], first entries [(0, 0, '0x60000'), (0, 1, '0x0'), (0, 2, '0x0'), (0, 3, '0x0')]
+INFO     cocotb:simulator.py:266 1324760.00ns ERROR    cocotb                             Iact buffer check failed after layer 5 (OPENEYE_KEEP_GOING: the model runs on)
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             Layer parameters created. 0.007501125335693359
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             All weight-files written
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             All iact-files written
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             All results calculated
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             All psum-files written
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             Reference Output calculated.
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             Reference data created. 0.003862142562866211
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             Start creating stream. 7.128715515136719e-05
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             Stream finished: 1 of 1
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             Streams set. 0.15544462203979492
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             Send stream No. 7
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             DMA stream sections (words each): [18, 0, 72, 12, 20, 0, 0]
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             DUT expects trans_cycles_iact = 0
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             DUT expects trans_cycles_wght = 9792
+INFO     cocotb:simulator.py:266 1324760.00ns INFO     cocotb                             DUT expects trans_cycles_psum = 32
+INFO     cocotb:simulator.py:266 1324930.00ns INFO     cocotb                             FSM state -> 2 at 1324930.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+INFO     cocotb:simulator.py:266 1324940.00ns INFO     cocotb                             DUT expects trans_cycles_iact = 0
+INFO     cocotb:simulator.py:266 1324940.00ns INFO     cocotb                             DUT expects trans_cycles_wght = 72
+INFO     cocotb:simulator.py:266 1324940.00ns INFO     cocotb                             DUT expects trans_cycles_psum = 12
+INFO     cocotb:simulator.py:266 1324940.00ns INFO     cocotb                             DUT compute_mask_reg = 0x55555555
+INFO     cocotb:simulator.py:266 1324940.00ns INFO     cocotb                             DUT send_data_out = 1
+INFO     cocotb:simulator.py:266 1324940.00ns INFO     cocotb                             DUT store_in_psum = 0
+INFO     cocotb:simulator.py:266 1324940.00ns INFO     cocotb                             DUT fully_connected_layer = 1
+INFO     cocotb:simulator.py:266 1324940.00ns INFO     cocotb                             Host will send: iact 0, wght 72, psum 12, quantize 20 words
+INFO     cocotb:simulator.py:266 1324960.00ns INFO     cocotb                             FSM state -> 4 at 1324960.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+INFO     cocotb:simulator.py:266 1325680.00ns INFO     cocotb                             FSM state -> 5 at 1325680.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+INFO     cocotb:simulator.py:266 1325800.00ns INFO     cocotb                             FSM state -> 6 at 1325800.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+INFO     cocotb:simulator.py:266 1325990.00ns INFO     cocotb                             Stream is sent.
+INFO     cocotb:simulator.py:266 1326000.00ns INFO     cocotb                             FSM state -> 7 at 1326000.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+INFO     cocotb:simulator.py:266 1326040.00ns INFO     cocotb                             FSM state -> 8 at 1326040.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+INFO     cocotb:simulator.py:266 1326220.00ns INFO     cocotb                             FSM state -> 9 at 1326220.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+INFO     cocotb:simulator.py:266 1326870.00ns INFO     cocotb                             FSM state -> 10 at 1326870.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+INFO     cocotb:simulator.py:266 1328290.00ns INFO     cocotb.OpenEye_FPGA                Output Stream started
+INFO     cocotb:simulator.py:266 1328410.00ns INFO     cocotb                             FSM state -> 1 at 1328410.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+INFO     cocotb:simulator.py:266 1328410.00ns INFO     cocotb                             Results are checked.
+INFO     cocotb:simulator.py:266 1328410.00ns ERROR    cocotb                             10 of 10 outputs differ from the reference
+INFO     cocotb:simulator.py:266 1328410.00ns ERROR    cocotb                               f = 0: reference 307, DUT 275
+INFO     cocotb:simulator.py:266 1328410.00ns ERROR    cocotb                               f = 1: reference 394, DUT 407
+INFO     cocotb:simulator.py:266 1328410.00ns ERROR    cocotb                               f = 2: reference 256, DUT 253
+INFO     cocotb:simulator.py:266 1328410.00ns ERROR    cocotb                               f = 3: reference 250, DUT 204
+INFO     cocotb:simulator.py:266 1328410.00ns ERROR    cocotb                               f = 4: reference 54, DUT 36
+INFO     cocotb:simulator.py:266 1328410.00ns ERROR    cocotb                               f = 5: reference -16, DUT -34
+INFO     cocotb:simulator.py:266 1328410.00ns ERROR    cocotb                               f = 6: reference -17, DUT -37
+INFO     cocotb:simulator.py:266 1328410.00ns ERROR    cocotb                               f = 7: reference -58, DUT -73
+INFO     cocotb:simulator.py:266 1328410.00ns ERROR    cocotb                             Difference found at line 1:
+INFO     cocotb:simulator.py:266 1328410.00ns ERROR    cocotb                             Line width mismatch: reference 64 chars, output 64 chars, expected 60 (3 words x 20 bits)
+INFO     cocotb:simulator.py:266 1328410.00ns ERROR    cocotb                             Reference Data: 0000000000000000000000000000000000000000000000000000000100110011   0 0 19
+INFO     cocotb:simulator.py:266 1328410.00ns ERROR    cocotb                             Output Data   : 0000000000000000000000000000000000000000000000000000000100010011   0 0 17
+INFO     cocotb:simulator.py:266 1328410.00ns WARNING  .. start_test_fpga.start_test_fpga result check failed: values differ, reference file differs
+INFO     cocotb:simulator.py:266                                                          assert (False)
+INFO     cocotb:simulator.py:266                                                          Traceback (most recent call last):
+INFO     cocotb:simulator.py:266                                                            File "/home/truongphi/OpenEye_orig/test/cocotb_fpga/OpenEye_FPGA_tb.py", line 155, in start_test_fpga
+INFO     cocotb:simulator.py:266                                                              await with_timeout(single_layer_test(dut),timeout_time, timeout_unit)
+INFO     cocotb:simulator.py:266                                                            File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/_extended_awaitables.py", line 411, in with_timeout
+INFO     cocotb:simulator.py:266                                                              res = await First(timeout_timer, trigger)
+INFO     cocotb:simulator.py:266                                                            File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/_extended_awaitables.py", line 203, in _wait
+INFO     cocotb:simulator.py:266                                                              return completed[0].result()
+INFO     cocotb:simulator.py:266                                                            File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/task.py", line 450, in result
+INFO     cocotb:simulator.py:266                                                              return cast("Outcome[ResultType]", self._outcome).get()
+INFO     cocotb:simulator.py:266                                                            File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/_outcomes.py", line 51, in get
+INFO     cocotb:simulator.py:266                                                              raise self.error
+INFO     cocotb:simulator.py:266                                                            File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/_extended_awaitables.py", line 73, in _wait_callback
+INFO     cocotb:simulator.py:266                                                              return await trigger
+INFO     cocotb:simulator.py:266                                                            File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/task.py", line 493, in __await__
+INFO     cocotb:simulator.py:266                                                              return self.result()
+INFO     cocotb:simulator.py:266                                                            File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/task.py", line 450, in result
+INFO     cocotb:simulator.py:266                                                              return cast("Outcome[ResultType]", self._outcome).get()
+INFO     cocotb:simulator.py:266                                                            File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/_outcomes.py", line 51, in get
+INFO     cocotb:simulator.py:266                                                              raise self.error
+INFO     cocotb:simulator.py:266                                                            File "/home/truongphi/OpenEye_orig/test/cocotb_fpga/OpenEye_FPGA_tb.py", line 236, in single_layer_test
+INFO     cocotb:simulator.py:266                                                              await execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, serial, ptp, trunc_model)
+INFO     cocotb:simulator.py:266                                                            File "/home/truongphi/OpenEye_orig/test/cocotb_fpga/OpenEye_FPGA_tb.py", line 567, in execute_model
+INFO     cocotb:simulator.py:266                                                              assert dram_ok and file_ok, "result check failed: values %s, reference file %s" % (
+INFO     cocotb:simulator.py:266                                                          AssertionError: result check failed: values differ, reference file differs
+INFO     cocotb:simulator.py:266                                                          assert (False)
+INFO     cocotb:simulator.py:266 1328410.00ns WARNING  cocotb.regression                  OpenEye_FPGA_tb.start_test_fpga failed
+INFO     cocotb:simulator.py:266 1328410.00ns INFO     cocotb.regression                  *****************************************************************************************
+INFO     cocotb:simulator.py:266                                                          ** TEST                             STATUS  SIM TIME (ns)  REAL TIME (s)  RATIO (ns/s) **
+INFO     cocotb:simulator.py:266                                                          *****************************************************************************************
+INFO     cocotb:simulator.py:266                                                          ** OpenEye_FPGA_tb.start_test_fpga   FAIL     1328410.00         498.07       2667.13  **
+INFO     cocotb:simulator.py:266                                                          *****************************************************************************************
+INFO     cocotb:simulator.py:266                                                          ** TESTS=1 PASS=0 FAIL=1 SKIP=0               1328410.00         498.07       2667.10  **
+INFO     cocotb:simulator.py:266                                                          *****************************************************************************************
+ERROR    cocotb:simulator.py:217 Failed: OpenEye_FPGA_tb::start_test_fpga
+=========================== short test summary info ============================
+FAILED doc/experiments/2026-11-17_paper_dense_sparse/test_paper_relu.py::test_paper_relu[paper_cr2_x2_y4]
+1 failed in 462.76s (0:07:42)

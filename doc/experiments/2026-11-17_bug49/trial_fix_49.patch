@@ -1,0 +1,17 @@
+diff --git a/hdl/psum_pipeline.v b/hdl/psum_pipeline.v
+index d09a2df..102dbd3 100644
+--- a/hdl/psum_pipeline.v
++++ b/hdl/psum_pipeline.v
+@@ -259,6 +259,12 @@ module psum_pipeline #(
+           // (bug #28, data dependent through zero skipping; doc/experiments/2026-11-03_table3_cr1.md).
+           if ((CLUSTER_ROWS == 1) && (rr_g*2 + 1 < NUM_GLB_PSUM)) begin : gen_pair_ready
+             assign chain_ready_terms[TERM] = psum_ready_o_reg[GLB] & psum_ready_o_reg[GLB+1];
++          end else if (rr_g*2 + 1 < NUM_GLB_PSUM) begin : gen_pair_ready_cr
++            // TRIAL (bug #49 investigation, scratch worktree only): the odd GLB of the pair counts too when it
++            // starts a chain (its own router_mode_psum bit 2).
++            wire not_chain_start_odd = (router_mode_psum[MODE + ROUTER_MODES_PSUM] == 0);
++            assign chain_ready_terms[TERM] = (psum_ready_o_reg[GLB] | not_chain_start) &
++                                             (psum_ready_o_reg[GLB+1] | not_chain_start_odd);
+           end else begin : gen_even_ready
+             assign chain_ready_terms[TERM] = psum_ready_o_reg[GLB] | not_chain_start;
+           end

@@ -1,0 +1,819 @@
+      0.00ns INFO     cocotb               File logging started at sim time 0.0 ns
+      0.00ns INFO     cocotb               OPENEYE_SEED: random model and data seeded with 1
+      0.00ns INFO     cocotb               OpenEye parameters set. 1.6267192363739014
+      0.00ns INFO     cocotb.OpenEye_FPGA  Clock is 10 ns
+     40.00ns INFO     cocotb               layer 0/7 Convolution2D: in=28x28 ch=1 filters=16 send_values_out=0 store_in_psum=0 transmissions=1 output_cycles=112.0 psum_output_words=7168 used_Y_cluster=1 used_X_cluster=4
+     40.00ns INFO     cocotb               layer 1/7 Pooling: in=28x28 ch=16 filters=1 send_values_out=1 store_in_psum=0 transmissions=1 output_cycles=0 psum_output_words=1 used_Y_cluster=1 used_X_cluster=1
+     40.00ns INFO     cocotb               layer 2/7 Convolution2D: in=14x14 ch=16 filters=32 send_values_out=0 store_in_psum=0 transmissions=1 output_cycles=28.0 psum_output_words=3584 used_Y_cluster=1 used_X_cluster=4
+     40.00ns INFO     cocotb               layer 3/7 Pooling: in=14x14 ch=32 filters=1 send_values_out=1 store_in_psum=0 transmissions=1 output_cycles=0 psum_output_words=1 used_Y_cluster=1 used_X_cluster=1
+     40.00ns INFO     cocotb               layer 4/7 Convolution2D: in=7x7 ch=32 filters=32 send_values_out=0 store_in_psum=0 transmissions=1 output_cycles=7.0 psum_output_words=896 used_Y_cluster=1 used_X_cluster=4
+     40.00ns INFO     cocotb               layer 5/7 Dense: in=1568x1 ch=1 filters=32 send_values_out=0 store_in_psum=0 transmissions=1 output_cycles=1 psum_output_words=32 used_Y_cluster=2 used_X_cluster=1
+     40.00ns INFO     cocotb               layer 6/7 Dense: in=32x1 ch=1 filters=10 send_values_out=1 store_in_psum=0 transmissions=1 output_cycles=1 psum_output_words=12 used_Y_cluster=2 used_X_cluster=1
+     40.00ns INFO     cocotb               Initialized DRAM. 0.02700328826904297
+     40.00ns INFO     cocotb               Layer parameters created. 9.51294755935669
+     40.00ns INFO     cocotb               All weight-files written
+     40.00ns INFO     cocotb               All iact-files written
+     40.00ns INFO     cocotb               All results calculated
+     40.00ns INFO     cocotb               All psum-files written
+     40.00ns INFO     cocotb               Stream 0 / 1 calculated.
+     40.00ns INFO     cocotb               Reference Output calculated.
+     40.00ns INFO     cocotb               Reference data created. 9.672199487686157
+     40.00ns INFO     cocotb               Start creating stream. 0.00032782554626464844
+     40.00ns INFO     cocotb               Stream finished: 1 of 1
+     40.00ns INFO     cocotb               Streams set. 0.7476158142089844
+     40.00ns INFO     cocotb               Send stream No. 1
+     40.00ns INFO     cocotb               FSM state -> 1 at 40.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=0)
+     40.00ns INFO     cocotb               DMA stream sections (words each): [18, 100, 144, 7168, 20, 0, 0]
+     40.00ns INFO     cocotb               DUT expects trans_cycles_iact = 0
+     40.00ns INFO     cocotb               DUT expects trans_cycles_wght = 0
+     40.00ns INFO     cocotb               DUT expects trans_cycles_psum = 0
+    210.00ns INFO     cocotb               FSM state -> 2 at 210.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+    220.00ns INFO     cocotb               DUT expects trans_cycles_iact = 100
+    220.00ns INFO     cocotb               DUT expects trans_cycles_wght = 144
+    220.00ns INFO     cocotb               DUT expects trans_cycles_psum = 7168
+    220.00ns INFO     cocotb               DUT compute_mask_reg = 0x3f3f3f3f
+    220.00ns INFO     cocotb               DUT send_data_out = 0
+    220.00ns INFO     cocotb               DUT store_in_psum = 0
+    220.00ns INFO     cocotb               DUT fully_connected_layer = 0
+    220.00ns INFO     cocotb               Host will send: iact 100, wght 144, psum 7168, quantize 20 words
+    240.00ns INFO     cocotb               FSM state -> 3 at 240.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+   1240.00ns INFO     cocotb               FSM state -> 4 at 1240.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+   2680.00ns INFO     cocotb               FSM state -> 5 at 2680.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+  74360.00ns INFO     cocotb               FSM state -> 6 at 74360.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+  74550.00ns INFO     cocotb               Stream is sent.
+  74560.00ns INFO     cocotb               FSM state -> 7 at 74560.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+  74600.00ns INFO     cocotb               FSM state -> 8 at 74600.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+  84820.00ns INFO     cocotb               FSM state -> 9 at 84820.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+  85470.00ns INFO     cocotb               FSM state -> 11 at 85470.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+ 256770.00ns INFO     cocotb               FSM state -> 1 at 256770.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=100, trans_cycles_psum=7168)
+ 256780.00ns INFO     cocotb               Ready signal detected. Start new stream 79.07748579978943
+ 256780.00ns INFO     cocotb               Results are transmitted.
+ 256780.00ns INFO     cocotb               Iact check context: layer 0, repetition 0 of 1
+ 256780.00ns INFO     cocotb               Iact storages are checked.
+ 256780.00ns INFO     cocotb               Iact reference: shape (16, 28, 28), used_channels 4, IACT_RAM_CELLS 4
+ 256780.00ns WARNING  cocotb               No iact buffer layout known for layer 'Pooling'; skipping the check.
+ 256780.00ns INFO     cocotb               Layer parameters created. 2.998288631439209
+ 256780.00ns INFO     cocotb               All weight-files written
+ 256780.00ns INFO     cocotb               All iact-files written
+ 256780.00ns INFO     cocotb               All results calculated
+ 256780.00ns INFO     cocotb               All psum-files written
+ 256780.00ns INFO     cocotb               Reference Output calculated.
+ 256780.00ns INFO     cocotb               Reference data created. 0.026535987854003906
+ 256780.00ns INFO     cocotb               Start creating stream. 0.0002090930938720703
+ 256780.00ns INFO     cocotb               Stream finished: 1 of 1
+ 256780.00ns INFO     cocotb               Streams set. 0.14954543113708496
+ 256780.00ns INFO     cocotb               Send stream No. 2
+ 256780.00ns INFO     cocotb               DMA stream sections (words each): [18, 0, 0, 0, 20, 0, 0]
+ 256780.00ns INFO     cocotb               DUT expects trans_cycles_iact = 100
+ 256780.00ns INFO     cocotb               DUT expects trans_cycles_wght = 144
+ 256780.00ns INFO     cocotb               DUT expects trans_cycles_psum = 7168
+ 256950.00ns INFO     cocotb               FSM state -> 2 at 256950.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 256960.00ns INFO     cocotb               DUT expects trans_cycles_iact = 1
+ 256960.00ns INFO     cocotb               DUT expects trans_cycles_wght = 1
+ 256960.00ns INFO     cocotb               DUT expects trans_cycles_psum = 1
+ 256960.00ns INFO     cocotb               DUT compute_mask_reg = 0xffffffff
+ 256960.00ns INFO     cocotb               DUT send_data_out = 1
+ 256960.00ns INFO     cocotb               DUT store_in_psum = 0
+ 256960.00ns INFO     cocotb               DUT fully_connected_layer = 0
+ 256960.00ns INFO     cocotb               Host will send: iact 0, wght 0, psum 0, quantize 20 words
+ 256980.00ns INFO     cocotb               FSM state -> 6 at 256980.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 257170.00ns INFO     cocotb               Stream is sent.
+ 257180.00ns INFO     cocotb               FSM state -> 12 at 257180.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 257500.00ns INFO     cocotb               FSM state -> 13 at 257500.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 257640.00ns INFO     cocotb               FSM state -> 14 at 257640.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 257670.00ns INFO     cocotb               FSM state -> 12 at 257670.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 257960.00ns INFO     cocotb               FSM state -> 13 at 257960.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 258100.00ns INFO     cocotb               FSM state -> 14 at 258100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 258130.00ns INFO     cocotb               FSM state -> 12 at 258130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 258420.00ns INFO     cocotb               FSM state -> 13 at 258420.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 258560.00ns INFO     cocotb               FSM state -> 14 at 258560.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 258590.00ns INFO     cocotb               FSM state -> 12 at 258590.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 258880.00ns INFO     cocotb               FSM state -> 13 at 258880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 259020.00ns INFO     cocotb               FSM state -> 14 at 259020.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 259050.00ns INFO     cocotb               FSM state -> 12 at 259050.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 259340.00ns INFO     cocotb               FSM state -> 13 at 259340.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 259480.00ns INFO     cocotb               FSM state -> 14 at 259480.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 259510.00ns INFO     cocotb               FSM state -> 12 at 259510.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 259800.00ns INFO     cocotb               FSM state -> 13 at 259800.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 259940.00ns INFO     cocotb               FSM state -> 14 at 259940.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 259970.00ns INFO     cocotb               FSM state -> 12 at 259970.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 260260.00ns INFO     cocotb               FSM state -> 13 at 260260.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 260400.00ns INFO     cocotb               FSM state -> 14 at 260400.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 260430.00ns INFO     cocotb               FSM state -> 12 at 260430.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 260720.00ns INFO     cocotb               FSM state -> 13 at 260720.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 260860.00ns INFO     cocotb               FSM state -> 14 at 260860.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 260890.00ns INFO     cocotb               FSM state -> 12 at 260890.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 261180.00ns INFO     cocotb               FSM state -> 13 at 261180.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 261320.00ns INFO     cocotb               FSM state -> 14 at 261320.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 261350.00ns INFO     cocotb               FSM state -> 12 at 261350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 261640.00ns INFO     cocotb               FSM state -> 13 at 261640.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 261780.00ns INFO     cocotb               FSM state -> 14 at 261780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 261810.00ns INFO     cocotb               FSM state -> 12 at 261810.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 262100.00ns INFO     cocotb               FSM state -> 13 at 262100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 262240.00ns INFO     cocotb               FSM state -> 14 at 262240.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 262270.00ns INFO     cocotb               FSM state -> 12 at 262270.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 262560.00ns INFO     cocotb               FSM state -> 13 at 262560.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 262700.00ns INFO     cocotb               FSM state -> 14 at 262700.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 262730.00ns INFO     cocotb               FSM state -> 12 at 262730.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 263020.00ns INFO     cocotb               FSM state -> 13 at 263020.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 263160.00ns INFO     cocotb               FSM state -> 14 at 263160.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 263190.00ns INFO     cocotb               FSM state -> 12 at 263190.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 263480.00ns INFO     cocotb               FSM state -> 13 at 263480.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 263620.00ns INFO     cocotb               FSM state -> 14 at 263620.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 263650.00ns INFO     cocotb               FSM state -> 12 at 263650.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 263940.00ns INFO     cocotb               FSM state -> 13 at 263940.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 264080.00ns INFO     cocotb               FSM state -> 14 at 264080.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 264110.00ns INFO     cocotb               FSM state -> 12 at 264110.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 264400.00ns INFO     cocotb               FSM state -> 13 at 264400.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 264540.00ns INFO     cocotb               FSM state -> 14 at 264540.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 264570.00ns INFO     cocotb               FSM state -> 12 at 264570.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 264860.00ns INFO     cocotb               FSM state -> 13 at 264860.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 265000.00ns INFO     cocotb               FSM state -> 14 at 265000.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 265030.00ns INFO     cocotb               FSM state -> 12 at 265030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 265320.00ns INFO     cocotb               FSM state -> 13 at 265320.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 265460.00ns INFO     cocotb               FSM state -> 14 at 265460.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 265490.00ns INFO     cocotb               FSM state -> 12 at 265490.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 265780.00ns INFO     cocotb               FSM state -> 13 at 265780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 265920.00ns INFO     cocotb               FSM state -> 14 at 265920.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 265950.00ns INFO     cocotb               FSM state -> 12 at 265950.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 266240.00ns INFO     cocotb               FSM state -> 13 at 266240.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 266380.00ns INFO     cocotb               FSM state -> 14 at 266380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 266410.00ns INFO     cocotb               FSM state -> 12 at 266410.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 266700.00ns INFO     cocotb               FSM state -> 13 at 266700.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 266840.00ns INFO     cocotb               FSM state -> 14 at 266840.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 266870.00ns INFO     cocotb               FSM state -> 12 at 266870.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 267160.00ns INFO     cocotb               FSM state -> 13 at 267160.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 267300.00ns INFO     cocotb               FSM state -> 14 at 267300.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 267330.00ns INFO     cocotb               FSM state -> 12 at 267330.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 267620.00ns INFO     cocotb               FSM state -> 13 at 267620.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 267760.00ns INFO     cocotb               FSM state -> 14 at 267760.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 267790.00ns INFO     cocotb               FSM state -> 12 at 267790.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 268080.00ns INFO     cocotb               FSM state -> 13 at 268080.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 268220.00ns INFO     cocotb               FSM state -> 14 at 268220.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 268250.00ns INFO     cocotb               FSM state -> 12 at 268250.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 268540.00ns INFO     cocotb               FSM state -> 13 at 268540.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 268680.00ns INFO     cocotb               FSM state -> 14 at 268680.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 268710.00ns INFO     cocotb               FSM state -> 12 at 268710.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 269000.00ns INFO     cocotb               FSM state -> 13 at 269000.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 269140.00ns INFO     cocotb               FSM state -> 14 at 269140.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 269170.00ns INFO     cocotb               FSM state -> 12 at 269170.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 269460.00ns INFO     cocotb               FSM state -> 13 at 269460.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 269600.00ns INFO     cocotb               FSM state -> 14 at 269600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 269630.00ns INFO     cocotb               FSM state -> 12 at 269630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 269920.00ns INFO     cocotb               FSM state -> 13 at 269920.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 270060.00ns INFO     cocotb               FSM state -> 14 at 270060.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 270090.00ns INFO     cocotb               FSM state -> 12 at 270090.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 270380.00ns INFO     cocotb               FSM state -> 13 at 270380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 270520.00ns INFO     cocotb               FSM state -> 14 at 270520.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 270550.00ns INFO     cocotb               FSM state -> 12 at 270550.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 270840.00ns INFO     cocotb               FSM state -> 13 at 270840.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 270980.00ns INFO     cocotb               FSM state -> 14 at 270980.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 271010.00ns INFO     cocotb               FSM state -> 12 at 271010.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 271300.00ns INFO     cocotb               FSM state -> 13 at 271300.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 271440.00ns INFO     cocotb               FSM state -> 14 at 271440.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 271470.00ns INFO     cocotb               FSM state -> 12 at 271470.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 271760.00ns INFO     cocotb               FSM state -> 13 at 271760.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 271900.00ns INFO     cocotb               FSM state -> 14 at 271900.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 271930.00ns INFO     cocotb               FSM state -> 12 at 271930.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 272220.00ns INFO     cocotb               FSM state -> 13 at 272220.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 272360.00ns INFO     cocotb               FSM state -> 14 at 272360.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 272390.00ns INFO     cocotb               FSM state -> 12 at 272390.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 272680.00ns INFO     cocotb               FSM state -> 13 at 272680.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 272820.00ns INFO     cocotb               FSM state -> 14 at 272820.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 272850.00ns INFO     cocotb               FSM state -> 12 at 272850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 273140.00ns INFO     cocotb               FSM state -> 13 at 273140.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 273280.00ns INFO     cocotb               FSM state -> 14 at 273280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 273310.00ns INFO     cocotb               FSM state -> 12 at 273310.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 273600.00ns INFO     cocotb               FSM state -> 13 at 273600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 273740.00ns INFO     cocotb               FSM state -> 14 at 273740.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 273770.00ns INFO     cocotb               FSM state -> 12 at 273770.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 274060.00ns INFO     cocotb               FSM state -> 13 at 274060.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 274200.00ns INFO     cocotb               FSM state -> 14 at 274200.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 274230.00ns INFO     cocotb               FSM state -> 12 at 274230.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 274520.00ns INFO     cocotb               FSM state -> 13 at 274520.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 274660.00ns INFO     cocotb               FSM state -> 14 at 274660.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 274690.00ns INFO     cocotb               FSM state -> 12 at 274690.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 274980.00ns INFO     cocotb               FSM state -> 13 at 274980.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 275120.00ns INFO     cocotb               FSM state -> 14 at 275120.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 275150.00ns INFO     cocotb               FSM state -> 12 at 275150.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 275440.00ns INFO     cocotb               FSM state -> 13 at 275440.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 275580.00ns INFO     cocotb               FSM state -> 14 at 275580.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 275610.00ns INFO     cocotb               FSM state -> 12 at 275610.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 275900.00ns INFO     cocotb               FSM state -> 13 at 275900.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 276040.00ns INFO     cocotb               FSM state -> 14 at 276040.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 276070.00ns INFO     cocotb               FSM state -> 12 at 276070.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 276360.00ns INFO     cocotb               FSM state -> 13 at 276360.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 276500.00ns INFO     cocotb               FSM state -> 14 at 276500.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 276530.00ns INFO     cocotb               FSM state -> 12 at 276530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 276820.00ns INFO     cocotb               FSM state -> 13 at 276820.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 276960.00ns INFO     cocotb               FSM state -> 14 at 276960.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 276990.00ns INFO     cocotb               FSM state -> 12 at 276990.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 277280.00ns INFO     cocotb               FSM state -> 13 at 277280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 277420.00ns INFO     cocotb               FSM state -> 14 at 277420.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 277450.00ns INFO     cocotb               FSM state -> 12 at 277450.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 277740.00ns INFO     cocotb               FSM state -> 13 at 277740.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 277880.00ns INFO     cocotb               FSM state -> 14 at 277880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 277910.00ns INFO     cocotb               FSM state -> 12 at 277910.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 278200.00ns INFO     cocotb               FSM state -> 13 at 278200.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 278340.00ns INFO     cocotb               FSM state -> 14 at 278340.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 278370.00ns INFO     cocotb               FSM state -> 12 at 278370.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 278660.00ns INFO     cocotb               FSM state -> 13 at 278660.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 278800.00ns INFO     cocotb               FSM state -> 14 at 278800.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 278830.00ns INFO     cocotb               FSM state -> 12 at 278830.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 279120.00ns INFO     cocotb               FSM state -> 13 at 279120.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 279260.00ns INFO     cocotb               FSM state -> 14 at 279260.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 279290.00ns INFO     cocotb               FSM state -> 12 at 279290.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 279580.00ns INFO     cocotb               FSM state -> 13 at 279580.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 279720.00ns INFO     cocotb               FSM state -> 14 at 279720.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 279750.00ns INFO     cocotb               FSM state -> 12 at 279750.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 280040.00ns INFO     cocotb               FSM state -> 13 at 280040.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 280180.00ns INFO     cocotb               FSM state -> 14 at 280180.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 280210.00ns INFO     cocotb               FSM state -> 12 at 280210.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 280500.00ns INFO     cocotb               FSM state -> 13 at 280500.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 280640.00ns INFO     cocotb               FSM state -> 14 at 280640.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 280670.00ns INFO     cocotb               FSM state -> 12 at 280670.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 280960.00ns INFO     cocotb               FSM state -> 13 at 280960.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 281100.00ns INFO     cocotb               FSM state -> 14 at 281100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 281130.00ns INFO     cocotb               FSM state -> 12 at 281130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 281420.00ns INFO     cocotb               FSM state -> 13 at 281420.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 281560.00ns INFO     cocotb               FSM state -> 14 at 281560.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 281590.00ns INFO     cocotb               FSM state -> 12 at 281590.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 281880.00ns INFO     cocotb               FSM state -> 13 at 281880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 282020.00ns INFO     cocotb               FSM state -> 14 at 282020.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 282050.00ns INFO     cocotb               FSM state -> 12 at 282050.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 282340.00ns INFO     cocotb               FSM state -> 13 at 282340.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 282480.00ns INFO     cocotb               FSM state -> 14 at 282480.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 282510.00ns INFO     cocotb               FSM state -> 12 at 282510.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 282800.00ns INFO     cocotb               FSM state -> 13 at 282800.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 282940.00ns INFO     cocotb               FSM state -> 1 at 282940.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 282950.00ns INFO     cocotb               Ready signal detected. Start new stream 6.619974851608276
+ 282950.00ns INFO     cocotb               Results are transmitted.
+ 282950.00ns INFO     cocotb               Iact check context: layer 1, repetition 0 of 1
+ 282950.00ns INFO     cocotb               Iact storages are checked.
+ 282950.00ns INFO     cocotb               Iact reference: shape (16, 14, 14), used_channels 4, IACT_RAM_CELLS 4
+ 282950.00ns INFO     cocotb               Iact buffer check: 392 expected words, 4 cells per group, depth 4096 (layer 'Convolution2D')
+ 282950.00ns INFO     cocotb               Layer parameters created. 0.014368534088134766
+ 282950.00ns INFO     cocotb               All weight-files written
+ 282950.00ns INFO     cocotb               All iact-files written
+ 282950.00ns INFO     cocotb               All results calculated
+ 282950.00ns INFO     cocotb               All psum-files written
+ 282950.00ns INFO     cocotb               Stream 0 / 1 calculated.
+ 282950.00ns INFO     cocotb               Reference Output calculated.
+ 282950.00ns INFO     cocotb               Reference data created. 3.9848036766052246
+ 282950.00ns INFO     cocotb               Start creating stream. 0.00037980079650878906
+ 282950.00ns INFO     cocotb               Stream finished: 1 of 1
+ 282950.00ns INFO     cocotb               Streams set. 0.20021891593933105
+ 282950.00ns INFO     cocotb               Send stream No. 3
+ 282950.00ns INFO     cocotb               DMA stream sections (words each): [18, 0, 4608, 3584, 20, 0, 0]
+ 282950.00ns INFO     cocotb               DUT expects trans_cycles_iact = 1
+ 282950.00ns INFO     cocotb               DUT expects trans_cycles_wght = 1
+ 282950.00ns INFO     cocotb               DUT expects trans_cycles_psum = 1
+ 283120.00ns INFO     cocotb               FSM state -> 2 at 283120.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+ 283130.00ns INFO     cocotb               DUT expects trans_cycles_iact = 392
+ 283130.00ns INFO     cocotb               DUT expects trans_cycles_wght = 4608
+ 283130.00ns INFO     cocotb               DUT expects trans_cycles_psum = 3584
+ 283130.00ns INFO     cocotb               DUT compute_mask_reg = 0x3f3f3f3f
+ 283130.00ns INFO     cocotb               DUT send_data_out = 0
+ 283130.00ns INFO     cocotb               DUT store_in_psum = 0
+ 283130.00ns INFO     cocotb               DUT fully_connected_layer = 0
+ 283130.00ns INFO     cocotb               Host will send: iact 0, wght 4608, psum 3584, quantize 20 words
+ 283150.00ns INFO     cocotb               FSM state -> 4 at 283150.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+ 329230.00ns INFO     cocotb               FSM state -> 5 at 329230.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+ 365070.00ns INFO     cocotb               FSM state -> 6 at 365070.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+ 365260.00ns INFO     cocotb               Stream is sent.
+ 365270.00ns INFO     cocotb               FSM state -> 7 at 365270.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+ 365310.00ns INFO     cocotb               FSM state -> 8 at 365310.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+ 388370.00ns INFO     cocotb               FSM state -> 9 at 388370.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+ 389020.00ns INFO     cocotb               FSM state -> 11 at 389020.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+ 589020.00ns ERROR    cocotb               FSM stuck in state 11 for 20000 cycles: fsm_cycle=0, fsm_psum_cycle=0, fsm_psum_current_state=2, trans_cycles_iact=392, trans_cycles_wght=4608, trans_cycles_psum=3584, current_cycle=101, needed_cycles=224, single_iteration=1
+ 589020.00ns ERROR    cocotb                 psum_ready_i_reg = 11111111
+ 589020.00ns ERROR    cocotb                 psum_enable_i_reg = 00000000
+ 589020.00ns ERROR    cocotb                 results_ready = 0
+ 589020.00ns ERROR    cocotb                 finished_cycles_psum = 000000000001100100
+ 589020.00ns ERROR    cocotb                 psum_choose_i_reg = 11111111
+ 589020.00ns ERROR    cocotb                 cluster(0,0) pe_router_psum_ready_out=00 enable_in=00
+ 589020.00ns ERROR    cocotb                 cluster(0,0) PE states by row: ['1001', '0110', '0110', '0110', '0110', '0110', '0000', '0000']
+ 589020.00ns ERROR    cocotb                 cluster(0,0) first PE psum_enable_i=0 psum_select=1
+ 589020.00ns ERROR    cocotb                 cluster(0,1) pe_router_psum_ready_out=00 enable_in=00
+ 589020.00ns ERROR    cocotb                 cluster(0,1) PE states by row: ['0110', '0110', '0110', '0110', '0110', '0110', '0000', '0000']
+ 589020.00ns ERROR    cocotb                 cluster(0,1) first PE psum_enable_i=0 psum_select=0
+ 589020.00ns ERROR    cocotb                 cluster(1,0) pe_router_psum_ready_out=00 enable_in=00
+ 589020.00ns ERROR    cocotb                 cluster(1,0) PE states by row: ['0110', '0110', '0110', '0110', '0110', '0110', '0000', '0000']
+ 589020.00ns ERROR    cocotb                 cluster(1,0) first PE psum_enable_i=0 psum_select=0
+ 589020.00ns ERROR    cocotb                 cluster(1,1) pe_router_psum_ready_out=00 enable_in=00
+ 589020.00ns ERROR    cocotb                 cluster(1,1) PE states by row: ['0110', '0110', '0110', '0110', '0110', '0110', '0000', '0000']
+ 589020.00ns ERROR    cocotb                 cluster(1,1) first PE psum_enable_i=0 psum_select=0
+ 589020.00ns ERROR    cocotb                 psum_enable_o = 00000000
+ 589020.00ns ERROR    cocotb                 psum_ready_o_reg = 00000000
+ 589020.00ns ERROR    cocotb                 router_mode_psum = 100100100100100100100100
+ 589020.00ns ERROR    cocotb                 iact_ready_o_oep_w = 0000
+ 589020.00ns ERROR    cocotb                 iact_enable_i_oep_w = 0000
+ 589020.00ns ERROR    cocotb                 DUT router_mode_iact = 000001000001000001000001
+ 589020.00ns ERROR    cocotb                 DUT router_mode_wght = 1111111100000000
+ 589020.00ns ERROR    cocotb                 DUT router_mode_psum = 100100100100100100100100
+ 589020.00ns ERROR    cocotb               iact handoff over 58897 cycles: enable cycles per bit {0: 6192, 1: 6192, 2: 6192, 3: 6192}, handshakes per bit {0: 6192, 1: 6192, 2: 6192, 3: 6192}
+ 589020.00ns ERROR    cocotb                 1548 valid cycles with enable=0xf choose=0xfefefefe -> cl0[c0r0<-g0] cl1[c0r0<-g0] cl2[c0r0<-g0] cl3[c0r0<-g0]
+ 589020.00ns ERROR    cocotb                 1548 valid cycles with enable=0xf choose=0xf9f9f9f9 -> cl0[c1r0<-g0,c0r1<-g0] cl1[c1r0<-g0,c0r1<-g0] cl2[c1r0<-g0,c0r1<-g0] cl3[c1r0<-g0,c0r1<-g0]
+ 589020.00ns ERROR    cocotb                 1548 valid cycles with enable=0xf choose=0xe7e7e7e7 -> cl0[c1r1<-g0,c0r2<-g0] cl1[c1r1<-g0,c0r2<-g0] cl2[c1r1<-g0,c0r2<-g0] cl3[c1r1<-g0,c0r2<-g0]
+ 589020.00ns ERROR    cocotb                 1548 valid cycles with enable=0xf choose=0x9f9f9f9f -> cl0[c1r2<-g0,c0r3<-g0] cl1[c1r2<-g0,c0r3<-g0] cl2[c1r2<-g0,c0r3<-g0] cl3[c1r2<-g0,c0r3<-g0]
+ 589020.00ns ERROR    cocotb               iact path BUFFER_A written words per cell (first 64 addrs): [64, 64, 64, 64]
+ 589020.00ns ERROR    cocotb               occupancy cluster(0,0) iact/wght/psum0: c0r0:12/32/17 c0r1:12/32/17 c0r2:12/32/17 c0r3:16/0/0 c1r0:12/32/17 c1r1:12/32/17 c1r2:12/32/17 c1r3:0/0/0
+ 589020.00ns ERROR    cocotb               occupancy cluster(0,1) iact/wght/psum0: c0r0:12/32/17 c0r1:12/32/17 c0r2:12/32/17 c0r3:16/0/0 c1r0:12/32/17 c1r1:12/32/17 c1r2:12/32/17 c1r3:0/0/0
+ 589020.00ns ERROR    cocotb               occupancy cluster(1,0) iact/wght/psum0: c0r0:12/32/17 c0r1:12/32/17 c0r2:12/32/17 c0r3:16/0/0 c1r0:12/32/17 c1r1:12/32/17 c1r2:12/32/17 c1r3:0/0/0
+ 589020.00ns ERROR    cocotb               occupancy cluster(1,1) iact/wght/psum0: c0r0:12/32/17 c0r1:12/32/17 c0r2:12/32/17 c0r3:16/0/0 c1r0:12/32/17 c1r1:12/32/17 c1r2:12/32/17 c1r3:0/0/0
+ 870690.00ns INFO     cocotb               FSM state -> 1 at 870690.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=392, trans_cycles_psum=3584)
+ 870700.00ns INFO     cocotb               Ready signal detected. Start new stream 218.70466113090515
+ 870700.00ns INFO     cocotb               Results are transmitted.
+ 870700.00ns INFO     cocotb               Iact check context: layer 2, repetition 0 of 1
+ 870700.00ns INFO     cocotb               Iact storages are checked.
+ 870700.00ns INFO     cocotb               Iact reference: shape (32, 14, 14), used_channels 4, IACT_RAM_CELLS 4
+ 870700.00ns WARNING  cocotb               No iact buffer layout known for layer 'Pooling'; skipping the check.
+ 870700.00ns INFO     cocotb               Layer parameters created. 1.3049936294555664
+ 870700.00ns INFO     cocotb               All weight-files written
+ 870700.00ns INFO     cocotb               All iact-files written
+ 870700.00ns INFO     cocotb               All results calculated
+ 870700.00ns INFO     cocotb               All psum-files written
+ 870700.00ns INFO     cocotb               Reference Output calculated.
+ 870700.00ns INFO     cocotb               Reference data created. 0.03104114532470703
+ 870700.00ns INFO     cocotb               Start creating stream. 0.0003364086151123047
+ 870700.00ns INFO     cocotb               Stream finished: 1 of 1
+ 870700.00ns INFO     cocotb               Streams set. 0.15033960342407227
+ 870700.00ns INFO     cocotb               Send stream No. 4
+ 870700.00ns INFO     cocotb               DMA stream sections (words each): [18, 0, 0, 0, 20, 0, 0]
+ 870700.00ns INFO     cocotb               DUT expects trans_cycles_iact = 392
+ 870700.00ns INFO     cocotb               DUT expects trans_cycles_wght = 4608
+ 870700.00ns INFO     cocotb               DUT expects trans_cycles_psum = 3584
+ 870870.00ns INFO     cocotb               FSM state -> 2 at 870870.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 870880.00ns INFO     cocotb               DUT expects trans_cycles_iact = 1
+ 870880.00ns INFO     cocotb               DUT expects trans_cycles_wght = 1
+ 870880.00ns INFO     cocotb               DUT expects trans_cycles_psum = 1
+ 870880.00ns INFO     cocotb               DUT compute_mask_reg = 0xffffffff
+ 870880.00ns INFO     cocotb               DUT send_data_out = 1
+ 870880.00ns INFO     cocotb               DUT store_in_psum = 0
+ 870880.00ns INFO     cocotb               DUT fully_connected_layer = 0
+ 870880.00ns INFO     cocotb               Host will send: iact 0, wght 0, psum 0, quantize 20 words
+ 870900.00ns INFO     cocotb               FSM state -> 6 at 870900.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 871090.00ns INFO     cocotb               Stream is sent.
+ 871100.00ns INFO     cocotb               FSM state -> 12 at 871100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 871280.00ns INFO     cocotb               FSM state -> 13 at 871280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 871350.00ns INFO     cocotb               FSM state -> 14 at 871350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 871380.00ns INFO     cocotb               FSM state -> 12 at 871380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 871530.00ns INFO     cocotb               FSM state -> 13 at 871530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 871600.00ns INFO     cocotb               FSM state -> 14 at 871600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 871630.00ns INFO     cocotb               FSM state -> 12 at 871630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 871780.00ns INFO     cocotb               FSM state -> 13 at 871780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 871850.00ns INFO     cocotb               FSM state -> 14 at 871850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 871880.00ns INFO     cocotb               FSM state -> 12 at 871880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 872030.00ns INFO     cocotb               FSM state -> 13 at 872030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 872100.00ns INFO     cocotb               FSM state -> 14 at 872100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 872130.00ns INFO     cocotb               FSM state -> 12 at 872130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 872280.00ns INFO     cocotb               FSM state -> 13 at 872280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 872350.00ns INFO     cocotb               FSM state -> 14 at 872350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 872380.00ns INFO     cocotb               FSM state -> 12 at 872380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 872530.00ns INFO     cocotb               FSM state -> 13 at 872530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 872600.00ns INFO     cocotb               FSM state -> 14 at 872600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 872630.00ns INFO     cocotb               FSM state -> 12 at 872630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 872780.00ns INFO     cocotb               FSM state -> 13 at 872780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 872850.00ns INFO     cocotb               FSM state -> 14 at 872850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 872880.00ns INFO     cocotb               FSM state -> 12 at 872880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 873030.00ns INFO     cocotb               FSM state -> 13 at 873030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 873100.00ns INFO     cocotb               FSM state -> 14 at 873100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 873130.00ns INFO     cocotb               FSM state -> 12 at 873130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 873280.00ns INFO     cocotb               FSM state -> 13 at 873280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 873350.00ns INFO     cocotb               FSM state -> 14 at 873350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 873380.00ns INFO     cocotb               FSM state -> 12 at 873380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 873530.00ns INFO     cocotb               FSM state -> 13 at 873530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 873600.00ns INFO     cocotb               FSM state -> 14 at 873600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 873630.00ns INFO     cocotb               FSM state -> 12 at 873630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 873780.00ns INFO     cocotb               FSM state -> 13 at 873780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 873850.00ns INFO     cocotb               FSM state -> 14 at 873850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 873880.00ns INFO     cocotb               FSM state -> 12 at 873880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 874030.00ns INFO     cocotb               FSM state -> 13 at 874030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 874100.00ns INFO     cocotb               FSM state -> 14 at 874100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 874130.00ns INFO     cocotb               FSM state -> 12 at 874130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 874280.00ns INFO     cocotb               FSM state -> 13 at 874280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 874350.00ns INFO     cocotb               FSM state -> 14 at 874350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 874380.00ns INFO     cocotb               FSM state -> 12 at 874380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 874530.00ns INFO     cocotb               FSM state -> 13 at 874530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 874600.00ns INFO     cocotb               FSM state -> 14 at 874600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 874630.00ns INFO     cocotb               FSM state -> 12 at 874630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 874780.00ns INFO     cocotb               FSM state -> 13 at 874780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 874850.00ns INFO     cocotb               FSM state -> 14 at 874850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 874880.00ns INFO     cocotb               FSM state -> 12 at 874880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 875030.00ns INFO     cocotb               FSM state -> 13 at 875030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 875100.00ns INFO     cocotb               FSM state -> 14 at 875100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 875130.00ns INFO     cocotb               FSM state -> 12 at 875130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 875280.00ns INFO     cocotb               FSM state -> 13 at 875280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 875350.00ns INFO     cocotb               FSM state -> 14 at 875350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 875380.00ns INFO     cocotb               FSM state -> 12 at 875380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 875530.00ns INFO     cocotb               FSM state -> 13 at 875530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 875600.00ns INFO     cocotb               FSM state -> 14 at 875600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 875630.00ns INFO     cocotb               FSM state -> 12 at 875630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 875780.00ns INFO     cocotb               FSM state -> 13 at 875780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 875850.00ns INFO     cocotb               FSM state -> 14 at 875850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 875880.00ns INFO     cocotb               FSM state -> 12 at 875880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 876030.00ns INFO     cocotb               FSM state -> 13 at 876030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 876100.00ns INFO     cocotb               FSM state -> 14 at 876100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 876130.00ns INFO     cocotb               FSM state -> 12 at 876130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 876280.00ns INFO     cocotb               FSM state -> 13 at 876280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 876350.00ns INFO     cocotb               FSM state -> 14 at 876350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 876380.00ns INFO     cocotb               FSM state -> 12 at 876380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 876530.00ns INFO     cocotb               FSM state -> 13 at 876530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 876600.00ns INFO     cocotb               FSM state -> 14 at 876600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 876630.00ns INFO     cocotb               FSM state -> 12 at 876630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 876780.00ns INFO     cocotb               FSM state -> 13 at 876780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 876850.00ns INFO     cocotb               FSM state -> 14 at 876850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 876880.00ns INFO     cocotb               FSM state -> 12 at 876880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 877030.00ns INFO     cocotb               FSM state -> 13 at 877030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 877100.00ns INFO     cocotb               FSM state -> 14 at 877100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 877130.00ns INFO     cocotb               FSM state -> 12 at 877130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 877280.00ns INFO     cocotb               FSM state -> 13 at 877280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 877350.00ns INFO     cocotb               FSM state -> 14 at 877350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 877380.00ns INFO     cocotb               FSM state -> 12 at 877380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 877530.00ns INFO     cocotb               FSM state -> 13 at 877530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 877600.00ns INFO     cocotb               FSM state -> 14 at 877600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 877630.00ns INFO     cocotb               FSM state -> 12 at 877630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 877780.00ns INFO     cocotb               FSM state -> 13 at 877780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 877850.00ns INFO     cocotb               FSM state -> 14 at 877850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 877880.00ns INFO     cocotb               FSM state -> 12 at 877880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 878030.00ns INFO     cocotb               FSM state -> 13 at 878030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 878100.00ns INFO     cocotb               FSM state -> 14 at 878100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 878130.00ns INFO     cocotb               FSM state -> 12 at 878130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 878280.00ns INFO     cocotb               FSM state -> 13 at 878280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 878350.00ns INFO     cocotb               FSM state -> 14 at 878350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 878380.00ns INFO     cocotb               FSM state -> 12 at 878380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 878530.00ns INFO     cocotb               FSM state -> 13 at 878530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 878600.00ns INFO     cocotb               FSM state -> 14 at 878600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 878630.00ns INFO     cocotb               FSM state -> 12 at 878630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 878780.00ns INFO     cocotb               FSM state -> 13 at 878780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 878850.00ns INFO     cocotb               FSM state -> 14 at 878850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 878880.00ns INFO     cocotb               FSM state -> 12 at 878880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 879030.00ns INFO     cocotb               FSM state -> 13 at 879030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 879100.00ns INFO     cocotb               FSM state -> 14 at 879100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 879130.00ns INFO     cocotb               FSM state -> 12 at 879130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 879280.00ns INFO     cocotb               FSM state -> 13 at 879280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 879350.00ns INFO     cocotb               FSM state -> 14 at 879350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 879380.00ns INFO     cocotb               FSM state -> 12 at 879380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 879530.00ns INFO     cocotb               FSM state -> 13 at 879530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 879600.00ns INFO     cocotb               FSM state -> 14 at 879600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 879630.00ns INFO     cocotb               FSM state -> 12 at 879630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 879780.00ns INFO     cocotb               FSM state -> 13 at 879780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 879850.00ns INFO     cocotb               FSM state -> 14 at 879850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 879880.00ns INFO     cocotb               FSM state -> 12 at 879880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 880030.00ns INFO     cocotb               FSM state -> 13 at 880030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 880100.00ns INFO     cocotb               FSM state -> 14 at 880100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 880130.00ns INFO     cocotb               FSM state -> 12 at 880130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 880280.00ns INFO     cocotb               FSM state -> 13 at 880280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 880350.00ns INFO     cocotb               FSM state -> 14 at 880350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 880380.00ns INFO     cocotb               FSM state -> 12 at 880380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 880530.00ns INFO     cocotb               FSM state -> 13 at 880530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 880600.00ns INFO     cocotb               FSM state -> 14 at 880600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 880630.00ns INFO     cocotb               FSM state -> 12 at 880630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 880780.00ns INFO     cocotb               FSM state -> 13 at 880780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 880850.00ns INFO     cocotb               FSM state -> 14 at 880850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 880880.00ns INFO     cocotb               FSM state -> 12 at 880880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 881030.00ns INFO     cocotb               FSM state -> 13 at 881030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 881100.00ns INFO     cocotb               FSM state -> 14 at 881100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 881130.00ns INFO     cocotb               FSM state -> 12 at 881130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 881280.00ns INFO     cocotb               FSM state -> 13 at 881280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 881350.00ns INFO     cocotb               FSM state -> 14 at 881350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 881380.00ns INFO     cocotb               FSM state -> 12 at 881380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 881530.00ns INFO     cocotb               FSM state -> 13 at 881530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 881600.00ns INFO     cocotb               FSM state -> 14 at 881600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 881630.00ns INFO     cocotb               FSM state -> 12 at 881630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 881780.00ns INFO     cocotb               FSM state -> 13 at 881780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 881850.00ns INFO     cocotb               FSM state -> 14 at 881850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 881880.00ns INFO     cocotb               FSM state -> 12 at 881880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 882030.00ns INFO     cocotb               FSM state -> 13 at 882030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 882100.00ns INFO     cocotb               FSM state -> 14 at 882100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 882130.00ns INFO     cocotb               FSM state -> 12 at 882130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 882280.00ns INFO     cocotb               FSM state -> 13 at 882280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 882350.00ns INFO     cocotb               FSM state -> 14 at 882350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 882380.00ns INFO     cocotb               FSM state -> 12 at 882380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 882530.00ns INFO     cocotb               FSM state -> 13 at 882530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 882600.00ns INFO     cocotb               FSM state -> 14 at 882600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 882630.00ns INFO     cocotb               FSM state -> 12 at 882630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 882780.00ns INFO     cocotb               FSM state -> 13 at 882780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 882850.00ns INFO     cocotb               FSM state -> 14 at 882850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 882880.00ns INFO     cocotb               FSM state -> 12 at 882880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 883030.00ns INFO     cocotb               FSM state -> 13 at 883030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 883100.00ns INFO     cocotb               FSM state -> 14 at 883100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 883130.00ns INFO     cocotb               FSM state -> 12 at 883130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 883280.00ns INFO     cocotb               FSM state -> 13 at 883280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 883350.00ns INFO     cocotb               FSM state -> 14 at 883350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 883380.00ns INFO     cocotb               FSM state -> 12 at 883380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 883530.00ns INFO     cocotb               FSM state -> 13 at 883530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 883600.00ns INFO     cocotb               FSM state -> 14 at 883600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 883630.00ns INFO     cocotb               FSM state -> 12 at 883630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 883780.00ns INFO     cocotb               FSM state -> 13 at 883780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 883850.00ns INFO     cocotb               FSM state -> 14 at 883850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 883880.00ns INFO     cocotb               FSM state -> 12 at 883880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 884030.00ns INFO     cocotb               FSM state -> 13 at 884030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 884100.00ns INFO     cocotb               FSM state -> 14 at 884100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 884130.00ns INFO     cocotb               FSM state -> 12 at 884130.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 884280.00ns INFO     cocotb               FSM state -> 13 at 884280.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 884350.00ns INFO     cocotb               FSM state -> 14 at 884350.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 884380.00ns INFO     cocotb               FSM state -> 12 at 884380.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 884530.00ns INFO     cocotb               FSM state -> 13 at 884530.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 884600.00ns INFO     cocotb               FSM state -> 14 at 884600.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 884630.00ns INFO     cocotb               FSM state -> 12 at 884630.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 884780.00ns INFO     cocotb               FSM state -> 13 at 884780.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 884850.00ns INFO     cocotb               FSM state -> 14 at 884850.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 884880.00ns INFO     cocotb               FSM state -> 12 at 884880.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 885030.00ns INFO     cocotb               FSM state -> 13 at 885030.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 885100.00ns INFO     cocotb               FSM state -> 1 at 885100.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=1, trans_cycles_psum=1)
+ 885110.00ns INFO     cocotb               Ready signal detected. Start new stream 3.59787917137146
+ 885110.00ns INFO     cocotb               Results are transmitted.
+ 885110.00ns INFO     cocotb               Iact check context: layer 3, repetition 0 of 1
+ 885110.00ns INFO     cocotb               Iact storages are checked.
+ 885110.00ns INFO     cocotb               Iact reference: shape (32, 7, 7), used_channels 4, IACT_RAM_CELLS 4
+ 885110.00ns INFO     cocotb               Iact buffer check: 196 expected words, 4 cells per group, depth 4096 (layer 'Convolution2D')
+ 885110.00ns ERROR    cocotb               Error found in Iact storage; word: 1 cell: 1 addr: 0
+ 885110.00ns ERROR    cocotb               Ref-Value: 0x20800020307 DUT-Value: 0x100020800020307
+ 885110.00ns ERROR    cocotb               Error found in Iact storage; word: 54 cell: 2 addr: 13
+ 885110.00ns ERROR    cocotb               Ref-Value: 0x4000000050000 DUT-Value: 0x4000000080000
+ 885110.00ns ERROR    cocotb               Error found in Iact storage; word: 75 cell: 3 addr: 18
+ 885110.00ns ERROR    cocotb               Ref-Value: 0xa0005000300 DUT-Value: 0xa0002000400
+ 885110.00ns ERROR    cocotb               Error found in Iact storage; word: 124 cell: 0 addr: 31
+ 885110.00ns ERROR    cocotb               Ref-Value: 0x80000000700 DUT-Value: 0x80000000900
+ 885110.00ns ERROR    cocotb               Error found in Iact storage; word: 127 cell: 3 addr: 31
+ 885110.00ns ERROR    cocotb               Ref-Value: 0x60000000600 DUT-Value: 0x10000000600
+ 885110.00ns ERROR    cocotb               Error found in Iact storage; word: 148 cell: 0 addr: 37
+ 885110.00ns ERROR    cocotb               Ref-Value: 0x508030501050303 DUT-Value: 0x708030501050303
+ 885110.00ns ERROR    cocotb               Error found in Iact storage; word: 152 cell: 0 addr: 38
+ 885110.00ns ERROR    cocotb               Ref-Value: 0x2030400010302 DUT-Value: 0x2030404010302
+ 885110.00ns ERROR    cocotb               Error found in Iact storage; word: 173 cell: 1 addr: 43
+ 885110.00ns ERROR    cocotb               Ref-Value: 0x500000005000002 DUT-Value: 0x500000004000002
+ 885110.00ns ERROR    cocotb               Iact value comparison: 188/196 words match exactly, 0 of 196 expected words unwritten; over the 196 written words the byte multisets DIFFER - the values themselves are wrong
+ 885110.00ns ERROR    cocotb               Iact buffer context: send_data_out = 1
+ 885110.00ns ERROR    cocotb               Iact buffer context: fsm_current_state = 1
+ 885110.00ns ERROR    cocotb               Iact buffer context: choose_iact_buffer = 0
+ 885110.00ns ERROR    cocotb               Iact buffer context: iact_channels_per_pe_next_layer = 4
+ 885110.00ns ERROR    cocotb               Iact buffer context: fsm_cycle = 0
+ 885110.00ns ERROR    cocotb               Iact buffer context: skipIact_reg = 1
+ 885110.00ns ERROR    cocotb               Iact buffer context: max_pooling unavailable (AttributeError)
+ 885110.00ns ERROR    cocotb               Iact buffer context: FSM_CEIL_IACT_RTR_CCLS = 1
+ 885110.00ns ERROR    cocotb               Iact buffer context: FSM_CEIL_WGHT_RTR_CCLS = 1
+ 885110.00ns ERROR    cocotb               Iact buffer context: FSM_CEIL_PSUM_RTR_CCLS = 1
+ 885110.00ns ERROR    cocotb               Iact buffer context: CLUSTERS = 4
+ 885110.00ns ERROR    cocotb               Iact buffer context: NUM_GLB_IACT = 1
+ 885110.00ns ERROR    cocotb               Iact buffer context: NUM_GLB_WGHT = 4
+ 885110.00ns ERROR    cocotb               Iact buffer context: NUM_GLB_PSUM = 2
+ 885110.00ns ERROR    cocotb               Iact buffer context: fsm_psum_cycle = 0
+ 885110.00ns ERROR    cocotb               Iact buffer context: trans_cycles_psum = 1
+ 885110.00ns ERROR    cocotb               Iact buffer context: fsm_psum_current_state = 0
+ 885110.00ns ERROR    cocotb               Iact buffer context: filters = 1
+ 885110.00ns ERROR    cocotb               Iact buffer context: needed_cycles = 56
+ 885110.00ns ERROR    cocotb               Iact buffer context: finished_cycles_psum unavailable (AttributeError)
+ 885110.00ns ERROR    cocotb               Iact buffer context: main FSM states visited = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14] over 88508 samples (RECEIVE_PSUMS_TO_IACT is 11)
+ 885110.00ns ERROR    cocotb               Iact buffer context: FSM transitions (ns, state) = [('40.0', 1), ('210.0', 2), ('240.0', 3), ('1240.0', 4), ('2680.0', 5), ('74360.0', 6), ('74560.0', 7), ('74600.0', 8), ('84820.0', 9), ('85470.0', 11), ('256770.0', 1), ('256950.0', 2), ('256980.0', 6), ('257180.0', 12), ('257500.0', 13), ('257640.0', 14), ('257670.0', 12), ('257960.0', 13), ('258100.0', 14), ('258130.0', 12), ('258420.0', 13), ('258560.0', 14), ('258590.0', 12), ('258880.0', 13), ('259020.0', 14), ('259050.0', 12), ('259340.0', 13), ('259480.0', 14), ('259510.0', 12), ('259800.0', 13), ('259940.0', 14), ('259970.0', 12), ('260260.0', 13), ('260400.0', 14), ('260430.0', 12), ('260720.0', 13), ('260860.0', 14), ('260890.0', 12), ('261180.0', 13), ('261320.0', 14), ('261350.0', 12), ('261640.0', 13), ('261780.0', 14), ('261810.0', 12), ('262100.0', 13), ('262240.0', 14), ('262270.0', 12), ('262560.0', 13), ('262700.0', 14), ('262730.0', 12), ('263020.0', 13), ('263160.0', 14), ('263190.0', 12), ('263480.0', 13), ('263620.0', 14), ('263650.0', 12), ('263940.0', 13), ('264080.0', 14), ('264110.0', 12), ('264400.0', 13), ('264540.0', 14), ('264570.0', 12), ('264860.0', 13), ('265000.0', 14), ('265030.0', 12), ('265320.0', 13), ('265460.0', 14), ('265490.0', 12), ('265780.0', 13), ('265920.0', 14), ('265950.0', 12), ('266240.0', 13), ('266380.0', 14), ('266410.0', 12), ('266700.0', 13), ('266840.0', 14), ('266870.0', 12), ('267160.0', 13), ('267300.0', 14), ('267330.0', 12), ('267620.0', 13), ('267760.0', 14), ('267790.0', 12), ('268080.0', 13), ('268220.0', 14), ('268250.0', 12), ('268540.0', 13), ('268680.0', 14), ('268710.0', 12), ('269000.0', 13), ('269140.0', 14), ('269170.0', 12), ('269460.0', 13), ('269600.0', 14), ('269630.0', 12), ('269920.0', 13), ('270060.0', 14), ('270090.0', 12), ('270380.0', 13), ('270520.0', 14), ('270550.0', 12), ('270840.0', 13), ('270980.0', 14), ('271010.0', 12), ('271300.0', 13), ('271440.0', 14), ('271470.0', 12), ('271760.0', 13), ('271900.0', 14), ('271930.0', 12), ('272220.0', 13), ('272360.0', 14), ('272390.0', 12), ('272680.0', 13), ('272820.0', 14), ('272850.0', 12), ('273140.0', 13), ('273280.0', 14), ('273310.0', 12), ('273600.0', 13), ('273740.0', 14), ('273770.0', 12), ('274060.0', 13), ('274200.0', 14), ('274230.0', 12), ('274520.0', 13), ('274660.0', 14), ('274690.0', 12), ('274980.0', 13), ('275120.0', 14), ('275150.0', 12), ('275440.0', 13), ('275580.0', 14), ('275610.0', 12), ('275900.0', 13), ('276040.0', 14), ('276070.0', 12), ('276360.0', 13), ('276500.0', 14), ('276530.0', 12), ('276820.0', 13), ('276960.0', 14), ('276990.0', 12), ('277280.0', 13), ('277420.0', 14), ('277450.0', 12), ('277740.0', 13), ('277880.0', 14), ('277910.0', 12), ('278200.0', 13), ('278340.0', 14), ('278370.0', 12), ('278660.0', 13), ('278800.0', 14), ('278830.0', 12), ('279120.0', 13), ('279260.0', 14), ('279290.0', 12), ('279580.0', 13), ('279720.0', 14), ('279750.0', 12), ('280040.0', 13), ('280180.0', 14), ('280210.0', 12), ('280500.0', 13), ('280640.0', 14), ('280670.0', 12), ('280960.0', 13), ('281100.0', 14), ('281130.0', 12), ('281420.0', 13), ('281560.0', 14), ('281590.0', 12), ('281880.0', 13), ('282020.0', 14), ('282050.0', 12), ('282340.0', 13), ('282480.0', 14), ('282510.0', 12), ('282800.0', 13), ('282940.0', 1), ('283120.0', 2), ('283150.0', 4), ('329230.0', 5), ('365070.0', 6), ('365270.0', 7), ('365310.0', 8), ('388370.0', 9), ('389020.0', 11), ('870690.0', 1), ('870870.0', 2), ('870900.0', 6), ('871100.0', 12), ('871280.0', 13), ('871350.0', 14), ('871380.0', 12), ('871530.0', 13), ('871600.0', 14), ('871630.0', 12), ('871780.0', 13)]
+ 885110.00ns ERROR    cocotb               Iact buffer occupancy: 256 written words, cells [0, 1, 2, 3], first entries [(0, 0, '0x20400000005'), (0, 1, '0x700000107'), (0, 2, '0x10500000103'), (0, 3, '0x10400000304')]
+ 885110.00ns ERROR    cocotb               Iact buffer check failed after layer 3 (OPENEYE_KEEP_GOING: the model runs on)
+ 885110.00ns INFO     cocotb               Layer parameters created. 0.01756429672241211
+ 885110.00ns INFO     cocotb               All weight-files written
+ 885110.00ns INFO     cocotb               All iact-files written
+ 885110.00ns INFO     cocotb               All results calculated
+ 885110.00ns INFO     cocotb               All psum-files written
+ 885110.00ns INFO     cocotb               Stream 0 / 1 calculated.
+ 885110.00ns INFO     cocotb               Reference Output calculated.
+ 885110.00ns INFO     cocotb               Reference data created. 5.675583839416504
+ 885110.00ns INFO     cocotb               Start creating stream. 0.00040841102600097656
+ 885110.00ns INFO     cocotb               Stream finished: 1 of 1
+ 885110.00ns INFO     cocotb               Streams set. 0.24832487106323242
+ 885110.00ns INFO     cocotb               Send stream No. 5
+ 885110.00ns INFO     cocotb               DMA stream sections (words each): [18, 0, 9216, 896, 20, 0, 0]
+ 885110.00ns INFO     cocotb               DUT expects trans_cycles_iact = 1
+ 885110.00ns INFO     cocotb               DUT expects trans_cycles_wght = 1
+ 885110.00ns INFO     cocotb               DUT expects trans_cycles_psum = 1
+ 885280.00ns INFO     cocotb               FSM state -> 2 at 885280.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+ 885290.00ns INFO     cocotb               DUT expects trans_cycles_iact = 196
+ 885290.00ns INFO     cocotb               DUT expects trans_cycles_wght = 9216
+ 885290.00ns INFO     cocotb               DUT expects trans_cycles_psum = 896
+ 885290.00ns INFO     cocotb               DUT compute_mask_reg = 0x3f3f3f3f
+ 885290.00ns INFO     cocotb               DUT send_data_out = 0
+ 885290.00ns INFO     cocotb               DUT store_in_psum = 0
+ 885290.00ns INFO     cocotb               DUT fully_connected_layer = 0
+ 885290.00ns INFO     cocotb               Host will send: iact 0, wght 9216, psum 896, quantize 20 words
+ 885310.00ns INFO     cocotb               FSM state -> 4 at 885310.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+ 977470.00ns INFO     cocotb               FSM state -> 5 at 977470.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+ 986430.00ns INFO     cocotb               FSM state -> 6 at 986430.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+ 986620.00ns INFO     cocotb               Stream is sent.
+ 986630.00ns INFO     cocotb               FSM state -> 7 at 986630.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+ 986670.00ns INFO     cocotb               FSM state -> 8 at 986670.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+1001090.00ns INFO     cocotb               FSM state -> 9 at 1001090.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+1001740.00ns INFO     cocotb               FSM state -> 11 at 1001740.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+1192030.00ns INFO     cocotb               FSM state -> 1 at 1192030.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=196, trans_cycles_psum=896)
+1192040.00ns INFO     cocotb               Ready signal detected. Start new stream 107.34055304527283
+1192040.00ns INFO     cocotb               Results are transmitted.
+1192040.00ns INFO     cocotb               Iact check context: layer 4, repetition 0 of 1
+1192040.00ns INFO     cocotb               Iact storages are checked.
+1192040.00ns INFO     cocotb               Iact reference: shape (1568,), used_channels 784, IACT_RAM_CELLS 4
+1192040.00ns INFO     cocotb               Iact buffer check: 196 expected words, 4 cells per group, depth 4096 (layer 'Dense')
+1192040.00ns ERROR    cocotb               Error found in Iact storage; word: 1 cell: 1 addr: 0
+1192040.00ns ERROR    cocotb               Ref-Value: 0x1000100000000 DUT-Value: 0x1000200000000
+1192040.00ns ERROR    cocotb               Error found in Iact storage; word: 29 cell: 1 addr: 7
+1192040.00ns ERROR    cocotb               Ref-Value: 0x200000002 DUT-Value: 0x200000003
+1192040.00ns ERROR    cocotb               Error found in Iact storage; word: 32 cell: 0 addr: 8
+1192040.00ns ERROR    cocotb               Ref-Value: 0x500000001 DUT-Value: 0x400000001
+1192040.00ns ERROR    cocotb               Error found in Iact storage; word: 33 cell: 1 addr: 8
+1192040.00ns ERROR    cocotb               Ref-Value: 0x300000002 DUT-Value: 0x300000001
+1192040.00ns ERROR    cocotb               Error found in Iact storage; word: 57 cell: 1 addr: 14
+1192040.00ns ERROR    cocotb               Ref-Value: 0x0 DUT-Value: 0x100
+1192040.00ns ERROR    cocotb               Error found in Iact storage; word: 78 cell: 2 addr: 19
+1192040.00ns ERROR    cocotb               Ref-Value: 0x10000 DUT-Value: 0x100000000010000
+1192040.00ns ERROR    cocotb               Error found in Iact storage; word: 100 cell: 0 addr: 25
+1192040.00ns ERROR    cocotb               Ref-Value: 0x200 DUT-Value: 0x300
+1192040.00ns ERROR    cocotb               Error found in Iact storage; word: 102 cell: 2 addr: 25
+1192040.00ns ERROR    cocotb               Ref-Value: 0x3000000030200 DUT-Value: 0x4000000030200
+1192040.00ns ERROR    cocotb               Error found in Iact storage; word: 106 cell: 2 addr: 26
+1192040.00ns ERROR    cocotb               Ref-Value: 0x2010000020000 DUT-Value: 0x2020000020000
+1192040.00ns ERROR    cocotb               Error found in Iact storage; word: 130 cell: 2 addr: 32
+1192040.00ns ERROR    cocotb               Ref-Value: 0x1010000000000 DUT-Value: 0x10000000000
+1192040.00ns ERROR    cocotb               Error found in Iact storage; word: 173 cell: 1 addr: 43
+1192040.00ns ERROR    cocotb               Ref-Value: 0x10500000104 DUT-Value: 0x400000205
+1192040.00ns ERROR    cocotb               Error found in Iact storage; word: 176 cell: 0 addr: 44
+1192040.00ns ERROR    cocotb               Ref-Value: 0x200000103 DUT-Value: 0x20200000004
+1192040.00ns ERROR    cocotb               Error found in Iact storage; word: 177 cell: 1 addr: 44
+1192040.00ns ERROR    cocotb               Ref-Value: 0x300000102 DUT-Value: 0x300000203
+1192040.00ns ERROR    cocotb               Error found in Iact storage; word: 179 cell: 3 addr: 44
+1192040.00ns ERROR    cocotb               Ref-Value: 0x600000102 DUT-Value: 0x500000102
+1192040.00ns ERROR    cocotb               Iact value comparison: 182/196 words match exactly, 0 of 196 expected words unwritten; over the 196 written words the byte multisets DIFFER - the values themselves are wrong
+1192040.00ns ERROR    cocotb               Iact buffer context: send_data_out = 0
+1192040.00ns ERROR    cocotb               Iact buffer context: fsm_current_state = 1
+1192040.00ns ERROR    cocotb               Iact buffer context: choose_iact_buffer = 0
+1192040.00ns ERROR    cocotb               Iact buffer context: iact_channels_per_pe_next_layer = 4
+1192040.00ns ERROR    cocotb               Iact buffer context: fsm_cycle = 0
+1192040.00ns ERROR    cocotb               Iact buffer context: skipIact_reg = 1
+1192040.00ns ERROR    cocotb               Iact buffer context: max_pooling unavailable (AttributeError)
+1192040.00ns ERROR    cocotb               Iact buffer context: FSM_CEIL_IACT_RTR_CCLS = 1
+1192040.00ns ERROR    cocotb               Iact buffer context: FSM_CEIL_WGHT_RTR_CCLS = 1
+1192040.00ns ERROR    cocotb               Iact buffer context: FSM_CEIL_PSUM_RTR_CCLS = 1
+1192040.00ns ERROR    cocotb               Iact buffer context: CLUSTERS = 4
+1192040.00ns ERROR    cocotb               Iact buffer context: NUM_GLB_IACT = 1
+1192040.00ns ERROR    cocotb               Iact buffer context: NUM_GLB_WGHT = 4
+1192040.00ns ERROR    cocotb               Iact buffer context: NUM_GLB_PSUM = 2
+1192040.00ns ERROR    cocotb               Iact buffer context: fsm_psum_cycle = 0
+1192040.00ns ERROR    cocotb               Iact buffer context: trans_cycles_psum = 896
+1192040.00ns ERROR    cocotb               Iact buffer context: fsm_psum_current_state = 0
+1192040.00ns ERROR    cocotb               Iact buffer context: filters = 16
+1192040.00ns ERROR    cocotb               Iact buffer context: needed_cycles = 112
+1192040.00ns ERROR    cocotb               Iact buffer context: finished_cycles_psum unavailable (AttributeError)
+1192040.00ns ERROR    cocotb               Iact buffer context: main FSM states visited = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14] over 119201 samples (RECEIVE_PSUMS_TO_IACT is 11)
+1192040.00ns ERROR    cocotb               Iact buffer context: FSM transitions (ns, state) = [('40.0', 1), ('210.0', 2), ('240.0', 3), ('1240.0', 4), ('2680.0', 5), ('74360.0', 6), ('74560.0', 7), ('74600.0', 8), ('84820.0', 9), ('85470.0', 11), ('256770.0', 1), ('256950.0', 2), ('256980.0', 6), ('257180.0', 12), ('257500.0', 13), ('257640.0', 14), ('257670.0', 12), ('257960.0', 13), ('258100.0', 14), ('258130.0', 12), ('258420.0', 13), ('258560.0', 14), ('258590.0', 12), ('258880.0', 13), ('259020.0', 14), ('259050.0', 12), ('259340.0', 13), ('259480.0', 14), ('259510.0', 12), ('259800.0', 13), ('259940.0', 14), ('259970.0', 12), ('260260.0', 13), ('260400.0', 14), ('260430.0', 12), ('260720.0', 13), ('260860.0', 14), ('260890.0', 12), ('261180.0', 13), ('261320.0', 14), ('261350.0', 12), ('261640.0', 13), ('261780.0', 14), ('261810.0', 12), ('262100.0', 13), ('262240.0', 14), ('262270.0', 12), ('262560.0', 13), ('262700.0', 14), ('262730.0', 12), ('263020.0', 13), ('263160.0', 14), ('263190.0', 12), ('263480.0', 13), ('263620.0', 14), ('263650.0', 12), ('263940.0', 13), ('264080.0', 14), ('264110.0', 12), ('264400.0', 13), ('264540.0', 14), ('264570.0', 12), ('264860.0', 13), ('265000.0', 14), ('265030.0', 12), ('265320.0', 13), ('265460.0', 14), ('265490.0', 12), ('265780.0', 13), ('265920.0', 14), ('265950.0', 12), ('266240.0', 13), ('266380.0', 14), ('266410.0', 12), ('266700.0', 13), ('266840.0', 14), ('266870.0', 12), ('267160.0', 13), ('267300.0', 14), ('267330.0', 12), ('267620.0', 13), ('267760.0', 14), ('267790.0', 12), ('268080.0', 13), ('268220.0', 14), ('268250.0', 12), ('268540.0', 13), ('268680.0', 14), ('268710.0', 12), ('269000.0', 13), ('269140.0', 14), ('269170.0', 12), ('269460.0', 13), ('269600.0', 14), ('269630.0', 12), ('269920.0', 13), ('270060.0', 14), ('270090.0', 12), ('270380.0', 13), ('270520.0', 14), ('270550.0', 12), ('270840.0', 13), ('270980.0', 14), ('271010.0', 12), ('271300.0', 13), ('271440.0', 14), ('271470.0', 12), ('271760.0', 13), ('271900.0', 14), ('271930.0', 12), ('272220.0', 13), ('272360.0', 14), ('272390.0', 12), ('272680.0', 13), ('272820.0', 14), ('272850.0', 12), ('273140.0', 13), ('273280.0', 14), ('273310.0', 12), ('273600.0', 13), ('273740.0', 14), ('273770.0', 12), ('274060.0', 13), ('274200.0', 14), ('274230.0', 12), ('274520.0', 13), ('274660.0', 14), ('274690.0', 12), ('274980.0', 13), ('275120.0', 14), ('275150.0', 12), ('275440.0', 13), ('275580.0', 14), ('275610.0', 12), ('275900.0', 13), ('276040.0', 14), ('276070.0', 12), ('276360.0', 13), ('276500.0', 14), ('276530.0', 12), ('276820.0', 13), ('276960.0', 14), ('276990.0', 12), ('277280.0', 13), ('277420.0', 14), ('277450.0', 12), ('277740.0', 13), ('277880.0', 14), ('277910.0', 12), ('278200.0', 13), ('278340.0', 14), ('278370.0', 12), ('278660.0', 13), ('278800.0', 14), ('278830.0', 12), ('279120.0', 13), ('279260.0', 14), ('279290.0', 12), ('279580.0', 13), ('279720.0', 14), ('279750.0', 12), ('280040.0', 13), ('280180.0', 14), ('280210.0', 12), ('280500.0', 13), ('280640.0', 14), ('280670.0', 12), ('280960.0', 13), ('281100.0', 14), ('281130.0', 12), ('281420.0', 13), ('281560.0', 14), ('281590.0', 12), ('281880.0', 13), ('282020.0', 14), ('282050.0', 12), ('282340.0', 13), ('282480.0', 14), ('282510.0', 12), ('282800.0', 13), ('282940.0', 1), ('283120.0', 2), ('283150.0', 4), ('329230.0', 5), ('365070.0', 6), ('365270.0', 7), ('365310.0', 8), ('388370.0', 9), ('389020.0', 11), ('870690.0', 1), ('870870.0', 2), ('870900.0', 6), ('871100.0', 12), ('871280.0', 13), ('871350.0', 14), ('871380.0', 12), ('871530.0', 13), ('871600.0', 14), ('871630.0', 12), ('871780.0', 13)]
+1192040.00ns ERROR    cocotb               Iact buffer occupancy: 256 written words, cells [0, 1, 2, 3], first entries [(0, 0, '0x1000000000001'), (0, 1, '0x0'), (0, 2, '0x0'), (0, 3, '0x0')]
+1192040.00ns ERROR    cocotb               Iact buffer check failed after layer 4 (OPENEYE_KEEP_GOING: the model runs on)
+1192040.00ns INFO     cocotb               Layer parameters created. 0.3527357578277588
+1192040.00ns INFO     cocotb               All weight-files written
+1192040.00ns INFO     cocotb               All iact-files written
+1192040.00ns INFO     cocotb               All results calculated
+1192040.00ns INFO     cocotb               All psum-files written
+1192040.00ns INFO     cocotb               Reference Output calculated.
+1192040.00ns INFO     cocotb               Reference data created. 0.048456430435180664
+1192040.00ns INFO     cocotb               Start creating stream. 0.00013184547424316406
+1192040.00ns INFO     cocotb               Stream finished: 1 of 1
+1192040.00ns INFO     cocotb               Streams set. 0.7773647308349609
+1192040.00ns INFO     cocotb               Send stream No. 6
+1192040.00ns INFO     cocotb               DMA stream sections (words each): [18, 0, 9792, 32, 20, 0, 0]
+1192040.00ns INFO     cocotb               DUT expects trans_cycles_iact = 196
+1192040.00ns INFO     cocotb               DUT expects trans_cycles_wght = 9216
+1192040.00ns INFO     cocotb               DUT expects trans_cycles_psum = 896
+1192210.00ns INFO     cocotb               FSM state -> 2 at 1192210.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+1192220.00ns INFO     cocotb               DUT expects trans_cycles_iact = 0
+1192220.00ns INFO     cocotb               DUT expects trans_cycles_wght = 9792
+1192220.00ns INFO     cocotb               DUT expects trans_cycles_psum = 32
+1192220.00ns INFO     cocotb               DUT compute_mask_reg = 0x55555555
+1192220.00ns INFO     cocotb               DUT send_data_out = 0
+1192220.00ns INFO     cocotb               DUT store_in_psum = 0
+1192220.00ns INFO     cocotb               DUT fully_connected_layer = 1
+1192220.00ns INFO     cocotb               Host will send: iact 0, wght 9792, psum 32, quantize 20 words
+1192240.00ns INFO     cocotb               FSM state -> 4 at 1192240.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+1290160.00ns INFO     cocotb               FSM state -> 5 at 1290160.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+1290480.00ns INFO     cocotb               FSM state -> 6 at 1290480.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+1290670.00ns INFO     cocotb               Stream is sent.
+1290680.00ns INFO     cocotb               FSM state -> 7 at 1290680.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+1290720.00ns INFO     cocotb               FSM state -> 8 at 1290720.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+1298900.00ns INFO     cocotb               FSM state -> 9 at 1298900.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+1299550.00ns INFO     cocotb               FSM state -> 11 at 1299550.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+1324750.00ns INFO     cocotb               FSM state -> 1 at 1324750.0 ns (fsm_psum_current_state=0, send_data_out=0, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=32)
+1324760.00ns INFO     cocotb               Ready signal detected. Start new stream 43.91729807853699
+1324760.00ns INFO     cocotb               Results are transmitted.
+1324760.00ns INFO     cocotb               Iact check context: layer 5, repetition 0 of 1
+1324760.00ns INFO     cocotb               Iact storages are checked.
+1324760.00ns INFO     cocotb               Iact reference: shape (32,), used_channels 16, IACT_RAM_CELLS 4
+1324760.00ns INFO     cocotb               Iact buffer check: first 32 activations only (the rest is padding)
+1324760.00ns INFO     cocotb               Iact buffer check: 4 expected words, 4 cells per group, depth 4096 (layer 'Dense')
+1324760.00ns ERROR    cocotb               Error found in Iact storage; word: 1 cell: 1 addr: 0
+1324760.00ns ERROR    cocotb               Ref-Value: 0x0 DUT-Value: 0x1000000
+1324760.00ns ERROR    cocotb               Error found in Iact storage; word: 2 cell: 2 addr: 0
+1324760.00ns ERROR    cocotb               Ref-Value: 0x100010100010002 DUT-Value: 0x100010100020002
+1324760.00ns ERROR    cocotb               Error found in Iact storage; word: 3 cell: 3 addr: 0
+1324760.00ns ERROR    cocotb               Ref-Value: 0x20402000100 DUT-Value: 0x20502000100
+1324760.00ns ERROR    cocotb               Iact value comparison: 1/4 words match exactly, 0 of 4 expected words unwritten; over the 4 written words the byte multisets DIFFER - the values themselves are wrong
+1324760.00ns ERROR    cocotb               Iact buffer context: send_data_out = 0
+1324760.00ns ERROR    cocotb               Iact buffer context: fsm_current_state = 1
+1324760.00ns ERROR    cocotb               Iact buffer context: choose_iact_buffer = 0
+1324760.00ns ERROR    cocotb               Iact buffer context: iact_channels_per_pe_next_layer = 1
+1324760.00ns ERROR    cocotb               Iact buffer context: fsm_cycle = 0
+1324760.00ns ERROR    cocotb               Iact buffer context: skipIact_reg = 1
+1324760.00ns ERROR    cocotb               Iact buffer context: max_pooling unavailable (AttributeError)
+1324760.00ns ERROR    cocotb               Iact buffer context: FSM_CEIL_IACT_RTR_CCLS = 1
+1324760.00ns ERROR    cocotb               Iact buffer context: FSM_CEIL_WGHT_RTR_CCLS = 1
+1324760.00ns ERROR    cocotb               Iact buffer context: FSM_CEIL_PSUM_RTR_CCLS = 1
+1324760.00ns ERROR    cocotb               Iact buffer context: CLUSTERS = 4
+1324760.00ns ERROR    cocotb               Iact buffer context: NUM_GLB_IACT = 1
+1324760.00ns ERROR    cocotb               Iact buffer context: NUM_GLB_WGHT = 4
+1324760.00ns ERROR    cocotb               Iact buffer context: NUM_GLB_PSUM = 2
+1324760.00ns ERROR    cocotb               Iact buffer context: fsm_psum_cycle = 0
+1324760.00ns ERROR    cocotb               Iact buffer context: trans_cycles_psum = 32
+1324760.00ns ERROR    cocotb               Iact buffer context: fsm_psum_current_state = 0
+1324760.00ns ERROR    cocotb               Iact buffer context: filters = 16
+1324760.00ns ERROR    cocotb               Iact buffer context: needed_cycles = 17
+1324760.00ns ERROR    cocotb               Iact buffer context: finished_cycles_psum unavailable (AttributeError)
+1324760.00ns ERROR    cocotb               Iact buffer context: main FSM states visited = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14] over 132473 samples (RECEIVE_PSUMS_TO_IACT is 11)
+1324760.00ns ERROR    cocotb               Iact buffer context: FSM transitions (ns, state) = [('40.0', 1), ('210.0', 2), ('240.0', 3), ('1240.0', 4), ('2680.0', 5), ('74360.0', 6), ('74560.0', 7), ('74600.0', 8), ('84820.0', 9), ('85470.0', 11), ('256770.0', 1), ('256950.0', 2), ('256980.0', 6), ('257180.0', 12), ('257500.0', 13), ('257640.0', 14), ('257670.0', 12), ('257960.0', 13), ('258100.0', 14), ('258130.0', 12), ('258420.0', 13), ('258560.0', 14), ('258590.0', 12), ('258880.0', 13), ('259020.0', 14), ('259050.0', 12), ('259340.0', 13), ('259480.0', 14), ('259510.0', 12), ('259800.0', 13), ('259940.0', 14), ('259970.0', 12), ('260260.0', 13), ('260400.0', 14), ('260430.0', 12), ('260720.0', 13), ('260860.0', 14), ('260890.0', 12), ('261180.0', 13), ('261320.0', 14), ('261350.0', 12), ('261640.0', 13), ('261780.0', 14), ('261810.0', 12), ('262100.0', 13), ('262240.0', 14), ('262270.0', 12), ('262560.0', 13), ('262700.0', 14), ('262730.0', 12), ('263020.0', 13), ('263160.0', 14), ('263190.0', 12), ('263480.0', 13), ('263620.0', 14), ('263650.0', 12), ('263940.0', 13), ('264080.0', 14), ('264110.0', 12), ('264400.0', 13), ('264540.0', 14), ('264570.0', 12), ('264860.0', 13), ('265000.0', 14), ('265030.0', 12), ('265320.0', 13), ('265460.0', 14), ('265490.0', 12), ('265780.0', 13), ('265920.0', 14), ('265950.0', 12), ('266240.0', 13), ('266380.0', 14), ('266410.0', 12), ('266700.0', 13), ('266840.0', 14), ('266870.0', 12), ('267160.0', 13), ('267300.0', 14), ('267330.0', 12), ('267620.0', 13), ('267760.0', 14), ('267790.0', 12), ('268080.0', 13), ('268220.0', 14), ('268250.0', 12), ('268540.0', 13), ('268680.0', 14), ('268710.0', 12), ('269000.0', 13), ('269140.0', 14), ('269170.0', 12), ('269460.0', 13), ('269600.0', 14), ('269630.0', 12), ('269920.0', 13), ('270060.0', 14), ('270090.0', 12), ('270380.0', 13), ('270520.0', 14), ('270550.0', 12), ('270840.0', 13), ('270980.0', 14), ('271010.0', 12), ('271300.0', 13), ('271440.0', 14), ('271470.0', 12), ('271760.0', 13), ('271900.0', 14), ('271930.0', 12), ('272220.0', 13), ('272360.0', 14), ('272390.0', 12), ('272680.0', 13), ('272820.0', 14), ('272850.0', 12), ('273140.0', 13), ('273280.0', 14), ('273310.0', 12), ('273600.0', 13), ('273740.0', 14), ('273770.0', 12), ('274060.0', 13), ('274200.0', 14), ('274230.0', 12), ('274520.0', 13), ('274660.0', 14), ('274690.0', 12), ('274980.0', 13), ('275120.0', 14), ('275150.0', 12), ('275440.0', 13), ('275580.0', 14), ('275610.0', 12), ('275900.0', 13), ('276040.0', 14), ('276070.0', 12), ('276360.0', 13), ('276500.0', 14), ('276530.0', 12), ('276820.0', 13), ('276960.0', 14), ('276990.0', 12), ('277280.0', 13), ('277420.0', 14), ('277450.0', 12), ('277740.0', 13), ('277880.0', 14), ('277910.0', 12), ('278200.0', 13), ('278340.0', 14), ('278370.0', 12), ('278660.0', 13), ('278800.0', 14), ('278830.0', 12), ('279120.0', 13), ('279260.0', 14), ('279290.0', 12), ('279580.0', 13), ('279720.0', 14), ('279750.0', 12), ('280040.0', 13), ('280180.0', 14), ('280210.0', 12), ('280500.0', 13), ('280640.0', 14), ('280670.0', 12), ('280960.0', 13), ('281100.0', 14), ('281130.0', 12), ('281420.0', 13), ('281560.0', 14), ('281590.0', 12), ('281880.0', 13), ('282020.0', 14), ('282050.0', 12), ('282340.0', 13), ('282480.0', 14), ('282510.0', 12), ('282800.0', 13), ('282940.0', 1), ('283120.0', 2), ('283150.0', 4), ('329230.0', 5), ('365070.0', 6), ('365270.0', 7), ('365310.0', 8), ('388370.0', 9), ('389020.0', 11), ('870690.0', 1), ('870870.0', 2), ('870900.0', 6), ('871100.0', 12), ('871280.0', 13), ('871350.0', 14), ('871380.0', 12), ('871530.0', 13), ('871600.0', 14), ('871630.0', 12), ('871780.0', 13)]
+1324760.00ns ERROR    cocotb               Iact buffer occupancy: 256 written words, cells [0, 1, 2, 3], first entries [(0, 0, '0x60000'), (0, 1, '0x0'), (0, 2, '0x0'), (0, 3, '0x0')]
+1324760.00ns ERROR    cocotb               Iact buffer check failed after layer 5 (OPENEYE_KEEP_GOING: the model runs on)
+1324760.00ns INFO     cocotb               Layer parameters created. 0.007501125335693359
+1324760.00ns INFO     cocotb               All weight-files written
+1324760.00ns INFO     cocotb               All iact-files written
+1324760.00ns INFO     cocotb               All results calculated
+1324760.00ns INFO     cocotb               All psum-files written
+1324760.00ns INFO     cocotb               Reference Output calculated.
+1324760.00ns INFO     cocotb               Reference data created. 0.003862142562866211
+1324760.00ns INFO     cocotb               Start creating stream. 7.128715515136719e-05
+1324760.00ns INFO     cocotb               Stream finished: 1 of 1
+1324760.00ns INFO     cocotb               Streams set. 0.15544462203979492
+1324760.00ns INFO     cocotb               Send stream No. 7
+1324760.00ns INFO     cocotb               DMA stream sections (words each): [18, 0, 72, 12, 20, 0, 0]
+1324760.00ns INFO     cocotb               DUT expects trans_cycles_iact = 0
+1324760.00ns INFO     cocotb               DUT expects trans_cycles_wght = 9792
+1324760.00ns INFO     cocotb               DUT expects trans_cycles_psum = 32
+1324930.00ns INFO     cocotb               FSM state -> 2 at 1324930.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+1324940.00ns INFO     cocotb               DUT expects trans_cycles_iact = 0
+1324940.00ns INFO     cocotb               DUT expects trans_cycles_wght = 72
+1324940.00ns INFO     cocotb               DUT expects trans_cycles_psum = 12
+1324940.00ns INFO     cocotb               DUT compute_mask_reg = 0x55555555
+1324940.00ns INFO     cocotb               DUT send_data_out = 1
+1324940.00ns INFO     cocotb               DUT store_in_psum = 0
+1324940.00ns INFO     cocotb               DUT fully_connected_layer = 1
+1324940.00ns INFO     cocotb               Host will send: iact 0, wght 72, psum 12, quantize 20 words
+1324960.00ns INFO     cocotb               FSM state -> 4 at 1324960.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+1325680.00ns INFO     cocotb               FSM state -> 5 at 1325680.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+1325800.00ns INFO     cocotb               FSM state -> 6 at 1325800.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+1325990.00ns INFO     cocotb               Stream is sent.
+1326000.00ns INFO     cocotb               FSM state -> 7 at 1326000.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+1326040.00ns INFO     cocotb               FSM state -> 8 at 1326040.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+1326220.00ns INFO     cocotb               FSM state -> 9 at 1326220.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+1326870.00ns INFO     cocotb               FSM state -> 10 at 1326870.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+1328290.00ns INFO     cocotb.OpenEye_FPGA  Output Stream started
+1328410.00ns INFO     cocotb               FSM state -> 1 at 1328410.0 ns (fsm_psum_current_state=0, send_data_out=1, store_in_psum=0, trans_cycles_iact=0, trans_cycles_psum=12)
+1328410.00ns INFO     cocotb               Results are checked.
+1328410.00ns ERROR    cocotb               10 of 10 outputs differ from the reference
+1328410.00ns ERROR    cocotb                 f = 0: reference 307, DUT 275
+1328410.00ns ERROR    cocotb                 f = 1: reference 394, DUT 407
+1328410.00ns ERROR    cocotb                 f = 2: reference 256, DUT 253
+1328410.00ns ERROR    cocotb                 f = 3: reference 250, DUT 204
+1328410.00ns ERROR    cocotb                 f = 4: reference 54, DUT 36
+1328410.00ns ERROR    cocotb                 f = 5: reference -16, DUT -34
+1328410.00ns ERROR    cocotb                 f = 6: reference -17, DUT -37
+1328410.00ns ERROR    cocotb                 f = 7: reference -58, DUT -73
+1328410.00ns ERROR    cocotb               Difference found at line 1:
+1328410.00ns ERROR    cocotb               Line width mismatch: reference 64 chars, output 64 chars, expected 60 (3 words x 20 bits)
+1328410.00ns ERROR    cocotb               Reference Data: 0000000000000000000000000000000000000000000000000000000100110011   0 0 19
+1328410.00ns ERROR    cocotb               Output Data   : 0000000000000000000000000000000000000000000000000000000100010011   0 0 17
+1328410.00ns WARNING  cocotb.Test start_test_fpga.start_test_fpga result check failed: values differ, reference file differs
+assert (False)
+Traceback (most recent call last):
+  File "/home/truongphi/OpenEye_orig/test/cocotb_fpga/OpenEye_FPGA_tb.py", line 155, in start_test_fpga
+    await with_timeout(single_layer_test(dut),timeout_time, timeout_unit)
+  File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/_extended_awaitables.py", line 411, in with_timeout
+    res = await First(timeout_timer, trigger)
+  File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/_extended_awaitables.py", line 203, in _wait
+    return completed[0].result()
+  File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/task.py", line 450, in result
+    return cast("Outcome[ResultType]", self._outcome).get()
+  File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/_outcomes.py", line 51, in get
+    raise self.error
+  File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/_extended_awaitables.py", line 73, in _wait_callback
+    return await trigger
+  File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/task.py", line 493, in __await__
+    return self.result()
+  File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/task.py", line 450, in result
+    return cast("Outcome[ResultType]", self._outcome).get()
+  File "/home/truongphi/OpenEye_orig/venv/lib/python3.10/site-packages/cocotb/_outcomes.py", line 51, in get
+    raise self.error
+  File "/home/truongphi/OpenEye_orig/test/cocotb_fpga/OpenEye_FPGA_tb.py", line 236, in single_layer_test
+    await execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, serial, ptp, trunc_model)
+  File "/home/truongphi/OpenEye_orig/test/cocotb_fpga/OpenEye_FPGA_tb.py", line 567, in execute_model
+    assert dram_ok and file_ok, "result check failed: values %s, reference file %s" % (
+AssertionError: result check failed: values differ, reference file differs
+assert (False)
+1328410.00ns WARNING  cocotb.regression    OpenEye_FPGA_tb.start_test_fpga failed
+1328410.00ns INFO     cocotb.regression    *****************************************************************************************
+** TEST                             STATUS  SIM TIME (ns)  REAL TIME (s)  RATIO (ns/s) **
+*****************************************************************************************
+** OpenEye_FPGA_tb.start_test_fpga   FAIL     1328410.00         498.07       2667.13  **
+*****************************************************************************************
+** TESTS=1 PASS=0 FAIL=1 SKIP=0               1328410.00         498.07       2667.10  **
+*****************************************************************************************
+

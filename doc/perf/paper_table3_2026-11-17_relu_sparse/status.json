@@ -1,0 +1,18 @@
+{
+ "paper_cr1_x2_y3": "PASS",
+ "paper_cr2_x2_y3": "FAIL (iact after L3,4,5; result)",
+ "paper_cr4_x2_y3": "PASS",
+ "paper_cr8_x2_y3": "PASS",
+ "paper_cr1_x4_y3": "PASS",
+ "paper_cr2_x4_y3": "PASS",
+ "paper_cr4_x4_y3": "PASS",
+ "paper_cr8_x4_y3": "PASS",
+ "paper_cr1_x2_y4": "PASS",
+ "paper_cr2_x2_y4": "FAIL (iact after L3,4,5; result)",
+ "paper_cr4_x2_y4": "PASS",
+ "paper_cr8_x2_y4": "PASS",
+ "paper_cr1_x4_y4": "PASS",
+ "paper_cr2_x4_y4": "PASS",
+ "paper_cr4_x4_y4": "PASS",
+ "paper_cr8_x4_y4": "PASS"
+}
