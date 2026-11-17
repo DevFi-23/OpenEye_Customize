@@ -37,14 +37,18 @@ from make_progress_report import bullets, fmt, para, table  # noqa: E402
 
 REPO = base_report.REPO
 DATA = os.path.join(REPO, "doc", "perf", "activation_2026-11-10_sparse_dense")
+# 4 activations x {floor, round} x {sparse, dense}, the default rounding from DATA and the other one from the forced
+# runs of doc/experiments/2026-11-12_rounding_modes (added 2026-11-12)
+CASES = os.path.join(REPO, "doc", "perf", "activation_2026-11-12_rounding")
 OUT_DIR = os.path.join(REPO, "doc", "reports", "2026-11-10_TienDo")
 DATE = "10/11/2026"
+UPDATED = "12/11/2026"
 OUT = os.path.join(OUT_DIR, "BaoCao_TienDo_OpenEye_2026-11-10.docx")
 FIG_FUNCS = os.path.join(OUT_DIR, "ham_kich_hoat_int8_2026-11-10.png")
 FIG_QUANT = os.path.join(OUT_DIR, "luong_tu_hoa_2026-11-10.png")
 FIG_CHIP = os.path.join(OUT_DIR, "duong_du_lieu_chip_2026-11-10.png")
 FIG_ROUND = os.path.join(OUT_DIR, "lam_tron_2026-11-10.png")
-FIG_MODES = os.path.join(OUT_DIR, "sparse_dense_ham_kich_hoat_2026-11-10.png")
+FIG_CASES = os.path.join(OUT_DIR, "truong_hop_lam_tron_che_do_2026-11-10.png")
 CLOCK_NS = 4.0     # 250 MHz, met after place and route (doc/synth/2026-11-09_route4ns_stride1_zu7ev)
 
 # Chart tokens: the validated reference palette of the dataviz method (as in the 2026-10-31 and 2026-11-05 reports);
@@ -59,6 +63,11 @@ COMPUTE_LAYERS = [(0, "Conv1"), (2, "Conv2"), (4, "Conv3"), (5, "Dense")]
 # State of the repository this report describes (README_FI.md section 3c, the log of 2026-11-10)
 REGRESSION = "211 test RTL: 207 PASS + 4 xfail đã biết, 0 FAIL"
 UNIT_TESTS = "485 unit test Python pass (11 lỗi cũ của test_dense_output.py, không liên quan)"
+# test_activation_rtl (12 random models, every activation mode x rounding) on the dense build, 2026-11-12
+ACT_RTL_DENSE = ("12/12 PASS, mọi lần kiểm bộ đệm iact khớp từng bit (Leaky ReLU, bảng, làm tròn, giữ bảng, "
+                 "NUM_GLB_PSUM 2, DMA 32 bit, mạng 7 layer của bài báo)")
+# trained models, 4 activations x 2 roundings x 2 modes that passed bit-exact (doc/perf/activation_2026-11-12_rounding)
+N_CASES_PASS = "16"
 
 
 def load(path):
@@ -298,19 +307,29 @@ def figure_chip():
     plt.close(fig)
 
 
-# Share of the outputs within 1 int8 unit of ONNX Runtime, test images 0-3 (doc/experiments/2026-11-02_activation.md,
-# section 4, measure_ort.py)
+# Share of the outputs within 1 int8 unit of ONNX Runtime, the worst of test images 0-3 (doc/experiments/
+# 2026-11-02_activation.md section 4, measure_ort.py; ReLU: doc/experiments/2026-11-12_rounding_modes/measure_ort_relu.py)
 ORT_WITHIN1 = {
+    "relu": {"floor": [100.0, 99.9, 99.1], "round": [100.0, 100.0, 100.0]},
     "leaky_relu": {"floor": [99.9, 96.7, 82.7], "round": [100.0, 99.4, 97.7]},
     "silu": {"floor": [97.9, 97.7, 86.5], "round": [99.9, 99.4, 94.5]},
     "hardswish": {"floor": [99.2, 98.0, 90.4], "round": [99.9, 99.6, 97.9]},
 }
 
 
+# Accuracy on the 10,000 MNIST test images with the chip's integer arithmetic (doc/experiments/2026-11-02_activation/
+# eval_10000.md); the same on sparse and dense hardware (both compute the same integers)
+ACCURACY = {"relu": {"floor": 99.35, "round": 99.36}, "leaky_relu": {"floor": 99.34, "round": 99.34},
+            "silu": {"floor": 99.25, "round": 99.27}, "hardswish": {"floor": 99.33, "round": 99.35}}
+DEFAULT_ROUND = {"relu": "floor", "leaky_relu": "round", "silu": "round", "hardswish": "round"}
+MODES = [("sparse", "floor"), ("sparse", "round"), ("dense", "floor"), ("dense", "round")]
+MODE_LABEL = {"sparse": "Sparse", "dense": "Dense", "floor": "floor", "round": "làm tròn"}
+
+
 def figure_rounding():
-    fig, axes = new_figure(9.4, 3.1, 1, 3)
+    fig, axes = new_figure(9.6, 3.0, 1, 4)
     w = 0.36
-    for ax, key in zip(axes, ("leaky_relu", "silu", "hardswish")):
+    for ax, key in zip(axes, ("relu", "leaky_relu", "silu", "hardswish")):
         style_axes(ax, "y")
         xs = list(range(3))
         floor, rnd = ORT_WITHIN1[key]["floor"], ORT_WITHIN1[key]["round"]
@@ -319,11 +338,12 @@ def figure_rounding():
         ax.bar([x + w / 2 + 0.01 for x in xs], rnd, w, color=COLOR[key], edgecolor=SURFACE, linewidth=1.0,
                label="làm tròn gần nhất")
         for x, a, b in zip(xs, floor, rnd):
-            ax.text(x - w / 2 - 0.01, a + 0.4, num(a), ha="center", va="bottom", fontsize=6.5, color=INK)
-            ax.text(x + w / 2 + 0.01, b + 0.4, num(b), ha="center", va="bottom", fontsize=6.5, color=INK)
+            ax.text(x - w / 2 - 0.01, a + 0.4, num(a), ha="center", va="bottom", fontsize=5.6, color=INK)
+            ax.text(x + w / 2 + 0.01, b + 0.4, num(b), ha="center", va="bottom", fontsize=5.6, color=INK)
         ax.set_xticks(xs)
         ax.set_xticklabels(["Conv1", "Conv2", "Conv3"], color=INK)
         ax.set_ylim(75, 103)
+        ax.tick_params(labelsize=7.5)
         ax.set_title(LABEL[key], fontsize=9.5, color=INK, loc="left")
     axes[0].set_ylabel("Output lệch ONNX Runtime ≤ 1 (%)", color=INK_2)
     fig.legend(handles=[Patch(facecolor=SURFACE, edgecolor=INK_2, hatch="////", label="làm tròn xuống (floor)"),
@@ -334,31 +354,43 @@ def figure_rounding():
     plt.close(fig)
 
 
-def figure_modes(runs):
-    """Total cycles of each trained model on the sparse and on the dense hardware."""
-    fig, ax = new_figure(9.2, 3.6)
-    style_axes(ax, "y")
-    w = 0.36
-    top = max(runs[k][m]["total_cycles"] for k, _ in ACTS for m in ("sparse", "dense"))
-    for i, (key, label) in enumerate(ACTS):
-        s, d = runs[key]["sparse"]["total_cycles"], runs[key]["dense"]["total_cycles"]
-        ax.bar(i - w / 2 - 0.01, s, w, color=COLOR[key], edgecolor=SURFACE, linewidth=1.0)
-        ax.bar(i + w / 2 + 0.01, d, w, color=SURFACE, edgecolor=COLOR[key], hatch="////", linewidth=1.0)
-        ax.text(i - w / 2 - 0.01, s + top * 0.012, f"{us(s)} µs", ha="center", va="bottom", fontsize=7.2, color=INK)
-        ax.text(i + w / 2 + 0.01, d + top * 0.012, f"{us(d)} µs", ha="center", va="bottom", fontsize=7.2, color=INK)
-        diff = (d - s) / s * 100
-        ax.text(i, top * 1.10, f"dense {pct(diff, 1, True)}", ha="center", fontsize=7.6,
-                color=INK if diff < 0 else INK_2, fontweight="bold" if diff < 0 else "normal")
-    ax.set_xticks(range(len(ACTS)))
-    ax.set_xticklabels([label for _, label in ACTS], color=INK)
-    ax.set_ylim(0, top * 1.18)
-    ax.set_ylabel("Chu kỳ cả mạng, ảnh test 0", color=INK_2)
-    ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: fmt(int(v))))
-    ax.legend(handles=[Patch(facecolor=INK_2, edgecolor=INK_2, label="sparse (bỏ qua số 0, mặc định của fork)"),
-                       Patch(facecolor=SURFACE, edgecolor=INK_2, hatch="////", label="dense (SPARSITY_EN = 0)")],
-              ncol=2, loc="lower left", bbox_to_anchor=(0, 1.01), frameon=False, fontsize=8)
-    fig.tight_layout()
-    fig.savefig(FIG_MODES, facecolor=fig.get_facecolor())
+def figure_cases(cases):
+    """Heat map: total cycles of each trained model in the 4 cases (sparse / dense x floor / round), the colour the
+    share above the fastest case of the same model (one sequential hue), the default case outlined."""
+    fig, ax = new_figure(9.4, 3.7)
+    ax.set_facecolor(SURFACE)
+    ramp = matplotlib.colors.LinearSegmentedColormap.from_list("seq", ["#eef4fc", "#2a78d6"])
+    worst = max((cases[k][c] - min(cases[k].values())) / min(cases[k].values()) * 100 for k, _ in ACTS for c in cases[k])
+    for r, (key, label) in enumerate(ACTS):
+        best = min(cases[key].values())
+        for c, case in enumerate(MODES):
+            t = cases[key][case]
+            extra = (t - best) / best * 100
+            shade = ramp(extra / worst if worst else 0)
+            ax.add_patch(plt.Rectangle((c, r), 0.96, 0.92, facecolor=shade, edgecolor=SURFACE, linewidth=0))
+            ink = "white" if extra / (worst or 1) > 0.55 else INK
+            mark = "  ★" if t == best else ""
+            ax.text(c + 0.48, r + 0.33, f"{us(t)} µs{mark}", ha="center", va="center", fontsize=8.6, color=ink,
+                    fontweight="bold" if t == best else "normal")
+            ax.text(c + 0.48, r + 0.66, "nhanh nhất" if t == best else f"+{num(extra, 1)} %", ha="center", va="center",
+                    fontsize=7.4, color=ink)
+            if (case[1] == DEFAULT_ROUND[key]) and case[0] == "sparse":
+                ax.add_patch(plt.Rectangle((c + 0.02, r + 0.02), 0.92, 0.88, fill=False, edgecolor=INK, linewidth=1.4,
+                                           linestyle="--"))
+    ax.set_xlim(0, 4)
+    ax.set_ylim(len(ACTS), 0)
+    ax.set_xticks([c + 0.48 for c in range(4)])
+    ax.set_xticklabels([f"{MODE_LABEL[m]}\n{MODE_LABEL[r]}" for m, r in MODES], color=INK, fontsize=8.6)
+    ax.xaxis.tick_top()
+    ax.set_yticks([r + 0.46 for r in range(len(ACTS))])
+    ax.set_yticklabels([label for _, label in ACTS], color=INK, fontsize=9)
+    ax.tick_params(length=0)
+    for side in ax.spines.values():
+        side.set_visible(False)
+    fig.text(0.01, 0.015, "Màu: chậm hơn trường hợp nhanh nhất của cùng model (đậm hơn = chậm hơn). Khung nét đứt: chế độ "
+             "và cách làm tròn mặc định của fork.", fontsize=7.2, color=INK_2)
+    fig.tight_layout(rect=(0, 0.05, 1, 1))
+    fig.savefig(FIG_CASES, facecolor=fig.get_facecolor())
     plt.close(fig)
 
 
@@ -367,6 +399,9 @@ def build():
     params = load(os.path.join(DATA, "params.json"))
     runs = {key: {mode: load(os.path.join(DATA, f"trained_{key}_img0_{mode}.json")) for mode in ("sparse", "dense")}
             for key, _ in ACTS}
+    full = {key: {case: load(os.path.join(CASES, f"trained_{key}_img0_{case[0]}_{case[1]}.json")) for case in MODES}
+            for key, _ in ACTS}
+    cases = {key: {case: full[key][case]["total_cycles"] for case in MODES} for key, _ in ACTS}
     sp = {key: runs[key]["sparse"]["total_cycles"] for key, _ in ACTS}
     dn = {key: runs[key]["dense"]["total_cycles"] for key, _ in ACTS}
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -374,7 +409,7 @@ def build():
     figure_quantization()
     figure_chip()
     figure_rounding()
-    figure_modes(runs)
+    figure_cases(cases)
 
     doc = Document()
     style = doc.styles["Normal"]
@@ -394,7 +429,7 @@ def build():
     r.font.size = Pt(14)
     info = doc.add_paragraph()
     info.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    info.add_run(f"Người thực hiện: Nguyễn Ngọc Trường Phi\nNgày: {DATE} (báo cáo trước: 05/11/2026)\n"
+    info.add_run(f"Người thực hiện: Nguyễn Ngọc Trường Phi\nNgày: {DATE}, cập nhật {UPDATED} (báo cáo trước: 05/11/2026)\n"
                  "Mã nguồn: github.com/DevFi-23/OpenEye (nhánh dev, private)").font.size = Pt(11)
 
     rel = {key: (sp[key] - sp["relu"]) / sp["relu"] * 100 for key, _ in ACTS}
@@ -413,10 +448,10 @@ def build():
         "với phép đổi scale về đúng scale input của layer tính kế tiếp, nên không cần bước lượng tử lại nào khác. Độ chính "
         "xác int8 trên 10.000 ảnh test: 99,27–99,35 %, cách model float tối đa 0,04 điểm.",
         f"Mới trong báo cáo này: vì phần cứng dense đã chạy đúng (sửa lỗi #46, #47 ngày 10/11), lần đầu đo được mỗi hàm "
-        f"trên cả hai chế độ. Với ReLU sparse nhanh hơn (dense chậm hơn {pct(dd['relu'], 1)}), còn với Leaky ReLU, SiLU và "
-        f"hard-swish dense nhanh hơn (chu kỳ {pct(dd['leaky_relu'], 1, True)}, {pct(dd['silu'], 1, True)}, "
-        f"{pct(dd['hardswish'], 1, True)}): chế độ "
-        "nên chọn theo hàm kích hoạt của model.",
+        f"với cả hai cách làm tròn trên cả hai chế độ (16 trường hợp, mục 7). Với ReLU sparse nhanh hơn (dense chậm hơn "
+        f"{pct(dd['relu'], 1)}), còn với Leaky ReLU, SiLU và hard-swish dense nhanh hơn (chu kỳ "
+        f"{pct(dd['leaky_relu'], 1, True)}, {pct(dd['silu'], 1, True)}, {pct(dd['hardswish'], 1, True)}). Ở dense cách "
+        "làm tròn không đổi chu kỳ; ở sparse floor có lợi cho ReLU, làm tròn có lợi cho Leaky ReLU.",
         "Các việc khác từ 05/11: sửa Conv có stride (#41b, #41c, #41d) và dựng phần cứng có stride làm mặc định; thêm các "
         "phép kiểm tra để toolchain báo lỗi thay vì tính sai lặng lẽ (#7, #21, #27, #41, #42, #43, #48); rà soát 2 đợt "
         "commit của upstream (không lấy); đo dense so với sparse; sửa chế độ dense (#46, #47).",
@@ -477,16 +512,26 @@ def build():
     table(doc, ["Model", "Layer", "mant", "shift", "M = mant / 2^shift", "Scale đích"], rows,
           widths=[2.6, 1.6, 2.6, 1.3, 3.2, 5.2], align_right=(2, 3, 4))
     doc.add_heading("3.4. Làm tròn và kẹp", level=2)
-    para(doc, "Dịch phải số học (>>) là làm tròn xuống (floor): mọi kết quả lệch trung bình −0,5 đơn vị int8, và độ lệch "
-              "cộng dồn qua các layer. Phần cứng thêm bit làm tròn gần nhất (round half up):")
+    para(doc, "Dịch phải số học (>>) là làm tròn xuống (floor): phần lẻ luôn bị bỏ, nên trung bình mỗi giá trị bị kéo "
+              "xuống khoảng 0,5 đơn vị int8, và sai lệch lan, lớn dần qua các layer. Phần cứng có thêm bit làm tròn gần nhất "
+              "(round half up) cho từng layer (act_round):")
     formula(doc, "q = kẹp((mant · psum + 2^(shift − 1)) >> shift,  act_min, 127)")
-    para(doc, "Hằng 2^(shift−1) được cộng bằng bộ cộng sau của DSP48E2 (phép A·B + C trong cùng tầng nhân), nên không tốn "
-              "logic hay chu kỳ thêm. Kẹp (bão hoà) thay cho cắt bit: 130 thành 127 chứ không thành −126 (lỗi #30). "
-              "Toolchain bật làm tròn cho Leaky ReLU, SiLU, hard-swish; ReLU giữ floor (làm tròn không tăng độ chính xác của "
-              "ReLU mà làm mất một ít số 0). Hình 2: tỉ lệ output lệch ONNX Runtime không quá 1 đơn vị.")
+    para(doc, "Hằng 2^(shift−1) được cộng ngay trong tầng nhân (tầng 2, mant · sum + hằng), nên không thêm chu kỳ nào. Nó có "
+              "tốn logic: tích 25 × 21 bit lớn hơn một DSP48E2 (27 × 18 bit) nên một phần phép nhân và phép cộng nằm ở LUT; "
+              "Vivado đo +193 LUT cho 4 bộ lượng tử khi thêm hệ số âm của Leaky ReLU và bit làm tròn, phần lớn vì hằng làm tròn "
+              "giữ đủ 46 bit của tích (mục 5.4). Psum được cộng offset trước khi nhân "
+              "(psum + offset); offset bằng 0 trong luồng này. Kẹp (bão hoà) thay cho cắt bit: 130 thành 127 chứ không thành "
+              "−126 (lỗi #30). Chip làm tròn nửa đơn vị lên trên, ONNX Runtime làm tròn nửa đơn vị về số chẵn; hai cách chỉ "
+              "khác khi trúng đúng nửa đơn vị.")
+    para(doc, "Toolchain mặc định bật làm tròn cho Leaky ReLU, SiLU, hard-swish và giữ floor cho ReLU. Lý do: với ReLU, floor "
+              "biến mọi giá trị dương nhỏ hơn 1 đơn vị thành 0 (số âm đằng nào cũng bị kẹp về 0), nên tạo thêm số 0 cho chế độ "
+              "sparse bỏ qua, mà độ chính xác như nhau. Với ba hàm kia, phía âm không bị kẹp: floor biến số âm rất nhỏ (ví dụ "
+              "−0,38) thành −1 thay vì 0, làm mất số 0 và kéo lệch mọi giá trị, sai lệch lớn dần theo độ sâu. Hình 2 so tỉ lệ "
+              "output lệch ONNX Runtime không quá 1 đơn vị; ReLU làm tròn khớp ONNX Runtime 100 % ở mọi layer. Mục 7 đo cả hai "
+              "cách làm tròn trên cả hai chế độ.")
     doc.add_picture(FIG_ROUND, width=Cm(16.5))
-    caption(doc, "Hình 2. Tỉ lệ output lệch ONNX Runtime ≤ 1 đơn vị int8 (ảnh test 0–3), floor so với làm tròn gần nhất. "
-                 "Không làm tròn, sai lệch tăng theo độ sâu (Conv3).")
+    caption(doc, "Hình 2. Tỉ lệ output lệch ONNX Runtime ≤ 1 đơn vị int8 (ảnh tệ nhất trong các ảnh test 0–3), floor so với "
+                 "làm tròn gần nhất, cả 4 hàm. Không làm tròn, sai lệch tăng theo độ sâu (Conv3).")
     doc.add_heading("3.5. Gộp hàm kích hoạt với phép đổi scale", level=2)
     para(doc, "ONNX Runtime lượng tử lại nhiều lần quanh một hàm kích hoạt (ví dụ SiLU thành QLinearSigmoid rồi QLinearMul, và "
               "một lần nữa quanh Flatten trước Dense). Phần cứng ghi output của layer thẳng vào bộ đệm input của layer sau, nên "
@@ -604,48 +649,102 @@ def build():
         ["Đối chứng âm (cố ý báo sai chế độ, lệch một ô bảng, tắt làm tròn)", "6/6 FAIL đúng như phải thế"],
         ["Model đã huấn luyện, ảnh test 0 và 1, cả 4 hàm (test_real_model)", "8/8 PASS, cả mạng khớp từng bit, DUT đoán đúng "
          "chữ số"],
-        ["Model đã huấn luyện ở phần cứng dense (mới, 10/11)", "4/4 PASS, khớp từng bit"],
+        ["test_activation_rtl ở phần cứng dense (mới, 12/11)", ACT_RTL_DENSE],
+        ["Model đã huấn luyện, 4 hàm × 2 cách làm tròn × 2 chế độ (mới, 10–12/11)", f"{N_CASES_PASS}/16 PASS, khớp từng "
+         "bit, DUT đoán đúng chữ số 7 (ảnh test 0)"],
     ], widths=[9.6, 7.1])
-    para(doc, "Độ chính xác trên 10.000 ảnh test MNIST (phép tính int8 đúng như chip, tuỳ chọn mặc định của toolchain):")
-    table(doc, ["Hàm", "Float (PyTorch)", "ONNX Runtime int8", "Chip int8", "Làm tròn"], [
-        ["ReLU", "99,35 %", "99,33 %", "99,35 %", "floor"],
-        ["Leaky ReLU", "99,33 %", "99,34 %", "99,34 %", "gần nhất"],
-        ["SiLU", "99,29 %", "99,29 %", "99,27 %", "gần nhất"],
-        ["hard-swish", "99,36 %", "99,29 %", "99,35 %", "gần nhất"],
-    ], widths=[3.4, 3.2, 3.6, 3.0, 2.6], align_right=(1, 2, 3))
+    para(doc, "Độ chính xác trên 10.000 ảnh test MNIST (phép tính int8 đúng như chip; như nhau ở sparse và dense vì hai "
+              "chế độ tính ra cùng các số nguyên; * là cách làm tròn mặc định của toolchain):")
+    table(doc, ["Hàm", "Float (PyTorch)", "ONNX Runtime int8", "Chip int8, floor", "Chip int8, làm tròn"], [
+        ["ReLU", "99,35 %", "99,33 %", "99,35 % *", "99,36 %"],
+        ["Leaky ReLU", "99,33 %", "99,34 %", "99,34 %", "99,34 % *"],
+        ["SiLU", "99,29 %", "99,29 %", "99,25 %", "99,27 % *"],
+        ["hard-swish", "99,36 %", "99,29 %", "99,33 %", "99,35 % *"],
+    ], widths=[3.0, 3.1, 3.5, 3.4, 3.6], align_right=(1, 2, 3, 4))
 
     # ---------------------------------------------------------------- 7
-    doc.add_heading("7. Hiệu năng: hàm kích hoạt trên phần cứng sparse và dense", level=1)
+    doc.add_heading("7. Hiệu năng: 4 hàm × 2 cách làm tròn × 2 chế độ", level=1)
     para(doc, "Chip có hai chế độ dựng (tham số SPARSITY_EN). Sparse (mặc định của fork, kiến trúc Eyeriss v2) lưu input và "
               "weight kèm 4 bit đánh dấu số 0 và bỏ qua mọi phép nhân với 0. Dense truyền giá trị 8 bit trần và nhân hết. Hàm "
-              "kích hoạt quyết định có bao nhiêu số 0 trong input của layer sau, nên quyết định chế độ nào nhanh hơn. Số liệu: "
-              "mạng MNIST đã huấn luyện, ảnh test 0, đo bằng profiler, 250 MHz.")
-    rows = []
+              "kích hoạt và cách làm tròn quyết định có bao nhiêu số 0 trong input của layer sau, nên quyết định chế độ nào "
+              "nhanh hơn. Mỗi model được chạy với cả hai cách làm tròn trên cả hai chế độ: 16 lần chạy trên RTL, mạng MNIST đã "
+              "huấn luyện, ảnh test 0, đo bằng profiler, 250 MHz.")
+    doc.add_heading("7.1. Bảng các trường hợp", level=2)
+    rows, fastest = [], []
     for key, label in ACTS:
-        L = runs[key]["sparse"]["layers"]
-        rows.append([label, f"{num(zeros(L[2]), 0)} / {num(zeros(L[4]), 0)} / {num(zeros(L[5]), 0)} %",
-                     f"{fmt(sp[key])} ({us(sp[key])} µs)", f"{fmt(dn[key])} ({us(dn[key])} µs)", pct(dd[key], 1, True)])
-    table(doc, ["Hàm", "Số 0 trong input Conv2 / Conv3 / Dense", "Sparse", "Dense", "Dense so với sparse"], rows,
-          widths=[2.6, 4.4, 3.7, 3.7, 2.3], align_right=(2, 3, 4))
-    doc.add_picture(FIG_MODES, width=Cm(16.0))
-    caption(doc, "Hình 5. Chu kỳ cả mạng của 4 model trên phần cứng sparse (đặc) và dense (gạch chéo).")
-    comp = {key: {mode: sum(phase(l, "compute") for l in runs[key][mode]["layers"]) for mode in ("sparse", "dense")}
-            for key, _ in ACTS}
-    wl = {key: {mode: phase(runs[key][mode], "load_wght") for mode in ("sparse", "dense")} for key, _ in ACTS}
-    other_zeros = [zeros(runs[key]["sparse"]["layers"][li]) for key, _ in ACTS[1:] for li in (2, 4, 5)]
-    zero_lo, zero_hi = round(min(other_zeros)), round(max(other_zeros))
+        best = min(cases[key].values())
+        for rnd in ("floor", "round"):
+            L = full[key][("sparse", rnd)]["layers"]
+            mark = " *" if rnd == DEFAULT_ROUND[key] else ""
+            cells = []
+            for mode in ("sparse", "dense"):
+                t = cases[key][(mode, rnd)]
+                cells.append(f"{fmt(t)} ({us(t)} µs)" + ("  ★" if t == best else ""))
+                if t == best:
+                    fastest.append((len(rows) + 1, 5 if mode == "sparse" else 6))
+            rows.append([label if rnd == "floor" else "", MODE_LABEL[rnd] + mark, pct(ACCURACY[key][rnd], 2),
+                         num(ORT_WITHIN1[key][rnd][2], 1) + " %",
+                         f"{num(zeros(L[2]), 0)} / {num(zeros(L[4]), 0)} / {num(zeros(L[5]), 0)} %"] + cells)
+    t = table(doc, ["Hàm", "Làm tròn", "Độ chính xác", "Lệch ONNX ≤ 1 (Conv3)", "Số 0 vào Conv2 / Conv3 / Dense",
+                    "Sparse: chu kỳ (µs)", "Dense: chu kỳ (µs)"], rows,
+              widths=[2.2, 1.7, 1.9, 2.0, 2.9, 3.0, 3.0], align_right=(2, 3, 5, 6))
+    for r, c in fastest:
+        base_report.shade(t.rows[r].cells[c], "D7F0E3")
+    for r in range(1, len(rows) + 1):
+        base_report.shade(t.rows[r].cells[0], "F2F2EF")
+    caption(doc, "Bảng các trường hợp. ★ và ô xanh: trường hợp nhanh nhất của mỗi model; * cách làm tròn mặc định của "
+                 "toolchain. Độ chính xác: 10.000 ảnh test; lệch ONNX: ảnh tệ nhất trong ảnh 0–3; số 0: input của layer sau "
+                 "pooling, ảnh 0 (như nhau ở hai chế độ).")
+    doc.add_picture(FIG_CASES, width=Cm(16.0))
+    caption(doc, "Hình 5. Chu kỳ cả mạng trong 16 trường hợp; màu theo mức chậm hơn trường hợp nhanh nhất của cùng model.")
+    doc.add_heading("7.2. Đọc bảng", level=2)
+    comp = {key: {case: sum(phase(l, "compute") for l in full[key][case]["layers"]) for case in MODES} for key, _ in ACTS}
+    wl = {mode: phase(full["relu"][(mode, "floor")], "load_wght") for mode in ("sparse", "dense")}
+    d = {key: {mode: cases[key][(mode, "round")] - cases[key][(mode, "floor")] for mode in ("sparse", "dense")}
+         for key, _ in ACTS}
+    z = {key: {rnd: zeros(full[key][("sparse", rnd)]["layers"][2]) for rnd in ("floor", "round")} for key, _ in ACTS}
+    dense_same = all(d[key]["dense"] == 0 for key, _ in ACTS)
     bullets(doc, [
-        f"Ở sparse, ReLU nhanh nhất: input của Conv2, Conv3, Dense có 44–87 % số 0 được bỏ qua. Leaky ReLU, SiLU, "
-        f"hard-swish giữ các số âm nhỏ, chỉ còn {zero_lo}–{zero_hi} % số 0, nên chậm hơn ReLU {pct(rel['leaky_relu'], 1)}, "
-        f"{pct(rel['silu'], 1)}, {pct(rel['hardswish'], 1)}.",
-        f"Ở dense, thời gian gần như không phụ thuộc hàm kích hoạt (FSM dense nhân hết, không nhìn giá trị): pha tính toán "
-        f"{fmt(comp['relu']['dense'])} chu kỳ cho cả 4 model; chênh lệch còn lại là 96 chu kỳ nạp 3 bảng.",
-        f"Dense nạp weight nhanh hơn 40 % ({fmt(wl['relu']['dense'])} so với {fmt(wl['relu']['sparse'])} chu kỳ): weight đã "
-        "huấn luyện gần như không có số 0, nên 4 bit đánh dấu của sparse chỉ là phần thừa.",
-        f"Kết quả: với ReLU dense chậm hơn {pct(dd['relu'], 1)}; với các hàm còn lại dense nhanh hơn "
-        f"{pct(-dd['leaky_relu'], 1)} (Leaky ReLU) đến {pct(-best_dense[0], 1)}, và dense nhỏ hơn 26,9 % LUT. Chọn chế độ "
-        "theo hàm kích hoạt của model; hướng tốt hơn cả hai là chế độ trộn (input sparse, weight 8 bit trần, mục 9).",
+        ("Ở dense, floor và làm tròn cho đúng cùng số chu kỳ ở cả 4 model" if dense_same else
+         "Ở dense, floor và làm tròn gần như cùng số chu kỳ") +
+        f" ({fmt(cases['relu'][('dense', 'floor')])} với ReLU và Leaky ReLU, {fmt(cases['silu'][('dense', 'floor')])} với "
+        "SiLU và hard-swish, gồm 96 chu kỳ nạp 3 bảng): FSM dense nhân mọi giá trị, không nhìn số 0. Ở dense, cách làm tròn "
+        "chỉ ảnh hưởng độ chính xác, không ảnh hưởng tốc độ.",
+        "Độ chính xác không phụ thuộc chế độ: sparse và dense tính ra cùng các số nguyên, cả 16 lần chạy khớp từng bit với "
+        "cùng một tham chiếu. Nó chỉ phụ thuộc cách làm tròn (mục 6).",
+        f"Sparse, ReLU: floor nhanh hơn làm tròn {fmt(d['relu']['sparse'])} chu kỳ "
+        f"({pct(d['relu']['sparse'] / cases['relu'][('sparse', 'floor')] * 100, 1)}). Làm tròn đổi các giá trị dương nhỏ "
+        f"hơn 1 đơn vị thành 1: số 0 vào Conv2 từ {num(z['relu']['floor'], 1)} % xuống {num(z['relu']['round'], 1)} %. "
+        "Đổi lại, ReLU làm tròn khớp ONNX Runtime 100 % (floor lệch tối đa 2 đơn vị) với độ chính xác gần như bằng nhau.",
+        f"Sparse, Leaky ReLU: làm tròn nhanh hơn floor {fmt(-d['leaky_relu']['sparse'])} chu kỳ "
+        f"({pct(-d['leaky_relu']['sparse'] / cases['leaky_relu'][('sparse', 'floor')] * 100, 1)}). Floor biến số âm rất nhỏ "
+        f"thành −1: số 0 vào Conv2 chỉ còn {num(z['leaky_relu']['floor'], 1)} %, so với {num(z['leaky_relu']['round'], 1)} % "
+        "khi làm tròn. Ở đây làm tròn vừa nhanh hơn vừa chính xác hơn. Mức chênh nhỏ hơn dự đoán ở bước A (khoảng 6.900 "
+        "chu kỳ, mô hình tuyến tính theo tỉ lệ số 0): lợi ích bỏ qua số 0 không tăng tuyến tính, ở tỉ lệ số 0 thấp nó nhỏ "
+        f"hơn nhiều (tính toán Conv2: {fmt(phase(full['leaky_relu'][('sparse', 'floor')]['layers'][2], 'compute'))} chu kỳ "
+        f"với {num(z['leaky_relu']['floor'], 1)} % số 0, {fmt(phase(full['leaky_relu'][('sparse', 'round')]['layers'][2], 'compute'))} "
+        f"với {num(z['leaky_relu']['round'], 1)} %, {fmt(phase(full['relu'][('sparse', 'floor')]['layers'][2], 'compute'))} "
+        f"với ReLU {num(z['relu']['floor'], 1)} %).",
+        f"Sparse, SiLU và hard-swish: chênh lệch nhỏ ({fmt(abs(d['silu']['sparse']))} và "
+        f"{fmt(abs(d['hardswish']['sparse']))} chu kỳ): bảng tra cho rất ít giá trị đúng bằng 0 dù làm tròn kiểu nào; "
+        "làm tròn chính xác hơn.",
+        f"Nhanh nhất cho từng model: ReLU ở sparse với floor ({us(min(cases['relu'].values()))} µs); Leaky ReLU, SiLU, "
+        "hard-swish ở dense (floor hay làm tròn như nhau). Dense nạp weight nhanh hơn 40 % "
+        f"({fmt(wl['dense'])} so với {fmt(wl['sparse'])} chu kỳ) vì weight đã huấn luyện gần như không có số 0, còn pha tính "
+        f"toán dense ({fmt(comp['relu'][('dense', 'floor')])} chu kỳ) chỉ thua sparse khi input có nhiều số 0 (ReLU).",
     ])
+    doc.add_heading("7.3. Nên chọn gì", level=2)
+    table(doc, ["Phần cứng", "ReLU", "Leaky ReLU", "SiLU / hard-swish"], [
+        ["Sparse", "floor: thêm số 0, nhanh hơn, độ chính xác như nhau (mặc định hiện tại)",
+         "làm tròn: nhanh hơn và chính xác hơn (mặc định hiện tại)", "làm tròn: chính xác hơn, chu kỳ gần như bằng "
+         "(mặc định hiện tại)"],
+        ["Dense", "làm tròn: 0 chu kỳ thêm, khớp ONNX Runtime 100 % (hiện toolchain vẫn chọn floor)", "làm tròn",
+         "làm tròn"],
+        ["Chế độ nên dựng", "sparse", "dense", "dense"],
+    ], widths=[2.6, 5.4, 4.2, 4.5])
+    para(doc, "Toolchain hiện chọn cách làm tròn theo hàm kích hoạt, chưa theo chế độ phần cứng: ReLU luôn floor, kể cả trên "
+              "phần cứng dense. Đổi sang chọn theo chế độ chỉ cần sửa onnx2model.finish_activations (chưa làm). Chế độ trộn "
+              "(input sparse, weight 8 bit trần, mục 9) sẽ lấy được cả hai ưu điểm cho model ReLU.")
 
     # ---------------------------------------------------------------- 8
     doc.add_heading("8. Các việc khác đã làm (05/11 – 10/11/2026)", level=1)
