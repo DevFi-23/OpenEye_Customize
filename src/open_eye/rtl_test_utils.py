@@ -1518,6 +1518,11 @@ def compare_iact_storage(ptp, dut, iact_ref, oep, layer_params, valid_values=Non
     expected = _to_ram_format(_iact_buffer_words(oep, layer_params, iact_ref),oep,layer_params)
 
     if expected is None:
+        if "Pool" in str(getattr(layer_params, "layer_name", "")):
+            # The output of a convolution that a pooling layer reads: check it here, with the layout the write-back
+            # gives it, so that a wrong convolution is reported at the layer that makes it (bug #49 was found one
+            # layer later, after the pooling had mixed the wrong pixels into its maxima).
+            return compare_pooling_input(dut, oep, iact_ref)
         logger.warning("No iact buffer layout known for layer '%s'; skipping the check.",
                        getattr(layer_params, "layer_name", "?"))
         return True
@@ -1580,6 +1585,57 @@ def compare_iact_storage(ptp, dut, iact_ref, oep, layer_params, valid_values=Non
         _log_iact_buffer_occupancy(dut, oep)
 
     return not error_found
+
+
+def pooling_input_bytes(iact_ref):
+    """Buffer positions of a convolution output that the next (pooling) layer reads.
+
+    The write-back stores a convolution output as the input of a convolution of the same size: groups of 4 channels,
+    in a group row y, then column x, then the 4 channels, 8 values per buffer word, word k in RAM cell
+    k % IACT_RAM_CELLS at address k // IACT_RAM_CELLS. Value (c, x, y) of the (C, X, Y) reference is byte
+    ((c // 4 * Y + y) * X + x) * 4 + c % 4 of that image (the layout IactStreamMapper builds for a convolution input,
+    doc/experiments/2026-11-17_bug49.md). Returns (word, byte, value, c, x, y) per value, or None when the reference
+    is not a (C, X, Y) image with C a multiple of 4 (other layouts are not checked here)."""
+    ref = np.array(iact_ref)
+    if ref.ndim != 3 or ref.shape[0] % 4:
+        return None
+    C, X, Y = ref.shape
+    out = []
+    for c in range(C):
+        for y in range(Y):
+            for x in range(X):
+                k = ((c // 4 * Y + y) * X + x) * 4 + c % 4
+                out.append((k // 8, k % 8, int(ref[c, x, y]) & 0xFF, c, x, y))
+    return out
+
+
+def compare_pooling_input(dut, oep, iact_ref):
+    """Check the iact buffer that a pooling layer is about to read (the previous convolution's output) against the
+    reference, value by value (pooling_input_bytes). Returns True when every value matches or the layout is not
+    covered (logged)."""
+    positions = pooling_input_bytes(iact_ref)
+    if positions is None:
+        logger.warning("Pooling input of shape %s: no layout check (channels not a multiple of 4); skipped.",
+                       np.array(iact_ref).shape)
+        return True
+    half_offset = iact_half_offset(dut, oep)
+    words = {}
+    wrong = []
+    for word, byte, value, c, x, y in positions:
+        if word not in words:
+            words[word] = _ram_word(dut.BUFFER_A[word % oep.IACT_RAM_CELLS]
+                                    .iact_layer_buffer.impl.mem[half_offset + word // oep.IACT_RAM_CELLS])
+        dut_word = words[word]
+        dut_value = None if dut_word is None else (dut_word >> (8 * byte)) & 0xFF
+        if dut_value != value:
+            wrong.append((c, x, y, value, dut_value))
+    logger.info("Pooling input check: %d values in %d buffer words, %d differ", len(positions), len(words), len(wrong))
+    for c, x, y, value, dut_value in wrong[:16]:
+        logger.error("Pooling input (the convolution output) wrong at channel %d x %d y %d: ref %d, DUT %s",
+                     c, x, y, value, "X" if dut_value is None else dut_value)
+    if len(wrong) > 16:
+        logger.error("... and %d further wrong values of the pooling input.", len(wrong) - 16)
+    return not wrong
 
 
 def _log_iact_value_comparison(dut, oep, expected, cells_per_group, half_offset=0):

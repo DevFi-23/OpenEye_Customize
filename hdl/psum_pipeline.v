@@ -26,7 +26,11 @@ module psum_pipeline #(
     parameter DATA_PSUM_BITWIDTH = 32,
     parameter PSUM_PER_PE = 32,
     parameter PSUM_CYCLES_ONE_WORD_ALL_CELLS = 2,
-    parameter PSUM_OUTPUT_WORDS = 2
+    parameter PSUM_OUTPUT_WORDS = 2,
+    // 1: a Conv layer may send its bias once per filter (status bit bias_per_filter); the psum buffer is then
+    // rewritten from a bias table while the main FSM goes on (doc/experiments/2026-11-17_bias_per_filter.md).
+    // 0: only the old per-output bias stream, no table (the hardware of before 2026-11-17). Default 1 since 2026-11-17.
+    parameter BIAS_PER_FILTER_EN = 1
 ) (
     input wire clk_i,
     input wire rst_n,
@@ -66,6 +70,11 @@ module psum_pipeline #(
     input wire       fully_connected_layer,
     input wire       store_in_psum,
     input wire       send_data_out,
+    // Bias per filter: GET_BIAS receives ceil(filters / PSUM_OUTPUT_WORDS) words of biases (filter f at slot
+    // f % PSUM_OUTPUT_WORDS of word f / PSUM_OUTPUT_WORDS) instead of the whole map; bias_groups = filters of the
+    // layer / kernels_per_calc, the psum buffer addresses of one output row.
+    input wire        bias_per_filter,
+    input wire [10:0] bias_groups,
 
     input wire [8*QUANT_AMOUNT-1:0] quant_offset_flat,
     input wire [7*QUANT_AMOUNT-1:0] quant_exp_flat,
@@ -205,6 +214,54 @@ module psum_pipeline #(
   // drops bits whenever the accumulator width is less than a DMA slot.
   localparam CONV_DMA_PAYLOAD_WIDTH = PSUM_OUTPUT_WORDS * TRANS_BITWIDTH_PSUM;
   localparam CONV_BIAS_CYCLES = (CLUSTERS * NUM_GLB_PSUM + PSUM_OUTPUT_WORDS - 1) / PSUM_OUTPUT_WORDS;
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // Bias per filter (BIAS_PER_FILTER_EN, doc/experiments/2026-11-17_bias_per_filter.md).
+  // The old Conv stream sends, for every x pass and output row, the words of every filter group: for a group of
+  // kernels_per_calc filters f0 .. f0+k-1, filter f0+k-1 first, each filter in CONV_BIAS_CYCLES / k words that carry
+  // its bias in each of the PSUM_OUTPUT_WORDS slots; GET_BIAS shifts CONV_BIAS_CYCLES words into one buffer address.
+  // So the address of (x pass, row, group g) always holds the same word, built from the biases of group g only.
+  // With bias_per_filter, GET_BIAS stores the biases in bias_table, then the rewrite below builds the word of group g
+  // with the same shifts (one per cycle, the table in place of the DMA) and writes it to the group's addresses,
+  // g, g + groups, g + 2 groups, ... (rows x x passes of them), one address per cycle: the buffer ends up exactly as
+  // after the old stream. It runs in PSUM_IDLE while the main FSM goes on (GET_QUANTIZE ... the weight send);
+  // a compute start that arrives before it ends is held in compute_pending.
+  // ---------------------------------------------------------------------------------------------------------------
+  localparam BIAS_TABLE_ROWS = (QUANT_AMOUNT + PSUM_OUTPUT_WORDS - 1) / PSUM_OUTPUT_WORDS;
+  localparam BIAS_ROW_WIDTH  = BIAS_TABLE_ROWS > 1 ? $clog2(BIAS_TABLE_ROWS) : 1;
+  localparam BIAS_FILTER_WIDTH = 12;                 // filter index (QUANT_AMOUNT <= 2048 entries)
+  wire bias_mode = (BIAS_PER_FILTER_EN == 1) & bias_per_filter & !fully_connected_layer;
+  reg                          bias_regen;           // rewriting the psum buffer from bias_table
+  reg                          bias_writing;         // 0: shifting the group word together, 1: writing it
+  reg                          compute_pending;      // compute_reg seen during the rewrite
+  reg [10:0]                   bias_group;           // group being written
+  reg [BIAS_FILTER_WIDTH-1:0]  bias_filter;          // filter whose bias is shifted in this cycle
+  reg [4:0]                    bias_q;               // filters of the group still to come after bias_filter
+  reg [7:0]                    bias_rep;             // words of bias_filter shifted in so far
+  reg [7:0]                    bias_block_len;       // words per filter: CONV_BIAS_CYCLES / kernels_per_calc
+  reg [7:0]                    bias_row;             // output row of the address being written
+  reg [7:0]                    bias_xrep;            // x pass of the address being written
+  reg [BUFFER_WIDTH-1:0]       bias_addr;            // address being written
+  wire [TRANS_BITWIDTH_PSUM-1:0] bias_value;         // bias_table entry of bias_filter
+  wire [4:0] bias_kernels = (kernels_per_calc == 5'd0) ? 5'd1 : kernels_per_calc;
+  generate
+    if (BIAS_PER_FILTER_EN == 1) begin : gen_bias_table
+      // One DMA word per row (LUTRAM: one write port, read without a clock).
+      reg  [PSUM_OUTPUT_WORDS*TRANS_BITWIDTH_PSUM-1:0] bias_table [0:BIAS_TABLE_ROWS-1];
+      wire [BIAS_ROW_WIDTH-1:0]    bias_row_index = BIAS_ROW_WIDTH'(bias_filter / BIAS_FILTER_WIDTH'(PSUM_OUTPUT_WORDS));
+      wire [BIAS_FILTER_WIDTH-1:0] bias_slot      = bias_filter % BIAS_FILTER_WIDTH'(PSUM_OUTPUT_WORDS);
+      wire [PSUM_OUTPUT_WORDS*TRANS_BITWIDTH_PSUM-1:0] bias_row_data = bias_table[bias_row_index];
+      always @(posedge clk_i) begin
+        if ((fsm_current_state == GET_BIAS) & enable_dma_i_reg & bias_mode) begin
+          bias_table[fsm_psum_cycle[BIAS_ROW_WIDTH-1:0]] <= data_dma_i_reg[0+:PSUM_OUTPUT_WORDS*TRANS_BITWIDTH_PSUM];
+        end
+      end
+      assign bias_value = bias_row_data[bias_slot*TRANS_BITWIDTH_PSUM+:TRANS_BITWIDTH_PSUM];
+    end else begin : gen_no_bias_table
+      assign bias_value = {TRANS_BITWIDTH_PSUM{1'b0}};
+    end
+  endgenerate
+
   wire [DMA_BITWIDTH-1:0] psum_dma_word = fully_connected_layer ?
       psum_buffer_data_temp_reg[0+:DMA_BITWIDTH] :
       {{(DMA_BITWIDTH-CONV_DMA_PAYLOAD_WIDTH){1'b0}},
@@ -259,6 +316,14 @@ module psum_pipeline #(
           // (bug #28, data dependent through zero skipping; doc/experiments/2026-11-03_table3_cr1.md).
           if ((CLUSTER_ROWS == 1) && (rr_g*2 + 1 < NUM_GLB_PSUM)) begin : gen_pair_ready
             assign chain_ready_terms[TERM] = psum_ready_o_reg[GLB] & psum_ready_o_reg[GLB+1];
+          end else if (rr_g*2 + 1 < NUM_GLB_PSUM) begin : gen_pair_ready_rows
+            // The same at CLUSTER_ROWS >= 2 when the odd GLB starts a chain too (its own router_mode_psum bit 2):
+            // at CR 2 X 2 every GLB does, and an odd column that finished late was collected out of step, one pixel
+            // wrong in many filters (bug #49, data dependent through zero skipping, Table 2 network with ReLU;
+            // doc/experiments/2026-11-17_bug49.md).
+            wire not_chain_start_odd = (router_mode_psum[MODE + ROUTER_MODES_PSUM] == 0);
+            assign chain_ready_terms[TERM] = (psum_ready_o_reg[GLB] | not_chain_start) &
+                                             (psum_ready_o_reg[GLB+1] | not_chain_start_odd);
           end else begin : gen_even_ready
             assign chain_ready_terms[TERM] = psum_ready_o_reg[GLB] | not_chain_start;
           end
@@ -377,6 +442,17 @@ module psum_pipeline #(
       psum_buffer_data_temp_reg   <= 0;
       ready_dma_i_q1              <= 0;
       ready_dma_i_q2              <= 0;
+      bias_regen                  <= 0;
+      bias_writing                <= 0;
+      compute_pending             <= 0;
+      bias_group                  <= 0;
+      bias_filter                 <= 0;
+      bias_q                      <= 0;
+      bias_rep                    <= 0;
+      bias_block_len              <= 0;
+      bias_row                    <= 0;
+      bias_xrep                   <= 0;
+      bias_addr                   <= 0;
     end else begin
       ready_dma_i_q1 <= ready_dma_i;
       ready_dma_i_q2 <= ready_dma_i_q1;
@@ -412,6 +488,21 @@ module psum_pipeline #(
               if (fsm_psum_cycle == trans_cycles_psum - 1) begin
                 fsm_psum_cycle <= 0;
                 psum_cnt       <= psum_buffer_addr_array[0][0][0] + 1;
+                if (bias_mode) begin
+                  // The last bias word arrives now (written into bias_table this edge): start the rewrite with
+                  // group 0, its last filter first, as the old stream did.
+                  bias_regen       <= 1;
+                  bias_writing     <= 0;
+                  bias_group       <= 0;
+                  bias_filter      <= {{(BIAS_FILTER_WIDTH-5){1'b0}}, bias_kernels} - 1'b1;
+                  bias_q           <= bias_kernels - 1'b1;
+                  bias_rep         <= 0;
+                  bias_block_len   <= 8'(CONV_BIAS_CYCLES) / {3'd0, bias_kernels};
+                  bias_row         <= 0;
+                  bias_xrep        <= 0;
+                  bias_addr        <= 0;
+                  psum_cycle_count <= 0;
+                end
               end
               // Dense/FC bias loading (DensePsumStreamMapper.get_psum_stream)
               // sends one bias word per DMA cycle, cycling through all
@@ -452,7 +543,7 @@ module psum_pipeline #(
                   end
                   psum_buffer_en_w <= ~0;
                 end
-              end else begin
+              end else if (!bias_mode) begin
                 psum_buffer_data_w <= (psum_buffer_data_w << CONV_DMA_PAYLOAD_WIDTH) |
                     data_dma_i_reg[0+:CONV_DMA_PAYLOAD_WIDTH];
                 psum_buffer_en_w <= 0;
@@ -473,7 +564,60 @@ module psum_pipeline #(
           psum_transmitted    <= 0;
           fsm_psum_last_state <= PSUM_IDLE;
           storage_cycles      <= 0;
-          if (compute_reg) begin
+          // Bias per filter: rewrite of the psum buffer from bias_table (see bias_mode above).
+          if (bias_regen) begin
+            if (!bias_writing) begin
+              // Shift the group word together exactly as GET_BIAS did with the DMA words.
+              psum_buffer_data_w <= (psum_buffer_data_w << CONV_DMA_PAYLOAD_WIDTH) |
+                  PSUM_BUS_WIDTH'({PSUM_OUTPUT_WORDS{bias_value}});
+              bias_rep <= bias_rep + 1'b1;
+              if (bias_rep == bias_block_len - 1'b1) begin
+                bias_rep <= 0;
+                if (bias_q == 0) begin
+                  bias_writing <= 1;
+                end else begin
+                  bias_q      <= bias_q - 1'b1;
+                  bias_filter <= bias_filter - 1'b1;
+                end
+              end
+            end else begin
+              // Write the word to the group's address of this x pass and row; the next one is groups further.
+              psum_buffer_en_w <= ~0;
+              for (cc_psum = 0; cc_psum < CLUSTER_COLUMNS; cc_psum = cc_psum + 1) begin
+                for (cr_psum = 0; cr_psum < CLUSTER_ROWS; cr_psum = cr_psum + 1) begin
+                  for (g_psum = 0; g_psum < (NUM_GLB_PSUM+1)/2; g_psum = g_psum + 1) begin
+                    psum_buffer_addr_array[cc_psum][cr_psum][g_psum] <= bias_addr;
+                  end
+                end
+              end
+              bias_addr <= bias_addr + {{(BUFFER_WIDTH-11){1'b0}}, bias_groups};
+              bias_row  <= bias_row + 1'b1;
+              if (bias_row == iact_size_y - 1'b1) begin
+                bias_row  <= 0;
+                bias_xrep <= bias_xrep + 1'b1;
+                if (bias_xrep == iact_x_line_repetitions - 1'b1) begin
+                  bias_xrep <= 0;
+                  if (bias_group == bias_groups - 1'b1) begin
+                    // Done; psum_cnt as the old GET_BIAS left it (the last address written).
+                    bias_regen <= 0;
+                    psum_cnt   <= bias_addr;
+                  end else begin
+                    // Next group: its first address is the group index, its last filter comes first.
+                    bias_group   <= bias_group + 1'b1;
+                    bias_addr    <= {{(BUFFER_WIDTH-11){1'b0}}, bias_group} + 1'b1;
+                    bias_writing <= 0;
+                    bias_q       <= bias_kernels - 1'b1;
+                    bias_filter  <= bias_filter + {{(BIAS_FILTER_WIDTH-6){1'b0}}, bias_kernels, 1'b0} - 1'b1;
+                  end
+                end
+              end
+            end
+          end
+          if (compute_reg & bias_regen) begin
+            compute_pending <= 1;
+          end
+          if ((compute_reg | compute_pending) & !bias_regen) begin
+            compute_pending <= 0;
             for (cc_psum = 0; cc_psum < CLUSTER_COLUMNS; cc_psum = cc_psum + 1) begin
               for (cr_psum = 0; cr_psum < CLUSTER_ROWS; cr_psum = cr_psum + 1) begin
                 for (g_psum = 0; g_psum < (NUM_GLB_PSUM+1)/2; g_psum = g_psum + 1) begin
@@ -933,6 +1077,8 @@ module psum_pipeline #(
       endcase
       if (status_reg_enable_reg) begin
         psum_transmitted            <= 0;
+        bias_regen                  <= 0;            // a new layer configuration: no rewrite, no held compute start
+        compute_pending             <= 0;
         for (cc_psum = 0; cc_psum < CLUSTER_COLUMNS; cc_psum = cc_psum + 1) begin
           for (cr_psum = 0; cr_psum < CLUSTER_ROWS; cr_psum = cr_psum + 1) begin
             for (g_psum = 0; g_psum < (NUM_GLB_PSUM+1)/2; g_psum = g_psum + 1) begin

@@ -127,6 +127,7 @@ module OpenEye_FPGA #(
       parameter TRANS_BITWIDTH_IACT = 24,
       parameter TRANS_BITWIDTH_WGHT = 8,
       parameter STRIDE_ENABLED = 1,  // 1: use each layer's stride_x/y_reg; 0: stride tied to 1 (smaller). 1 since 2026-11-09
+      parameter BIAS_PER_FILTER_EN = 1,  // 1: Conv bias sent once per filter, psum buffer rewritten on chip (psum_pipeline); 1 since 2026-11-17
   `else
     `include "parameters_FPGA.vh"
       // Defaultvalues
@@ -371,6 +372,8 @@ reg [1023:0] fst_path;
   wire skipIact_reg;                             // When 1: skip GET_IACT phase (activations already in buffer from previous layer).
   wire skipWght_reg;                             // When 1: skip GET_WGHT phase (weights unchanged from previous layer).
   wire skipPsum_reg;                             // When 1: skip GET_BIAS / GET_QUANTIZE phases (no bias to load).
+  wire bias_per_filter;                          // Conv layer: GET_BIAS receives one bias per filter (needs BIAS_PER_FILTER_EN).
+  wire [10:0] bias_groups;                       // Conv layer, bias per filter: filters / kernels_per_calc (psum addresses per row).
   wire [4-1:0] kernel_per_pe_cluster_reg;        // Number of filter kernels mapped to a single PE cluster (from dma_storage).
   wire [5:0] kernel_size_x;                      // Spatial kernel size (e.g. 3 for 3×3 conv); used to compute padding and iact_converter_max_cycles.
   wire [3:0] kernel_size_y;                      // Spatial kernel size (e.g. 3 for 3×3 conv); used to compute padding and iact_converter_max_cycles.
@@ -2717,7 +2720,8 @@ end
       .DATA_PSUM_BITWIDTH(DATA_PSUM_BITWIDTH),
       .PSUM_PER_PE(PSUM_PER_PE),
       .PSUM_CYCLES_ONE_WORD_ALL_CELLS(PSUM_CYCLES_ONE_WORD_ALL_CELLS),
-      .PSUM_OUTPUT_WORDS(PSUM_OUTPUT_WORDS)
+      .PSUM_OUTPUT_WORDS(PSUM_OUTPUT_WORDS),
+      .BIAS_PER_FILTER_EN(BIAS_PER_FILTER_EN)
   ) psum_pipeline_inst (
       .clk_i(clk_i),
       .rst_n(rst_n),
@@ -2753,6 +2757,8 @@ end
       .fully_connected_layer(fully_connected_layer),
       .store_in_psum(store_in_psum),
       .send_data_out(send_data_out),
+      .bias_per_filter(bias_per_filter),
+      .bias_groups(bias_groups),
       .quant_offset_flat(quant_offset_flat),
       .quant_exp_flat(quant_exp_flat),
       .quant_mant_flat(quant_mant_flat),
@@ -3141,6 +3147,7 @@ end
         .skipIact_reg(skipIact_reg),
         .skipWght_reg(skipWght_reg),
         .skipPsum_reg(skipPsum_reg),
+        .bias_per_filter(bias_per_filter),
         .psum_q(psum_q),
         .kernel_per_pe_cluster_reg(kernel_per_pe_cluster_reg),
         .kernel_size_x(kernel_size_x),
@@ -3165,6 +3172,7 @@ end
         .padding_y(padding_y),
         .psum_size_x(psum_size_x),
         .psum_size_y(psum_size_y),
+        .bias_groups(bias_groups),
         .psum_x_all_cluster(psum_x_all_cluster),
         .iact_needed_cycles(iact_needed_cycles),
         .kernels_per_calc(kernels_per_calc),

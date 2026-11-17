@@ -118,6 +118,7 @@ def create_vh_file(openeye_parameter: object, filename: str = 'parameters.vh',
             txt_file.write(f"parameter TRANS_BITWIDTH_WGHT = {openeye_parameter.WGHT_Trans_Bitwidth},\n")
             txt_file.write(f"parameter TRANSMISSIONS = {TRANSMISSIONS},\n")
             txt_file.write(f"parameter STRIDE_ENABLED = {openeye_parameter.STRIDE_ENABLED},\n")
+            txt_file.write(f"parameter BIAS_PER_FILTER_EN = {openeye_parameter.BIAS_PER_FILTER_EN},\n")
             
     else:
         with open(filename, 'w') as txt_file:

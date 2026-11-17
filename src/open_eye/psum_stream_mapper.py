@@ -116,7 +116,21 @@ class PsumStreamMapper(object):
             - Parallel mode delegates to write_psum_data_glb() for per-cluster generation
 
         """
-        if (self.params.SERIAL):
+        if (self.params.SERIAL and getattr(self.layer_params, "bias_per_filter", 0)):
+            # === SERIAL MODE, BIAS PER FILTER (LayerParameters.set_bias_per_filter) ===
+            # One bias per filter, words_per_transmission per DMA word (filter f in slot f % words_per_transmission
+            # of word f // words_per_transmission); psum_pipeline.v rebuilds the buffer of the stream below from them.
+            words_per_transmission = min(2, self.params.DMA_BITWIDTH // self.params.DATA_PSUM_BITWIDTH)
+            filters = self.layer_params.filters
+            psum_stream = []
+            for first in range(0, filters, words_per_transmission):
+                word = 0
+                for slot in range(words_per_transmission):
+                    if first + slot < filters:
+                        bias_bits = gtu.to_twos_complement(self.dram_bias[first + slot], self.params.DATA_PSUM_BITWIDTH)
+                        word |= bias_bits << (slot * self.params.DATA_PSUM_BITWIDTH)
+                psum_stream.append(word)
+        elif (self.params.SERIAL):
             # === SERIAL MODE: LINEAR STREAM GENERATION ===
             # Calculate how many times to replicate each bias value
             psum_stream = []

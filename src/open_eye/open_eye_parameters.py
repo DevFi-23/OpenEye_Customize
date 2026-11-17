@@ -249,6 +249,15 @@ class OpenEyeParameters(object):
             # (smaller; check_conv_geometry then refuses strided layers, bug #41). 1 since 2026-11-09 (+155 LUT, README_FI 5.10)
             self.STRIDE_ENABLED = 1
 
+        try:
+            self.BIAS_PER_FILTER_EN = int(os.getenv("BIAS_PER_FILTER_EN"))
+        except:
+            # Bias once per filter for Conv layers (parameter BIAS_PER_FILTER_EN of OpenEye_FPGA.v / psum_pipeline.v):
+            # the psum buffer is rewritten on chip from a bias table instead of receiving the whole bias map
+            # (doc/experiments/2026-11-17_bias_per_filter.md). 0: the old stream only (the hardware of before).
+            # 1 is the default since 2026-11-17.
+            self.BIAS_PER_FILTER_EN = 1
+
         # === COMMUNICATION MODE ===
         self.SERIAL = serial           # Serial (DMA) vs parallel communication mode
 

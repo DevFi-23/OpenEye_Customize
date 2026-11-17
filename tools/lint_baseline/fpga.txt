@@ -44,7 +44,7 @@
 1	UNUSEDPARAM | hdl/router_configurator.v | Parameter is not used: 'FSM_CEIL_PSUM_RTR_CCLS'
 1	UNUSEDPARAM | hdl/router_configurator.v | Parameter is not used: 'PSUM_CHOOSE_REP_2'
 1	UNUSEDPARAM | hdl/router_configurator.v | Parameter is not used: 'PSUM_CHOOSE_REP_4'
-1	UNUSEDSIGNAL | <generated>/dma_storage.v | Bits of signal are not used: 'pipe_chain_reg'[895:891]
+1	UNUSEDSIGNAL | <generated>/dma_storage.v | Bits of signal are not used: 'pipe_chain_reg'[895:892]
 1	UNUSEDSIGNAL | hdl/GLB_cluster.v | Signal is not used: 'data_write_enable_i'
 1	UNUSEDSIGNAL | hdl/GLB_cluster.v | Signal is not used: 'data_write_enable_iact_i'
 1	UNUSEDSIGNAL | hdl/GLB_cluster.v | Signal is not used: 'ext_mem_iact_addr_i'
@@ -214,10 +214,7 @@
 1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'fsm_psum_r_q'
 1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'iact_channels_per_pe_next_layer'
 1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'iact_size_x'
-1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'iact_size_y'
-1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'iact_x_line_repetitions'
 1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'iteration_for_kernels'
-1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'kernels_per_calc'
 1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'psum_size_y'
 1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'psum_x_all_cluster'
 1	UNUSEDSIGNAL | hdl/psum_pipeline.v | Signal is not used: 'psum_x_with_add_up'

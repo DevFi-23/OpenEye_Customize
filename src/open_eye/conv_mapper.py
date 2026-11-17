@@ -155,6 +155,8 @@ class ConvMapper(LayerMapper):
         "skipIact_reg": layer_params.skipIact,
         "skipWght_reg": layer_params.skipWght,
         "skipPsum_reg": layer_params.skipPsum,
+        "bias_per_filter": getattr(layer_params, "bias_per_filter", 0),
+        "bias_groups": getattr(layer_params, "bias_groups", 0),
         "psum_q": layer_params.psum_delay,
         "kernel_per_pe_cluster_reg": layer_params.kernel_per_pe_cluster,
         "kernel_size_x": layer_params.kernel_size[0],

@@ -598,6 +598,8 @@ class LayerParameters(object):
         self.trans_cycles_iact = 1             # Needed transmissions cycles for iact
         self.trans_cycles_wght = 1             # Needed transmissions cycles for wght
         self.trans_cycles_psum = 1             # Needed transmissions cycles for psum
+        self.bias_per_filter = 0               # Conv: bias sent once per filter (set_bias_per_filter)
+        self.bias_groups = 0                   # Conv, bias per filter: filters / different_kernels_per_calculation
         self.iact_cycles_one_word_all_ram = 1
         self.iact_repetitions_per_write = 0
         self.overhang_discrepancy = 0
@@ -1458,6 +1460,52 @@ class LayerParameters(object):
         temp = math.ceil(params.NUM_GLB_PSUM * (params.Clusters * params.DATA_PSUM_BITWIDTH/params.DMA_BITWIDTH))
         self.trans_cycles_psum = self.filters * self.iact_size_y * self.iact_x_line_repetitions * temp
 
+    def set_bias_per_filter(self, params):
+        """Choose the bias stream of a Conv2D layer: once per filter (bias_per_filter = 1) or the whole map (0).
+
+        The old stream (PsumStreamMapper.get_psum_stream) sends, for every x pass and output row, every filter group's
+        words; GET_BIAS of psum_pipeline.v shifts CONV_BIAS_CYCLES = ceil(Clusters * NUM_GLB_PSUM / PSUM_OUTPUT_WORDS)
+        words into one psum buffer address. Hardware built with BIAS_PER_FILTER_EN = 1 rebuilds that buffer itself from
+        one bias per filter (doc/experiments/2026-11-17_bias_per_filter.md); it can do so when every address holds one
+        whole filter group, i.e. when the stream is regular:
+          * DMA 32 or 64 bit (PSUM_OUTPUT_WORDS of the RTL = the biases per word of the Python stream; at 128 bit the
+            two differ, the old stream is kept as it is),
+          * the filters split into whole groups of different_kernels_per_calculation, and the group fills an address
+            (block_length x groups = CONV_BIAS_CYCLES),
+          * at most QUANT_AMOUNT filters (the bias table) and 2047 groups (the 11-bit field bias_groups).
+        Otherwise the layer keeps the old stream; the result is the same, only the load time differs."""
+        self.bias_per_filter = 0
+        self.bias_groups = 0
+        if not int(getattr(params, "BIAS_PER_FILTER_EN", 0)) or not getattr(params, "SERIAL", True):
+            return
+        name = str(getattr(self, "layer_name", "?"))
+        reason = None
+        per_word = min(2, params.DMA_BITWIDTH // params.DATA_PSUM_BITWIDTH)
+        rtl_per_word = 2 if params.DMA_BITWIDTH == 64 else 1
+        groups = self.different_kernels_per_calculation
+        if self.fully_connected:
+            reason = "fully connected"
+        elif params.DMA_BITWIDTH not in (32, 64) or per_word != rtl_per_word:
+            reason = f"DMA {params.DMA_BITWIDTH} bit"
+        elif groups < 1 or groups > 31 or self.filters % groups:
+            reason = f"{self.filters} filters in groups of {groups}"
+        elif ((params.NUM_GLB_PSUM // per_word) * params.Clusters) // groups * groups != \
+                math.ceil(params.Clusters * params.NUM_GLB_PSUM / rtl_per_word):
+            reason = f"groups of {groups} do not fill a psum buffer address"
+        elif self.filters > params.QUANT_AMOUNT or self.filters // groups > 2047:
+            reason = f"{self.filters} filters, bias table of {params.QUANT_AMOUNT}"
+        if reason:
+            logger.info("%s: bias per filter off (%s), the whole bias map is sent", name, reason)
+            return
+        # words of the per-output stream (PsumStreamMapper.get_psum_stream): filters x rows x x passes x block length
+        old_words = self.filters * self.iact_size_y * self.iact_x_line_repetitions * \
+            (((params.NUM_GLB_PSUM // per_word) * params.Clusters) // groups)
+        self.bias_per_filter = 1
+        self.bias_groups = self.filters // groups
+        self.trans_cycles_psum = math.ceil(self.filters / per_word)
+        logger.info("%s: bias per filter on: %d filters, %d group(s) of %d, %d DMA words instead of %d", name,
+                    self.filters, self.bias_groups, groups, self.trans_cycles_psum, old_words)
+
     def write_conv2d_layer(self, layer_parameters, layer, params, layer_number, max_layers):
         """Compute all configuration parameters for a Conv2D layer.
 
@@ -1663,6 +1711,7 @@ class LayerParameters(object):
         self.psum_x_all_cluster = self.different_kernels_per_calculation * self.iact_x_add_up
         # === Phase 9: Finalize calculations ===
         self.calculate_transmission_cycles(params)
+        self.set_bias_per_filter(params)
         self.calculate_needed_refreshes_mx(params)
         self.calculate_fpga_parameters(params)
         self.get_pagu_values(params)

@@ -42,13 +42,13 @@ git add <file> && git commit -m "..."
 git push origin dev
 ```
 
-### Trạng thái các commit của upstream (cập nhật 2026-11-09, `upstream/main` = `9a742fb`)
+### Trạng thái các commit của upstream (cập nhật 2026-11-17, `upstream/main` = `3e2e027`)
 
 `dev` dựa trên upstream `c4bd562`. Từ đó upstream có 22 commit không phải merge (12–29/10/2026). Bảng dưới gộp mọi lần kiểm tra
 (2026-10-19, 21, 24, 30, 31); chi tiết và cách chạy lại: `doc/experiments/2026-10-21_upstream_cherry_pick.md`,
 `doc/experiments/2026-10-31_upstream_review.md` (chạy upstream nguyên bản trong worktree, so với `dev` cùng bộ chạy),
 `doc/experiments/2026-10-31_upstream_551cf85_iact.md`, `doc/experiments/2026-10-31_wght_send_end.md`, `doc/experiments/2026-11-04_upstream_36395dd.md`
-(2 commit mới ngày 03/11), `doc/experiments/2026-11-06_upstream_dw_review.md` (5 commit ngày 05/11, depthwise), `doc/experiments/2026-11-09_upstream_9a742fb_review.md` (5 commit ngày 06/11, luồng dữ liệu iact).
+(2 commit mới ngày 03/11), `doc/experiments/2026-11-06_upstream_dw_review.md` (5 commit ngày 05/11, depthwise), `doc/experiments/2026-11-09_upstream_9a742fb_review.md` (5 commit ngày 06/11, luồng dữ liệu iact), `doc/experiments/2026-11-17_upstream_3e2e027_review.md` (9 commit ngày 10–13/11).
 
 | Commit (ngày) | Nội dung | So với `dev` | Trạng thái |
 |---|---|---|---|
@@ -75,6 +75,7 @@ git push origin dev
 | `e8b3c3e`, `2abe8d4`, `0d5a0e3`, `7465852`, `b1e02a0` (05/11) | `e8b3c3e` "Reimplemented Depthwise Convolution": DW chuyển vào FSM **dense** của PE (`dw_mode`), viết lại `get_pagu_values` / `calculate_pe_transmissions`, tham số mới `CHANNEL_CYCLE_WIDTH` (RTL 12, Python 16) nới `iact_channel_max_cycles` và trường regmap, sửa chỉ số x/y của tham chiếu DW, công tắc `WAVES` trong Makefile; `2abe8d4`, `0d5a0e3`: `iact_buffer_addr`, `quantized_value_reg` khai báo `wire` thay `reg` (được lái bằng `assign`); `7465852`: đánh số lại các vòng của bộ sinh địa chỉ đọc iact; `b1e02a0`: testbench PE reset `dw_mode` | Kiểm tra 2026-11-06 (`doc/experiments/2026-11-06_upstream_dw_review.md`): luồng Makefile của upstream (PE dense, Verilator 5.044): Conv 8×8×4 → 16 và 12×6×1 → 8 PASS, **giống hệt từng ns** trước và sau (viết lại PAGU không nhanh hơn); **DW sai ở cả 3 ca, trước và sau** (bản mới ra chủ yếu 0). Lỗi trong code: `rd_cycle_loop_cnt_4 <= rd_cycle_loop_cnt_4` (vòng 4 không bao giờ đếm), `rd_addr_inc_4_next` bị `assign` 2 lần (Yosys: nhiều driver), nhánh Python của DW chưa theo cách đánh số mới; việc nới `CHANNEL_CYCLE_WIDTH` làm dở (bộ đếm trong `psum_pipeline.v`, `router_configurator.v` vẫn 8 bit). Lint `fpga` 464 → 458 (5 mới, 11 cũ hết). Hai dòng `reg` → `wire`: đúng chuẩn Verilog, `dev` có đúng 2 khai báo đó, công cụ của ta chấp nhận | **Không lấy** (phụ thuộc `b10db82`; DW chưa xong và chỉ có ở PE dense, `dev` chạy sparse; PAGU có lỗi và xung đột với bước nhảy `NUM_GLB_IACT − 1`, `iact_read_inc_2` của `dev`). Có thể lấy riêng (cần bạn đồng ý vì là RTL): 2 dòng `reg` → `wire`, công tắc `WAVES`. Theo dõi tiếp DW (mạng kiểu MobileNet) |
 | `302d330`, `21bc1b6`, `9594bec`, `c288541`, `9a742fb` (06/11) | `9594bec` "Changed data flow for iact stream constructors": bộ đệm iact lưu **nhóm 2 channel** (trước 4), `channel_div_trans` 3 bit; nhiều bank iact thì **chia xen** (bus vào constructor 16 bit thay vì 16 × `NUM_GLB_IACT`, một bản dữ liệu thay vì mỗi bank một bản), thêm vòng địa chỉ ghi thứ 4; `9a742fb` "Fixed Interlayer_operability": ghi ngược theo nhóm 2 channel (gắn cứng); còn lại: test DW, test PE debug, `padding_x/y` thành dây. Cấu hình test của upstream: **dense**, `PARALLEL_MACS` 1, psum 32 bit, **1 × 1 cluster** | Kiểm tra 2026-11-09 (13 ca × 3 cây × sparse/dense, `doc/experiments/2026-11-09_upstream_9a742fb_review.md`): **sparse: 13/13 FAIL** (sai hoặc treo; Python tính word bộ đệm iact 96 bit, RTL 64); **dense:** Conv đơn PASS kể cả `NUM_GLB_IACT=3` (upstream cũ FAIL), mọi chuỗi có ghi ngược ở 2 × 2 cluster FAIL (chỉ PASS ở 1 × 1 cluster của họ), 3 và 6 channel FAIL; chu kỳ Conv đơn bằng upstream cũ. Hai lỗi code cũ (`assign` 2 lần, `rd_cycle_loop_cnt_4`) vẫn còn | **Không lấy** (dựa trên `b10db82`; viết lại đúng phần constructor / ghi ngược mà `dev` đã sửa #6/#7, #13, #17, #25, #37, #41c; hỏng chế độ sparse mà `dev` dùng). Ý tưởng đáng giữ: chia xen bank (nếu dùng `NUM_GLB_IACT > 1`); 32 psum mỗi PE của `b10db82` (28×28×1 → 32 nhanh hơn 6–7 %, cần đo riêng) |
 | nhánh `dev_asic_sg13g2` (tới 06/11) | Luồng ASIC IHP SG13G2 (LibreLane / OpenROAD) của tác giả khác, nền `e78e5b7`; dừng ở bước filler của KLayout (cần khoảng 247 GB RAM) | Không liên quan FPGA | Không lấy |
+| `c536234`, `65bce70`, `86e8d56`, `31ec523`, `ede6109`, `1398987`, `7af64ca`, `6c5ca66`, `3e2e027` (10–13/11) | Tiếp bản viết lại nhóm 2 channel: ghi ngược và pooling theo 2 channel (`CHANNELS_PER_WORD` 4 → 2), bỏ nhánh FC khỏi bộ dựng iact, tham số depthwise, sửa kích thước; FSM dense: chuyển tiếp psum cùng lane (`31ec523`, = phần (a) của #46) và cộng nốt tích trong pipeline khi kernel rất nhỏ (`86e8d56`); FSM **sparse**: đổi cách tăng `wght_data_vec`; `delay_cluster` lấy `ready` ở tầng 0; test PE | 13 ca: upstream sparse **0/13**, dense 8/13 (Conv → Conv 8 ch nay đúng; mọi chuỗi 4 filter, NUM_GLB_PSUM 2, Conv → Pool → Conv vẫn sai); `dev` dense **11/13**, sparse 11/13. Upstream dense 2×2 vẫn có #46 (2, 4 filter sai) và #47; fork không có lỗi kernel 1×1 (4/4 PASS). Test Makefile của upstream 3/3 PASS (1×1 cluster) | **Không lấy** (2026-11-17): dựa trên bản viết lại 2 channel làm hỏng sparse, bỏ nhánh FC mà #26/#36 dùng, sửa FSM sparse không test; hai bản sửa FSM dense: fork đã có bản đầy đủ hơn (#46) hoặc không cần |
 
 Lỗi còn mở của `dev` chạy trên upstream `93f0e82` (2026-10-31): #7 (3 channel), #9, #19b, #21, #23, #27, #28, #29 **sai y như trên `dev`**
 (#27 sai còn sớm hơn); upstream còn sai Dense 3136 → 10/16 (Dense của model MNIST đã huấn luyện) mà `dev` đúng, do lỗi #19 phần 2 (`current_x`
@@ -151,7 +152,7 @@ từng bit ở dense, các layer sau còn sai do lỗi RTL của chế độ den
 
 Sparse thắng ở compute nhờ số 0 của activation, dense thắng ở nạp weight nhờ bỏ 4 bit overhead (weight đã huấn luyện gần như không có số 0). Trên MNIST
 sparse nhanh hơn 3 %; với mạng không có số 0 trong activation dense sẽ nhanh hơn. Hướng tốt hơn cả hai: **chế độ trộn** (iact sparse, weight 8 bit trần),
-ước lượng ≈ 203.000 chu kỳ (−7,1 % so với sparse), cần sửa RTL (đường weight trong PE), chưa làm. Ngoài chuyện chế độ: `load_bias` chiếm 10,7 % (bias gửi
+ước lượng 203.000–209.000 chu kỳ (−4,5 đến −7 % so với sparse; đề xuất chi tiết ở mục "Chế độ trộn" ngay dưới), cần sửa RTL, chưa làm. Ngoài chuyện chế độ: `load_bias` chiếm 10,7 % (bias gửi
 thành nguyên bản đồ psum ban đầu, 14.336 word cho 32 bias của Conv1), là chỗ tiết kiệm lớn hơn.
 
 **Diện tích** (Vivado, cấu hình mốc, chỉ đổi `SPARSITY_EN`; `doc/synth/2026-11-09_route4ns_dense_zu7ev/`): dense **43.554 LUT so với 59.548 (−26,9 %)**,
@@ -159,6 +160,140 @@ FF −27,0 %, BRAM 184 so với 188, URAM 10 so với 12, cùng 250 MHz; mỗi P
 overhead và điều khiển bỏ số 0. Tóm lại trên MNIST: sparse nhanh hơn 3 % nhưng lớn hơn 37 % (59,5k / 43,6k LUT). Trả lời câu hỏi "fork có sai hướng":
 không sai cho mạng ReLU nếu chỉ tính độ trễ trên cùng số PE; nếu tính theo diện tích, dense (hoặc chế độ trộn) đáng làm cho đúng (#46, #47).
 Từ 2026-11-10 dense đã đúng (#46, #47 sửa); bản dense đã sửa 43.523 LUT (`doc/synth/2026-11-10_route4ns_dense4647_zu7ev/`), vẫn −26,9 %.
+
+### Chế độ trộn: iact sparse, weight 8 bit trần (đề xuất 2026-11-11; **hoãn 2026-11-17**, bạn quyết định chưa làm vì nhược điểm lớn)
+
+**Ý tưởng.** Hai nửa của mỗi phép nhân có tính chất khác nhau: activation sau ReLU có nhiều số 0 (input của Conv2 / Conv3 / Dense: 44 / 87 / 74 %
+ở MNIST), weight đã huấn luyện gần như không có (1–5 %). Sparse nén cả hai (8 bit + 4 bit overhead), dense không nén gì. Chế độ trộn giữ iact sparse
+(PE vẫn bỏ qua số 0 của activation) và gửi weight 8 bit trần (bỏ 4 bit overhead vô ích). Số đo của mục trên cho thấy hai lợi ích tách biệt và cộng
+được: `compute` của sparse ít hơn dense 22.209 chu kỳ (số 0 của iact), `load_wght` của dense ít hơn sparse 15.552 chu kỳ (3 thay vì 5 word mỗi hàng
+weight).
+
+**Vì sao không cần FSM mới.** Weight dense là một luồng CSC không bỏ số 0 nào: mọi overhead bằng 0 (`conv_wght_encoding.py`: "Without zero weights the
+result is the dense layout"). Với overhead 0, FSM sparse của `PE.v` tính đúng như hiện nay: địa chỉ psum = gốc + tổng overhead (tăng tuần tự theo
+filter), weight 0 với overhead 0 là mục hợp lệ (trường hợp "gap split" của #22), `data_pipeline_wght` tự dựng SPad địa chỉ weight bằng cách đếm vị trí
+(ranh giới cột mỗi ceil(M0 / 2) word). Chỉ đường vận chuyển và lưu trữ weight đổi (8 thay vì 12 bit); FSM tính toán giữ nguyên.
+
+**Ước lượng (chưa đo).** Cận dưới = sparse trừ 15.552 chu kỳ nạp weight; cận trên cộng thêm phần tính các weight 0 mà sparse đang bỏ qua (1–5 %):
+
+| Model MNIST, ảnh 0 | sparse | dense | trộn (ước lượng) |
+|---|---:|---:|---:|
+| ReLU | 218.564 | 225.221 | **203.000–209.000** (−4,5 đến −7 % so với sparse, −7 đến −10 % so với dense) |
+| Leaky ReLU | 237.689 | 225.221 | 222.000–229.000 (≈ dense) |
+| SiLU / hard-swish | 239.870 / 239.927 | 225.317 | 224.000–231.000 (≈ dense) |
+
+Chế độ trộn có lợi rõ với mạng nhiều số 0 (ReLU); với SiLU và các hàm tương tự chỉ ngang dense. Băng thông weight −40 % (5 → 3 word DMA mỗi hàng);
+bộ đệm weight, router và GLB weight hẹp lại 24 → 16 bit mỗi lần truyền. Diện tích, ước lượng Yosys trên một PE
+(`doc/experiments/2026-11-11_mixed_mode/pe_area.sh`, sparse → dense): `data_pipeline_wght` 257 → 107 LUT, `data_pipeline_iact` 93 → 71, phần còn lại
+của PE 513 → 410; SPad dữ liệu weight 24 → 16 ô RAM128X1S, SPad địa chỉ weight 7 RAM64X1S → 0. Từ đó: phương án A dưới đây khoảng −2 đến −5 % LUT cả
+chip, phương án B khoảng −8 đến −12 % (dense là −26,9 %); cần Vivado để có số chắc.
+
+**Cách triển khai.**
+- **Phương án A (làm trước, ít rủi ro):** giữ FSM sparse và SPad địa chỉ weight. Weight đi qua DMA, bộ đệm weight, router và vào PE dưới dạng 8 bit; tại
+  PE overhead weight là hằng 0 (SPad weight lưu 8 bit, gắn overhead 0 khi đọc ra); áp quy tắc của #47 cho weight (luôn lưu word toàn 0); Python gửi layout
+  dense căn theo cột, giữ word 0; số filter lẻ mỗi PE bị chặn như #48.
+- **Phương án B (sau, nếu A đạt):** bỏ cả SPad địa chỉ weight: FSM tự tính ô bắt đầu của cột = vị trí cột của iact (từ overhead của iact) ×
+  ceil(M0 / 2). Bỏ được phần dựng SPad địa chỉ trong `data_pipeline_wght`, nhưng phải sửa khối tính dải weight (BLOCK 2/3) của FSM sparse, rủi ro
+  timing cao hơn.
+- **Tham số:** tách `SPARSITY_EN` thành `SPARSITY_IACT_EN` (iact và FSM) và `SPARSITY_WGHT_EN` (định dạng weight, mặc định = `SPARSITY_EN`, nên mọi bản
+  dựng hiện tại không đổi). Trộn = iact 1, weight 0. Là lựa chọn lúc dựng phần cứng (độ rộng bus weight), không theo từng layer.
+
+**File sẽ sửa (phương án A).** RTL (cần đồng ý):
+
+| File | Thay đổi |
+|---|---|
+| `hdl/PE.v` | Tham số `SPARSITY_WGHT_EN`; `WGHT_WORDWIDTH_SINGLE` = 8 khi weight dense (dòng 490); tách dữ liệu SPad weight (dòng 830): payload 8 bit, overhead 0 khi FSM sparse mà weight dense; truyền tham số cho `data_pipeline_wght`. FSM và SPad địa chỉ giữ nguyên |
+| `hdl/data_pipeline_wght.v` | Cắt word đầu vào theo `SPARSITY_WGHT_EN` (dòng 386); overhead = 0 (dòng 393, 413, 424); điều kiện lưu word toàn 0 dùng `!SPARSITY_WGHT_EN`; vẫn dựng SPad địa chỉ khi `SPARSITY_EN = 1` (dòng 665) |
+| `hdl/PE_cluster.v` | `TRANS_BITWIDTH_WGHT` theo `SPARSITY_WGHT_EN` (dòng 177); truyền tham số |
+| `hdl/OpenEye_Cluster.v`, `hdl/OpenEye_Parallel.v` | Chỉ truyền tham số (độ rộng đã theo `TRANS_BITWIDTH_WGHT`) |
+| `hdl/OpenEye_FPGA.v` | `FINAL_DATA_WGHT_BITWIDTH` theo `SPARSITY_WGHT_EN` (dòng 229), từ đó độ rộng bộ đệm weight; khai báo, truyền tham số |
+
+Phía iact (`data_pipeline_iact.v`, `iact_stream_constructor.v`), đường psum, lượng tử và hàm kích hoạt không đổi. Python:
+
+| File | Thay đổi |
+|---|---|
+| `src/open_eye/open_eye_parameters.py` | `SPARSITY_WGHT_EN`; `WGHT_WOH_Bitwidth` = 8 khi weight dense (dòng 272), `IACT_WOH_Bitwidth` theo iact |
+| `src/open_eye/vh_file_creator.py` | Ghi tham số mới vào 3 file `parameters_*.vh`, đặt `TRANS_BITWIDTH_WGHT` |
+| `src/open_eye/wght_stream_mapper.py` | Các điều kiện đang dùng `SPARSITY_EN` (bỏ mã hoá cột #22, giữ word 0) chuyển sang "weight dense" |
+| `src/open_eye/layer_parameters.py` | `check_dense_wght_slots` (#48) áp cho mọi bản dựng có weight dense; số word weight tự tính theo độ rộng mới |
+| `src/open_eye/rtl_test_utils.py`, `dense_mapper.py` | Rà các chỗ giải mã / đóng gói weight theo độ rộng (FC vốn gửi weight thô) |
+
+Test, công cụ, tài liệu: `test/cocotb_fpga/test_mixed_mode.py` mới (Conv đơn, chuỗi layer, MNIST cả 4 hàm kích hoạt), unit test cho layout weight ở chế
+độ trộn và phép chặn #48, thêm vào `regression.sh`, mục này của README.
+
+**Kiểm chứng và đo.** Sparse mặc định không đổi: hồi quy 211 test, 12 ca mốc và Bảng 3 giống hệt từng chu kỳ, Vivado sparse cùng netlist. Chế độ trộn:
+khớp từng bit trên các test mới, kể cả MNIST 4 hàm kích hoạt. Đo chu kỳ từng pha (profiler) so với sparse và dense, Vivado cho diện tích. Rủi ro: cột
+weight không còn bỏ số 0 nên dài hơn một chút (vẫn vừa SPad vì layout dense đã dùng đúng số ô này); số filter lẻ mỗi PE vẫn phải chặn (#48).
+
+**Đánh giá lại 2026-11-17 và quyết định hoãn.** Ý tưởng giữ nguyên ở đây để làm sau; chưa sửa RTL hay Python nào.
+
+| | Sparse (hiện tại) | Dense (hiện tại) | Trộn A |
+|---|---|---|---|
+| iact | CSC 12 bit, bỏ số 0 | 8 bit, không bỏ | CSC 12 bit, bỏ số 0 |
+| weight | CSC 12 bit, bỏ số 0 | 8 bit | 8 bit, không bỏ |
+| Word DMA mỗi hàng weight (DMA 64, 12 router) | 5 | 3 | 3 |
+| FSM của PE | sparse | dense | sparse (giữ nguyên) |
+| LUT so với sparse | 0 | −26,9 % (Vivado) | −2 đến −5 % (B: −8 đến −12 %), ước lượng Yosys |
+| MNIST ReLU / SiLU (chu kỳ) | 218.564 / 239.870 | 225.221 / 225.317 | 203.000–209.000 / 224.000–231.000 (ước lượng) |
+| Giới hạn | #7, #45 | thêm #48 | thêm #48 |
+
+- **Ưu điểm:** băng thông weight −33 đến −40 %, giữ bỏ-qua-số-0 của iact (nhanh nhất trong ba chế độ khi có ReLU), ít LUT hơn sparse.
+- **Nhược điểm (lý do hoãn):** mất bỏ-qua-số-0 của weight (nhỏ với weight đã huấn luyện, 1–5 % số 0, nhưng mất hẳn với mạng đã tỉa thưa); vẫn nhiều
+  LUT hơn dense rất nhiều (−2 đến −5 % so với −26,9 %); FSM sparse chậm hơn dense khoảng 3 % khi input không có số 0 (ảnh, dữ liệu ngẫu nhiên, SiLU gần
+  như không có số 0); thêm một bản dựng phải kiểm chứng; sửa ngay trong PE, phần nhạy nhất; số filter lẻ mỗi PE vẫn bị chặn.
+- **Ước lượng trên mạng Bảng 2 của paper** (16 cấu hình của mục 6.14, từ `doc/perf/paper_table3_2026-11-04`: bỏ 1/3–40 % pha `load_wght`, phần lớn
+  là layer Dense 1568 → 32): tổng thời gian −3 đến −14 %, tỉ lệ so với paper từ 1,97–3,52 xuống khoảng 1,70–3,41. Dữ liệu của Bảng 3 không có số 0
+  nên phần bỏ-qua-số-0 không có tác dụng ở đó; khoảng cách với paper chủ yếu không nằm ở định dạng weight (CR 1: tính toán chiếm 75 %; CR 8: nạp bias
+  5–19 % gần bằng nạp weight).
+- **Làm lại khi nào:** khi cần băng thông weight cho mạng lớn hơn MNIST, hoặc sau khi đã làm các việc rẻ hơn (bias theo filter, 32 psum mỗi PE).
+
+### Chọn sparse / dense theo từng layer (phân tích 2026-11-17, chưa làm; `doc/experiments/2026-11-17_per_layer_mode.md`)
+
+Khác với chế độ trộn ở trên (trộn theo toán hạng, mọi layer), ở đây mỗi layer tự chọn đường sparse hoặc dense lúc chạy (một bit trong word trạng thái).
+Từ 16 profile đã đo (MNIST, ảnh 0), chu kỳ từng layer (kể cả nạp weight), sparse / dense:
+
+| Layer | ReLU | Leaky ReLU | SiLU | hard-swish |
+|---|---:|---:|---:|---:|
+| Conv1 (input là ảnh, 0 % số 0) | 32.619 / **32.246** | 32.619 / **32.246** | 32.651 / **32.278** | 32.651 / **32.278** |
+| Conv2 | **112.010** / 114.380 | 118.928 / **114.380** | 120.221 / **114.412** | 120.490 / **114.412** |
+| Conv3 | **52.754** / 59.788 | 64.138 / **59.788** | 64.906 / **59.820** | 64.730 / **59.820** |
+| Dense | 13.107 / **10.733** | 13.930 / **10.733** | 14.018 / **10.733** | 13.982 / **10.733** |
+| Chọn tốt nhất từng layer | **215.817** (−1,26 % so với sparse) | = dense | = dense | = dense |
+
+- Với định dạng hiện tại, chọn theo layer chỉ lợi cho model ReLU (−1,26 %: Conv1 và Dense chạy dense, Conv2 và Conv3 chạy sparse); ba hàm kia mọi layer
+  đều thích dense. Layer Dense thích dense dù có 74 % số 0 vì nạp weight chiếm phần lớn (7.920 / 4.752 word).
+- Sau chế độ trộn theo toán hạng (weight 8 bit ở mọi layer), hai FSM chỉ còn khác ở pha tính toán: FSM sparse chậm hơn chỉ khi input gần như không có số 0
+  (Conv1: +3 %), từ khoảng 7–11 % số 0 đã nhanh hơn. Chọn FSM theo layer khi đó chỉ thêm 0,14–0,18 % (ReLU ước lượng 203.012 → 202.735).
+- Thiết kế nếu làm: cần chế độ trộn trước (để hai FSM đọc cùng weight 8 bit); trường `layer_dense` trong `regmap.yaml`; `OpenEye_FPGA.v` và
+  `OpenEye_Parallel.v` đưa bit xuống PE (3 bit trống cạnh `raw_wght`); `PE.v` chứa **cả hai FSM** chọn lúc chạy (hiện generate chỉ giữ một); `data_pipeline_iact.v`
+  và `iact_stream_constructor.v` đổi điều kiện `SPARSITY_EN` thành bit theo layer; Python: `layer_parameters.py` quyết định theo tỉ lệ số 0 dự kiến của input
+  (dưới khoảng 5 % → dense; ảnh đầu vào → dense; sau ReLU → sparse), mapper đóng gói bit, profiler ghi chế độ từng layer, test.
+- Chi phí: hai FSM trong mỗi PE, ước lượng +100–200 LUT mỗi PE (Yosys: phần logic riêng của PE 513 LUT ở sparse, 410 ở dense), tức +5–10k LUT (+8–16 %),
+  thêm mux trên đường địa chỉ SPad (rủi ro timing).
+- **Khuyến nghị:** chưa làm. Làm chế độ trộn theo toán hạng trước (ReLU −4,5 đến −7 %, ba hàm kia ≈ dense, ít LUT hơn), rồi đo model lớn hơn. Nếu có layer lớn
+  với input gần như không có số 0 mà FSM sparse tốn nhiều, cách rẻ hơn hai FSM là giảm chi phí của FSM sparse (phương án B của chế độ trộn: tự tính địa
+  chỉ cột weight thay vì đọc SPad địa chỉ).
+
+### "Adaptive Sparsity": tự chọn sparse / dense theo mật độ số 0 của từng layer (đánh giá 2026-11-17, không sửa gì; `doc/experiments/2026-11-17_adaptive_sparsity_review.md`)
+
+Đề xuất của bạn: đo tỉ lệ số 0 của weight và activation từng layer, ước lượng chu kỳ hai chế độ (cả phần nạp và giải mã), chọn chế độ nhanh hơn,
+cấu hình accelerator theo layer; điểm nghiên cứu là ngưỡng mật độ mà sparse thật sự có lợi. Đây chính là chế độ theo layer ở mục trên cộng một quy tắc
+tự động. Số đo trên hai mạng (MNIST đã huấn luyện; mạng Bảng 2, 16 cấu hình, có và không ReLU):
+
+- Trên phần cứng này khác biệt chính giữa hai chế độ là **định dạng weight** (sparse 12 bit, dense 8 bit: `load_wght` dense ít hơn 33–40 % ở mọi layer),
+  không phải chi phí giải mã activation. Sparse chỉ lợi ở pha tính, tỉ lệ với số 0 của activation.
+- Layer Dense (FC) dùng mỗi weight một lần nên thời gian là nạp weight: luôn thích dense dù input có 74–85 % số 0 (MNIST Dense 3136 → 10: dense −18 %;
+  Bảng 2 Dense 1568 → 32 có ReLU: dense −17 %). Ví dụ "FC1 80 % → Sparse" là ngược với phần cứng này.
+- Ngưỡng không phải một mật độ cố định: cùng Conv3 (53 % số 0) thích sparse ở CR 1–2 nhưng thích dense ở CR 4–8 (nhiều cluster làm phần tính ngắn lại,
+  phần nạp weight giữ nguyên). Weight đã huấn luyện chỉ có 1–5 % số 0, không đáng kể.
+- Lợi tối đa (chọn đúng chế độ cho từng layer): MNIST ReLU −1,26 %; các hàm kích hoạt khác 0; Bảng 2 không hàm kích hoạt 0; Bảng 2 có ReLU −0,8 đến
+  −1,5 % ở CR 1–2, 0 ở CR 4–8. Chi phí: cả hai FSM trong mỗi PE (+8–16 % LUT) hoặc FSM gộp; đường weight phải mang định dạng rộng nên layer dense mất phần
+  lợi băng thông nếu không đổi cả cách đóng gói weight theo layer; đo số 0 trên chip trước mỗi layer tốn thêm một lượt đọc bộ đệm (nên quyết định trong
+  toolchain bằng ảnh hiệu chỉnh và mô hình chi phí).
+- **Kết luận:** tiền đề đúng (sparse không phải lúc nào cũng nhanh hơn), nhưng thước đo quyết định là tỉ lệ nạp weight của layer chứ không chỉ mật độ
+  số 0, và lợi chỉ 0–1,5 % cho +8–16 % LUT: chưa nên làm phần cứng. Điểm nghiên cứu nên làm dưới dạng đo đạc, không sửa RTL: thêm móc testbench đặt tỉ
+  lệ số 0 của activation (hiện chỉ có mẫu bàn cờ 50 % `USE_SPARSE_IACTS`; sửa Python nhỏ, cần đồng ý), quét 0–90 % cho vài dạng layer ở CR 1/2/4/8 cả
+  hai chế độ, lập đường ngưỡng và một mô hình chi phí Python kiểm chứng trên 64 profile Bảng 2 và 16 profile MNIST.
 
 ### `551cf85` so với `dev`: hướng nào tốt hơn (phân tích 2026-10-31, `doc/experiments/2026-10-31_upstream_551cf85_iact.md`)
 
@@ -258,7 +393,7 @@ Một test cocotb là một tiến trình; máy 12 nhân / 7 GB RAM chạy song 
 venv/bin/python -m pytest -q test/test_*.py
 ```
 
-Hiện tại (2026-11-10): **485 pass, 11 fail** (2026-11-09: thêm 3 test luồng weight dense, `test_conv_wght_encoding.py`; 2026-11-10: 8 test phép kiểm tra #48, `test_model_guards.py`) (15 test tham số stride trong `test_stride_params.py` + 56 test phép kiểm tra nhóm A của mục 8e trong `test_model_guards.py` + 5 test bộ đệm weight / iact của #29 / #37, `test_wght_buffer.py` + 8 test số bộ weight và 32 test phép kiểm tra `check_wght_sets` của #39, 34 test phép kiểm tra `check_full_passes` của #40, `test_channel_pad.py` + 129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8 + 6 test đường model thật so với ONNX Runtime + 22 test thứ tự stream bias của lỗi #32 + 31 test hàm kích hoạt, bước A và B + 3 test profiler hàm kích hoạt, bước C; 12 trong số đó cần checkpoint của `models/train_mnist.py`, không có thì skip). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
+Hiện tại (2026-11-17): **504 pass, 11 fail** (2026-11-17: 19 test bias theo filter, `test_bias_per_filter.py`; 2026-11-09: thêm 3 test luồng weight dense, `test_conv_wght_encoding.py`; 2026-11-10: 8 test phép kiểm tra #48, `test_model_guards.py`) (15 test tham số stride trong `test_stride_params.py` + 56 test phép kiểm tra nhóm A của mục 8e trong `test_model_guards.py` + 5 test bộ đệm weight / iact của #29 / #37, `test_wght_buffer.py` + 8 test số bộ weight và 32 test phép kiểm tra `check_wght_sets` của #39, 34 test phép kiểm tra `check_full_passes` của #40, `test_channel_pad.py` + 129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8 + 6 test đường model thật so với ONNX Runtime + 22 test thứ tự stream bias của lỗi #32 + 31 test hàm kích hoạt, bước A và B + 3 test profiler hàm kích hoạt, bước C; 12 trong số đó cần checkpoint của `models/train_mnist.py`, không có thì skip). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
 thay đổi của fork. Các file của fork: `test_profile_report.py`, `test_profile_phases.py`, `test_channel_pad.py`, `test_conv_wght_encoding.py`, `test_paper_table3.py`,
 `test_memory_model.py`, `test_fc_writeback.py`, `test_conv_writeback.py`, `test_int8_clamp.py`, `test_onnx_model_flow.py` (cần `torch`, `onnxruntime`, file `.pth` đã huấn luyện),
 `test_psum_bias_order.py`, `test_activation.py`, `test_model_guards.py` (64 test, các phép kiểm tra nhóm A của mục 8e và #48, cần `torch`, `onnxruntime`), `test_stride_params.py` (15 test, #41b/#41d).
@@ -286,6 +421,8 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ../../venv/bin/python -m pytest -q -p no:cachep
 | `test_nets.py` | (cả file) | Model MNIST nhỏ (Keras ngẫu nhiên) qua `data_create` | ~40 s | 1 PASS |
 | `test_stride.py` | (cả file) | Conv stride 2 với RTL dựng `STRIDE_ENABLED=1` (#41b–#41d): 6 layer đơn (rộng 4, 7, 8, 12, 24; `NUM_GLB_PSUM` 2), 2 Conv nối tiếp (8×8, 14×8, 16×14), Conv → Pool → Conv 28×28, Conv → Dense (8×8, 16×14) | 17–45 s | 12 PASS (trên `69320ba`: 10 FAIL) |
 | `test_dense_mode.py` | (cả file) | Phần cứng **dense** (`SPARSITY_EN=0`, #46, #47): Conv đơn 2 / 4 / 8 / 16 filter mỗi PE, 16 channel có word weight toàn 0 (#47), Conv → Conv (`NUM_GLB_PSUM` 4, 2), Conv → Pool → Conv, model MNIST đã huấn luyện ảnh 0 | 3,5–6 phút | 10 PASS (trước bản sửa: 8 FAIL) |
+| `test_bias_per_filter.py` | (cả file) | Phần cứng `BIAS_PER_FILTER_EN=1` (bias một lần mỗi filter, mục 9): Conv đơn CR 1 / 2 / 4, nhóm kernel (4 filter), Conv → Conv (`NUM_GLB_PSUM` 4, 2), Conv → Pool → Conv, Conv đơn và chuỗi trên phần cứng dense, model MNIST đã huấn luyện ảnh 0; mỗi test kiểm tra log có layer dùng luồng mới; 2 ca `_off` với `BIAS_PER_FILTER_EN=0` (phần cứng cũ) | 3,5–6,5 phút | 10 PASS (2026-11-17); 2 ca `_off` chưa chạy |
+| `test_bug49.py` | (cả file) | Lỗi #49: mạng Bảng 2 có ReLU ở CR 2 X 2 Y 3 và Y 4, sparse, mọi kiểm tra bộ đệm (kể cả Conv trước pooling) và kết quả | khoảng 6–10 phút | chưa chạy (thêm 2026-11-17) |
 | `test_quant_mantissa.py` | (cả file) | Mantissa hệ số lượng tử 17 và 24 bit (#38): Conv → Conv, Dense → Dense (móc `OPENEYE_QUANT_MANT`) | 25–45 s | 3 PASS (trước bản sửa: 3 FAIL) |
 | `test_cluster_rows1.py` | (cả file) | `CLUSTER_ROWS=1`: Dense 32 → 10 ở X 2 (#36), Dense 1568 → 32 → 10 ở X 4 và X 2 (#29, #36), mạng paper CR 1 X 2 Y 3 (#28, #29, #36), Conv 14×14×32 → 32 ở X 2 (#37, 4.096 word bộ đệm iact mỗi lượt) | 20 s – 4 phút | 5 PASS (trước các bản sửa: 5 FAIL) |
 | `test_empty_pass.py` | (cả file) | Lượt không có activation khác 0 (lỗi #31): Conv lượt rỗng đầu, lượt rỗng giữa, Dense 1024 → 10 có khối input 0 (`OPENEYE_ZERO_BLOCK`) | ~40 s | 3 PASS (RTL trước bản sửa: 3 FAIL) |
@@ -301,7 +438,7 @@ venv/bin/python -m pytest --collect-only -q test/cocotb_fpga/test_conv_const.py 
 xargs -P 8 -I{} sh -c 'venv/bin/python -m pytest -q "{}" | tail -1' < ids.txt
 ```
 
-**Bộ hồi quy RTL đầy đủ hiện tại (2026-11-10): 211 test** = 189 test dưới đây + `test_stride` 12 + `test_dense_mode` 10; chạy bằng `doc/experiments/2026-11-07_bug41_stride/regression.sh <thư mục>`; kết quả: **207 PASS + 4 xfail đã biết**. 2026-11-08: 201 test, 197 PASS + 4 xfail. Trước đó (2026-11-04, sau hàng O): 189 test = `test_conv_const` 36, `test_mnist_layers` 27, `test_gemm_layer` 63 (với
+**Bộ hồi quy RTL đầy đủ hiện tại (2026-11-17): 225 test** = 189 test dưới đây + `test_stride` 12 + `test_dense_mode` 10 + `test_bias_per_filter` 12 + `test_bug49` 2 (2 test sau cùng và 2 ca `_off` thêm sau lần chạy dưới, chưa chạy); chạy bằng `doc/experiments/2026-11-07_bug41_stride/regression.sh <thư mục>`; kết quả 2026-11-17: **217 PASS + 4 xfail đã biết**, cả khi chạy mặc định lẫn với `BIAS_PER_FILTER_EN=1` (2026-11-10: 211 test, 207 PASS + 4 xfail). 2026-11-08: 201 test, 197 PASS + 4 xfail. Trước đó (2026-11-04, sau hàng O): 189 test = `test_conv_const` 36, `test_mnist_layers` 27, `test_gemm_layer` 63 (với
 `OPENEYE_SKIP_FC_WRITE_CHECK=1`), `test_pooling` 4, `test_nets` 1, `test_dense_chain` 11, `test_glb_psum2` 7, `test_int8_clamp` 9, `test_empty_pass` 3,
 `test_activation_rtl` 12, `test_real_model` 8 (ReLU ảnh 0, 1 + 3 hàm × 2 ảnh), `test_cluster_rows1` 5, `test_quant_mantissa` 3: **185 PASS + 4 xfail đã biết** (3 channel ×2 #7,
 Conv3 ×2 #9; xfail #17 cũ nay là `test_mnist_conv1_with_padding`, PASS); thêm 2 testbench riêng (bộ lượng tử 2, `activation_table` 3). Khoảng 1 giờ với 6–7 tiến trình song song.
@@ -374,6 +511,7 @@ Chi tiết: mục 6 (profiler), 6.13 (model nhiều layer), 6.14 (Bảng 3), 6.1
 | `OPENEYE_X_CONTINUE=1` | Output Conv có word X: ghi word đó (dạng chuỗi có `x`) vào `output.txt` và chạy tiếp thay vì dừng ở word X đầu tiên; log `XPOS` với `[f, x, y]` của từng psum X (dùng cho `doc/experiments/2026-11-09_dense_vs_sparse/dense_diag.py`) | tắt (dừng ở word X đầu) |
 | `SPARSITY_EN=0/1` | Phần cứng dense hoặc sparse (mục 2 "Sparse và dense"); `0` đúng từ bản sửa #46, #47 (2026-11-10, `test_dense_mode.py`), số filter mỗi PE lẻ bị từ chối (#48) | 1 |
 | `STRIDE_ENABLED=0/1` | Có stride trong RTL hay không (tham số `STRIDE_ENABLED` của `OpenEye_FPGA.v`, ghi vào `parameters_FPGA.vh`; mục 5.10). Bằng 0: mạch nhỏ hơn 155 LUT nhưng toolchain từ chối Conv stride > 1 (#41) | **1** (từ 2026-11-09; 0 trước đó) |
+| `BIAS_PER_FILTER_EN=0/1` | Phần cứng có bảng bias hay không (tham số `BIAS_PER_FILTER_EN` của `OpenEye_FPGA.v` / `psum_pipeline.v`, ghi vào `parameters_FPGA.vh`); `1`: Conv2D gửi bias một lần mỗi filter, chip tự ghi lại bộ đệm psum (mục 9 "Gửi bias theo filter"); `0`: phần cứng cũ | **1** (từ 2026-11-17; 0 trước đó) |
 | `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1` | Tránh plugin pytest-rerunfailures mở socket | nên đặt khi chạy trực tiếp |
 
 ## 4. Cấu trúc project
@@ -1110,6 +1248,40 @@ số của thí nghiệm `+1` ở cả 16 cấu hình (bước B: 0 lệch). M�
 CR 1 X 4 Y 3 còn sai ở Dense 1568→32 (lỗi tính #19b); X = 2 vẫn như cũ (#25). Chu kỳ: layer 0–4 giữ nguyên, pha ghi ngược của layer 5 dài thêm 15–21 chu kỳ,
 cả mạng +15 đến +28 chu kỳ (≤ 0,03 %); các bảng thời gian ở trên hầu như không đổi.
 
+### 6.14b Mạng Bảng 2 của paper: sparse và dense (2026-11-17)
+
+Chi tiết: `doc/experiments/2026-11-17_paper_dense_sparse.md` (bảng theo cấu hình, theo layer và theo pha), script
+`doc/experiments/2026-11-17_paper_dense_sparse/`. Chỉ chạy, không sửa RTL / Python. Bốn lần chạy, mỗi lần 16 cấu hình của Bảng 3 (cách đo như 6.14):
+
+| Lần chạy | Dữ liệu | Chế độ | Kết quả | Profile |
+|---|---|---|---|---|
+| Bảng 3 (mốc có sẵn) | `PAPER_MNIST`, không hàm kích hoạt | sparse | 16/16 PASS | `doc/perf/paper_table3_2026-11-04` |
+| Bảng 3 dense | như trên | dense (`SPARSITY_EN=0`) | **16/16 PASS** | `doc/perf/paper_table3_2026-11-17_dense` |
+| ReLU sparse | `PAPER_MNIST_RELU`: ReLU sau mọi layer trừ layer cuối | sparse | **14/16 PASS**; CR 2 X 2 Y 3 / Y 4 FAIL (lỗi mới **#49**) | `doc/perf/paper_table3_2026-11-17_relu_sparse` |
+| ReLU dense | như trên | dense | **16/16 PASS** | `doc/perf/paper_table3_2026-11-17_relu_dense` |
+
+```bash
+SPARSITY_EN=0 venv/bin/python tools/paper_table3.py --run --jobs 6 --save doc/perf/paper_table3_<ngày>_dense --report doc/perf/paper_table3_<ngày>_dense.md
+venv/bin/python doc/experiments/2026-11-17_paper_dense_sparse/run_relu.py doc/perf/paper_table3_<ngày>_relu_sparse 6
+SPARSITY_EN=0 venv/bin/python doc/experiments/2026-11-17_paper_dense_sparse/run_relu.py doc/perf/paper_table3_<ngày>_relu_dense 6
+venv/bin/python doc/experiments/2026-11-17_paper_dense_sparse/compare.py <thư mục sparse> <thư mục dense>
+```
+
+| Tổng 16 cấu hình (ns ở 200 MHz) | sparse | dense | dense − sparse | Tổng / paper (sparse; dense) |
+|---|---:|---:|---:|---|
+| Không hàm kích hoạt (dữ liệu Bảng 3) | 8.807.505 | 8.245.555 | **−6,4 %** (−2,3 đến −11,5 % từng cấu hình) | 1,97–3,52; 1,75–3,42 |
+| ReLU | 8.475.300 | 8.245.555 | **−2,7 %** (+3,5 đến −10,3 %) | 1,95–3,31; 1,75–3,42 |
+
+- Dense không phụ thuộc dữ liệu: có ReLU hay không, số chu kỳ giống hệt ở mọi cấu hình.
+- Dense luôn nạp weight nhanh hơn: `load_wght` −33 đến −35 %, phần lớn ở layer Dense 1568 → 32.
+- Sparse tính nhanh hơn khi input của layer có số 0. Với ReLU (tổng 16 cấu hình): Conv3 (53 % số 0) `compute` −19 % so với dense, Dense 1568 → 32 (85 %)
+  −32 %; Conv2 (11 %, max pooling giữ lại ít số 0) ngang; Conv1 (ảnh, 0 %) dense −3 %. Không hàm kích hoạt (4–11 % số 0) thì `compute` hai chế độ
+  chênh trong ±3 %.
+- Ai thắng tuỳ tỉ lệ tính toán: CR 1 X 2 (tính chiếm khoảng 75 %) sparse nhanh hơn 3,4–3,5 % khi có ReLU; CR 1 X 4 ngang (+0,7 %); từ CR 2 trở lên dense
+  thắng (−2 đến −10 %) vì nhiều cluster làm phần tính ngắn lại còn phần nạp weight giữ nguyên.
+- Cả hai chế độ đều chưa thu hẹp được khoảng cách với paper (1,75–3,42 lần): ở CR 1 phần tính chiếm phần lớn, ở CR 8 là nạp weight và nạp bias (5–19 %,
+  đề xuất ở mục 8c, `doc/experiments/2026-11-17_bias_per_filter.md`).
+
 ### 6.15 Đo hàm kích hoạt bằng profiler (bước C, 2026-11-02)
 
 Chi tiết: `doc/experiments/2026-11-02_activation_profiler.md`; số đo và báo cáo: `doc/perf/activation_2026-11-02.md` (file `activation_2026-11-02/*.json`).
@@ -1168,6 +1340,40 @@ Lệch không quá 0,4 điểm so với bảng trên: chi phí là của hàm k�
 - Kiểm chứng thêm: `load_act` = 32 / 32 ở layer có bảng, **0** ở layer giữ bảng (`table_keep_mlp`), **64** ở DMA 32 bit (`table_conv_stack_dma32`), 32 ở
   4 layer Conv/Dense có bảng của mạng paper; 7/7 lần chạy PASS; ReLU ít hơn số ngày 31/10 đúng 673 chu kỳ (dòng `wghts_per_pe + 1`); unit test profiler 41/41;
   12 ca mốc với profiler mới: 12/12 PASS, 0 chu kỳ và 0 word DMA lệch so với `baseline_2026-11-02` (profiler chỉ quan sát).
+
+### 6.16 Hàm kích hoạt × cách làm tròn × sparse / dense (2026-11-12)
+
+16 lần chạy trên RTL: 4 model MNIST đã huấn luyện (ảnh test 0, `OPENEYE_PROFILE=1`) × làm tròn xuống (floor) / làm tròn gần nhất (`act_round`) ×
+phần cứng sparse / dense. Cách làm tròn mặc định (ReLU floor, ba hàm kia làm tròn) là lần đo 10/11; cách còn lại được ép bằng
+`doc/experiments/2026-11-12_rounding_modes/probe_round.py` qua `run_round.py <hàm> <0|1> <tag>` (đặt `activation_round` sau
+`onnx2model.finish_activations`, nên tham chiếu và RTL dùng cùng một cách; không sửa toolchain hay RTL). **16/16 PASS**, khớp từng bit, DUT đoán đúng 7.
+Profile: `doc/perf/activation_2026-11-12_rounding/` (+ `.md`).
+
+| Model | Làm tròn | Sparse | Dense | Số 0 vào Conv2 / Conv3 / Dense | Độ chính xác (10.000 ảnh) |
+|---|---|---:|---:|---:|---:|
+| ReLU | floor (mặc định) | **218.564** | 225.221 | 43,5 / 87,3 / 74,3 % | 99,35 % |
+| ReLU | làm tròn | 219.659 | 225.221 | 38,3 / 87,3 / 72,3 % | 99,36 % |
+| Leaky ReLU | floor | 240.379 | **225.221** | 0,9 / 1,8 / 3,4 % | 99,34 % |
+| Leaky ReLU | làm tròn (mặc định) | 237.689 | **225.221** | 24,3 / 14,7 / 18,1 % | 99,34 % |
+| SiLU | floor | 240.435 | **225.317** | 10,3 / 6,1 / 6,7 % | 99,25 % |
+| SiLU | làm tròn (mặc định) | 239.870 | **225.317** | 11,0 / 7,1 / 6,7 % | 99,27 % |
+| hard-swish | floor | 240.244 | **225.317** | 5,6 / 13,0 / 13,3 % | 99,33 % |
+| hard-swish | làm tròn (mặc định) | 239.927 | **225.317** | 5,9 / 14,1 / 13,1 % | 99,35 % |
+
+(chu kỳ cả mạng; đậm: nhanh nhất của mỗi model; độ chính xác theo mô hình số nguyên của chip, `doc/experiments/2026-11-02_activation/eval_10000.md`,
+như nhau ở hai chế độ vì chúng tính ra cùng các số nguyên)
+
+- **Dense: floor và làm tròn cho đúng cùng số chu kỳ** (FSM dense nhân mọi giá trị); ở dense cách làm tròn chỉ đổi độ chính xác.
+- **Sparse, ReLU:** làm tròn +1.095 chu kỳ (+0,5 %; ước lượng bước A +1.070): giá trị dương < 1 đơn vị thành 1 thay vì 0. Đổi lại ReLU làm tròn khớp
+  ONNX Runtime 100 % ở mọi layer (floor: lệch tối đa 2, khớp đúng 70–97 %; `2026-11-12_rounding_modes/measure_ort_relu.py`).
+- **Sparse, Leaky ReLU:** floor +2.690 chu kỳ (+1,1 %): số âm rất nhỏ thành −1, số 0 vào Conv2 24,3 → 0,9 %. Ước lượng bước A (+6.885, tuyến tính theo
+  tỉ lệ số 0) quá cao: lợi ích bỏ qua số 0 nhỏ hơn tuyến tính ở tỉ lệ số 0 thấp (tính toán Conv2 89.719 / 87.960 / 81.042 chu kỳ với 0,9 / 24,3 / 43,5 %).
+- **Sparse, SiLU / hard-swish:** floor +565 / +317 chu kỳ.
+- **Nên chọn:** sparse: giữ mặc định hiện tại (ReLU floor; ba hàm kia làm tròn); dense: làm tròn cho mọi hàm, kể cả ReLU (0 chu kỳ, khớp ONNX Runtime).
+  Toolchain hiện chọn theo hàm, chưa theo chế độ (ReLU luôn floor); đổi chỉ cần sửa `onnx2model.finish_activations` (chưa làm). Nhanh nhất cho từng model:
+  ReLU sparse floor; Leaky ReLU, SiLU, hard-swish dense.
+- **Phần cứng hàm kích hoạt ở dense:** `test_activation_rtl.py` (12 model ngẫu nhiên: Leaky ReLU, bảng, làm tròn, giữ bảng, `NUM_GLB_PSUM` 2, DMA 32 bit,
+  mạng 7 layer của bài báo) với `SPARSITY_EN=0`: **12/12 PASS**, mọi lần kiểm bộ đệm iact khớp từng bit (trước đây chỉ chạy ở sparse).
 
 ## 6b. Đo trên mô phỏng so với chạy trên FPGA thật
 
@@ -1409,6 +1615,8 @@ Lưu ý:
 
 ### Kết quả Vivado hiện tại: mốc phần cứng (sau các bản sửa #13, #6/#7, #14, 3 commit upstream, #19, #26, #25, #30, #31, upstream `e78e5b7`, dòng `wghts_per_pe + 1`, phần cứng hàm kích hoạt, các bản sửa #28, #29, #36, #38, hàng O #37, #17, #41c và `STRIDE_ENABLED = 1`; ngày 2026-11-09)
 
+**Bản dựng có bảng bias, 2026-11-17** (`doc/synth/2026-11-17_route4ns_bias_zu7ev/`, `BIAS_PER_FILTER_EN=1`, mục 9 "Gửi bias theo filter"): 0 CRITICAL, đạt 250 MHz (WNS +0,026 ns sau route), LUT 59.982 (+434 so với mốc dưới), FF 39.548 (+99), BRAM / URAM / DSP như mốc. Bản dựng mặc định (0) không có bảng nên mốc phần cứng dưới vẫn đúng cho nó.
+
 **Kiểm lại 2026-11-10 sau bản sửa #46 / #47** (`doc/synth/2026-11-10_route4ns_fix4647_zu7ev/`): bản dựng sparse mặc định ra **cùng netlist** với mốc dưới (cùng LUT / FF / BRAM / URAM / DSP, WNS, 311 cảnh báo), vì hai chỗ sửa chỉ có trong bản dựng dense; mốc phần cứng giữ nguyên.
 
 **Mới nhất: `doc/synth/2026-11-09_route4ns_stride1_zu7ev/SUMMARY.md`** (đề xuất 5: cùng RTL, dựng với `STRIDE_ENABLED = 1`, nay là mặc định): 0 CRITICAL, 311 cảnh báo y như cũ; WNS +0,171 / **+0,042 ns** sau route (đạt 250 MHz, ~252,7 MHz; đường găng `fsm_cycle` → `router_configurator`, như lần `wsend`); LUT 61.674 / **59.548** (+155 / +175 so với `fix41`, +0,25 %: gần hết ở `dma_storage` +220, các `iact_stream_constructor` không tăng), FF 39.406 / 39.449 (+7 / +13), CARRY8 +4, BRAM 188 / URAM 12 / DSP 4 như cũ.
@@ -1580,7 +1788,7 @@ dài 96 thay vì 192 chu kỳ.
 | Đo hàm kích hoạt: pha `load_act`, chu kỳ khối kích hoạt, số 0 ở input từng layer | **Xong** (2026-11-02, mục 6.15) |
 | Bảng 3 của paper đo bằng profiler (16 cấu hình, theo layer) | **Xong** (2026-10-24, mục 6.14); sau bản sửa #26 và #25: 13/16; **sau bản sửa #28, #29, #36 (2026-11-03): 16/16 cấu hình tính đúng cả mạng** |
 
-### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-11-09)
+### 8b. Tổng hợp lỗi phát hiện được (cập nhật 2026-11-17)
 
 | # | Lỗi | Nơi | Trạng thái |
 |---|---|---|---|
@@ -1637,6 +1845,7 @@ dài 96 thay vì 192 chu kỳ.
 | 46 | **Chế độ dense** (`SPARSITY_EN=0`): Conv có ≤ 4 filter mỗi PE (`used_psum_per_PE` 2–4; ở 2 × 2 cluster: 2–4 filter, hoặc 8 filter với ảnh rộng 8) sai mọi feature map | `hdl/PE.v` FSM dense: (a) địa chỉ psum lặp lại trong 2 chu kỳ, lần ghi trước bị chặn (`psum_data_SPad_en_w_i`) mà FSM dense không chuyển tiếp kết quả bộ cộng (FSM sparse có, bản sửa `4e8402c` của upstream; FSM dense viết từ `c8ec883`, trước bản sửa đó); (b) ≤ 2 filter mỗi PE: địa chỉ psum không bao giờ về gốc | **Đã sửa 2026-11-10** (được bạn đồng ý; `doc/experiments/2026-11-10_bug46_47.md`): chép khối chuyển tiếp của FSM sparse vào `CALCULATING` dense + điều kiện `filters_reg_M0 <= PARALLEL_MACS` khi reset địa chỉ (`PE.v`, 1 dòng sửa + 22 dòng thêm, chỉ trong FSM dense). Upstream `b1e02a0` / `9a742fb` vẫn có lỗi. Test `test_dense_mode.py`; sparse không đổi (hồi quy, 12 ca mốc, Bảng 3 giống hệt) |
 | 47 | **Chế độ dense**: Conv có **word weight toàn 0** (hai weight 0 liền nhau) sai: ví dụ 8×4×16 → 16 seed 1 (filter chẵn X), model MNIST ở dense (Conv2 / Conv3 / Dense sai). Phụ thuộc dữ liệu: seed 2 đúng | `hdl/data_pipeline_wght.v`: ngoài raw mode (chỉ bật cho FC / GEMM) word 0 bị coi là "không có dữ liệu" (quy ước sparse): bỏ word đó và đặt địa chỉ ghi SPad về 0, phần weight còn lại ghi đè đầu SPad, PE đọc iact ngoài vùng đã ghi → X | **Đã sửa 2026-11-10** (được bạn đồng ý): như `data_pipeline_iact.v` của upstream (DenLeb `9c143b7` / `1a8864d`), thêm `| !SPARSITY_EN` vào 3 điều kiện ghi (3 dòng); Python giữ word 0 ở dense (`wght_stream_mapper.py`, 2026-11-09). Upstream có cùng RTL và Python còn bỏ word 0 (lỗi ẩn vì weight ngẫu nhiên của họ không có cặp 0). Model MNIST ở dense **khớp từng bit** (`test_dense_mode.py::test_dense_trained_mnist`) |
 | 48 | **Chế độ dense**: số filter mỗi PE **lẻ** (M0 = 3, ví dụ 8×4×4 → 6; 3, 5, 10 filter) sai lặng lẽ (ở sparse Python từ chối: `encoded columns need 24 words, the PE block has 18`) | Python: FSM dense dùng `ceil(M0 / 2)` word mỗi iact (có ô đệm), khối weight Python chỉ có `ceil(used_wght_per_PE / 2)` word | **Chặn 2026-11-10** (được bạn đồng ý): `check_dense_wght_slots` (`layer_parameters.py`, gọi từ `conv_mapper.py`) báo `NotImplementedError` khi số word PE đọc khác số word được gửi, chỉ với phần cứng dense; `OPENEYE_ALLOW_UNSUPPORTED=1` chỉ cảnh báo; 8 test trong `test_model_guards.py`. Còn mở: thêm ô đệm cho mỗi cột iact như `encode_columns` |
+| 49 | **Sparse**, mạng Bảng 2 có ReLU (`PAPER_MNIST_RELU`) ở `CLUSTER_ROWS = 2`, `NUM_GLB_PSUM = 2` (Y 3 và Y 4): kết quả sai. Điều tra 2026-11-17: **Conv2 tính sai** 20/6.272 giá trị (x = 7, y = 1 và 3, 15/32 channel); testbench không thấy vì bỏ qua kiểm tra bộ đệm khi layer sau là pooling, lỗi lộ ra sau pooling. Cơ chế của #28 ở CR 2: điều kiện ready của `CALCULATE_PSUM` chỉ xét GLB chẵn của mỗi cặp, trong khi ở CR 2 X 2 mọi GLB đều là đầu chuỗi; 8/300 lần gom psum bắt đầu khi một GLB lẻ chưa xong (phụ thuộc dữ liệu qua bỏ-qua-số-0) | `hdl/psum_pipeline.v` (`chain_ready_terms`); testbench (`compare_iact_storage` bỏ qua Conv trước pooling) | **Đã sửa 2026-11-17** (được bạn đồng ý; mục 9 "Sửa #49"; `doc/experiments/2026-11-17_bug49.md`): GLB lẻ của cặp được xét khi nó là đầu chuỗi, ở mọi CR; testbench nay kiểm tra cả output Conv trước pooling; test `test_bug49.py`. Bản vá đã thử trong worktree tạm (0 lần bắt đầu sớm, mọi kiểm tra PASS ở CR 2 X 2 Y 3); **bản trong project chưa chạy kiểm chứng** (bạn chạy sau) |
 
 ### 8c. Kế hoạch gần (theo thứ tự ưu tiên, cập nhật 2026-11-02)
 
@@ -1649,7 +1858,7 @@ dài 96 thay vì 192 chu kỳ.
 | A | Place & route (clock 4 ns) để có fmax chính thức | Vivado, không sửa RTL | Fmax sau tổng hợp là ước lượng lạc quan; mọi tối ưu cần cả chu kỳ lẫn fmax | **Xong 2026-10-13: đạt 250 MHz sau route** (WNS +0,025 ns); đường găng là dây tới 144 BRAM của bộ đệm psum (mục 6d) |
 | B | **Lỗi #13: phần cứng khác mô phỏng** ở `iact_stream_constructor` | Thí nghiệm, rồi sửa RTL | Nếu đúng như Vivado báo, bitstream hiện tại tính sai iact, nên mọi số đo trên board sẽ vô nghĩa | (1) Thí nghiệm **xong 2026-10-13: lỗi có thật**, 6/9 case sai trên phần cứng giả lập. (2) **Đã sửa 2026-10-13** (mục 9). (3) **Vivado xác nhận 2026-10-14**: CRITICAL WARNING biến mất, vẫn đạt 250 MHz. **Xong** |
 | B2 | Lỗi #6/#7 (1 channel, `NUM_GLB_IACT=3`) và #18 (weight đọc gấp đôi) | Sửa RTL (#6/#7), Python (#18) | Kết quả sai | **Xong 2026-10-14/15** (mục 9), Vivado xác nhận |
-| C | Gửi bias theo filter (1.1 bên dưới) | Sửa RTL | Bias chiếm **26 %** chu kỳ `mnist1` sau bản sửa #18; ước tính −23 % chu kỳ, DMA pha bias giảm khoảng 900 lần, chi phí khoảng +2 % FF và 0 BRAM | Chờ đồng ý |
+| C | Gửi bias theo filter (1.1 bên dưới) | Sửa RTL | Bias chiếm **26 %** chu kỳ `mnist1` sau bản sửa #18; ước tính −23 % chu kỳ, DMA pha bias giảm khoảng 900 lần, chi phí khoảng +2 % FF và 0 BRAM | **Xong 2026-11-17** (được bạn đồng ý, phương án A chạy nền; mục 9 "Gửi bias theo filter"): phần cứng `BIAS_PER_FILTER_EN=1`, **mặc định từ 2026-11-17**; 12 ca mốc −2,5 đến −26,1 % chu kỳ, MNIST thật −9,3 % |
 | C2 | MNIST đầy đủ: lỗi #17 (Conv1), #9 (Conv3), #5 (FC) | Python (đệm channel) hoặc RTL | Chạy cả mạng thật, đo độ trễ end-to-end | **Kiến trúc MNIST chạy đủ 6 layer** (2026-10-22): #17 có workaround Python, #5 là lỗi testbench, #9 không chặn khi nối layer; `model_mnist_real_c1` = 963 µs (dữ liệu ngẫu nhiên). #22 đã sửa (2026-10-24): Conv1/2/3 với weight đã huấn luyện tính đúng. **Xong 2026-10-30**: sau #30 (kẹp int8, ReLU), #34, #32, #31, model int8 đã huấn luyện chạy trọn mạng trên RTL, khớp từng bit ở ảnh test 0–7, đoán đúng cả 8; đo được 852–884 µs (mục 6.13, 8d) |
 | D | Thu nhỏ bộ đệm psum (`BUFFER_WIDTH_PSUM` 14 → 11/12) | Đổi tham số, không sửa RTL | 144/168 RAMB36 là bộ đệm psum, layer lớn nhất chỉ dùng khoảng 1.792/16.384 địa chỉ (ước tính); tiết kiệm khoảng 100–124 BRAM36 để thêm cluster hoặc bộ đệm | Cần kiểm chứng bằng 9 case. Sau route còn thấy lợi thêm: đường găng là dây tới các BRAM này, nên bộ đệm nhỏ hơn có thể tăng fmax |
 | E | DMA 128 bit | Băng thông | Cổng HP của ZU+ rộng 128 bit; 64 bit ở 250 MHz chỉ đạt khoảng 2 GB/s; giảm một nửa số chu kỳ nạp và đọc kết quả | 128 bit chưa từng được kiểm chứng |
@@ -1664,6 +1873,7 @@ dài 96 thay vì 192 chu kỳ.
 
 | N | Sửa 3 lỗi của các cấu hình CR 1 trong Bảng 3: #29 (kiểm tra số hàng bộ đệm weight trong Python + `BUFFER_WIDTH_WGHT = 13`), #28 (điều kiện ready xét cả GLB lẻ ở CR 1), #36 (nới thanh ghi đọc ra) | Python + tham số (#29), sửa RTL (#28, #36) | Bảng 3 lên 16/16; #29 còn chặn mọi Dense lớn (3136 → 32 ở cấu hình MNIST) | **Xong 2026-11-03** (được bạn đồng ý, mục 9): Bảng 3 16/16, hồi quy 184 test 179 PASS + 5 xfail, 12 ca mốc 0 lệch |
 | O | Chép từ upstream `36395dd` / `9498271`: #17 (1 channel trong RTL, bỏ `channel_pad`) và #37 (nới trường iact) | Sửa RTL + regmap | #17: Conv1 MNIST bớt 1,1 % chu kỳ (đo: −360, −336 word DMA; ước tính ban đầu khoảng 5 % theo thời gian mô phỏng), bỏ được workaround Python; #37: Conv lớn ở CR 1 X 2 | **Xong 2026-11-04** (được bạn đồng ý; `doc/experiments/2026-11-04_rowO_bug17_bug37.md`, mục 9 "Sửa #37, #17"): chép từng phần lên code của `dev`, không gộp commit |
+| P | **Chế độ trộn**: iact sparse, weight 8 bit trần (mục 2 "Chế độ trộn") | Sửa RTL + Python, tham số dựng `SPARSITY_WGHT_EN` | MNIST ReLU ước lượng −4,5 đến −7 % chu kỳ so với sparse, băng thông weight −40 %, ít LUT hơn; SiLU ≈ dense | Đề xuất 2026-11-11 (phương án A trước, B sau); **hoãn 2026-11-17** theo quyết định của bạn (nhược điểm ở mục 2 "Chế độ trộn") |
 
 Thứ tự đề xuất: A, B, B2, C2 (kiến trúc MNIST chạy đủ), I, K, L, M (hàm kích hoạt A/B/C) **đã xong**; tiếp theo là C (bias theo filter: Bảng 3 cho thấy bias chiếm khoảng 54.000–58.000 ns ở mọi
 cấu hình), rồi D (I: #25, #26 đã sửa).
@@ -1677,6 +1887,12 @@ Mỗi thay đổi RTL: test, `run_profile --compare`, Yosys (so sánh nhanh LUT)
 3. **Giai đoạn 1.3: tìm hiểu định dạng weight** (hiệu suất 15–30 %). Bước đầu chỉ phân tích, không sửa RTL; sau đó mới đề xuất cách đóng gói.
 4. **Việc 0.2:** đo layer Dense và lượt nhiều layer: **xong** (2026-10-22, mục 6.13); lỗi #5 hoá ra là báo động giả của testbench.
 5. **Giai đoạn 2:** chạy chồng pha nạp và pha tính toán (double-buffering), sau khi Giai đoạn 1 xong.
+
+**Đã làm 2026-11-17** (phương án A chạy nền, được bạn đồng ý; mục 9 "Gửi bias theo filter"). Đề xuất làm lại theo code hiện tại trước đó: Bias hiện chiếm 9,7–10,7 %
+chu kỳ của model MNIST đã huấn luyện và 5,1–18,7 % của mạng Bảng 2. Khuyến nghị phương án A chạy nền: bảng bias, sau đó bộ đếm ghi lại bộ đệm psum trong
+lúc FSM psum rảnh (từ `GET_BIAS` tới khi PE xong lượt đầu), có bit theo layer để giữ cách cũ. Ước lượng: MNIST −9 đến −11 %, Bảng 2 −5 đến −18 %, lưu
+lượng bias của Conv giảm 56–896 lần. Rủi ro: thêm mux trên đường ghi bộ đệm psum, đúng vùng có đường găng sau route. Thiết kế 2026-10-15 dưới đây vẫn đúng
+về ý; số liệu ở đó đã cũ.
 
 **Thiết kế đề xuất cho 1.1 (gửi bias theo filter), chưa thực hiện, chờ đồng ý:**
 - Hiện tại: Python (`psum_stream_mapper.get_psum_stream`) gửi giá trị bias cho từng (lượt x, hàng output, filter), mỗi giá trị lặp
@@ -3248,6 +3464,93 @@ Nguyên nhân và cách tìm: mục 8b, `doc/experiments/2026-11-10_bug46_47.md`
 
 Còn mở: bản sửa thật của #48 (ô đệm cho mỗi cột iact trong layout dense).
 
+### Gửi bias theo filter, phương án A chạy nền (2026-11-17, được bạn đồng ý; `doc/experiments/2026-11-17_bias_per_filter.md`)
+
+**Vấn đề.** Bộ đệm psum là bộ cộng dồn của cả layer, trước lượt tính đầu phải chứa bias, nên Python gửi bias cho **từng giá trị output** (mỗi lượt x
+× mỗi hàng × mỗi filter, lặp lại để lấp đủ một địa chỉ bộ đệm): Conv1 của MNIST có 32 bias mà gửi 14.336 word DMA. Pha bias chiếm 9,7–10,7 % chu kỳ
+model MNIST đã huấn luyện và 5–19 % mạng Bảng 2.
+
+**Cách làm.** Phần cứng dựng với `BIAS_PER_FILTER_EN=1` (**mặc định từ 2026-11-17**, bạn quyết định; 0 = phần cứng cũ, không có bảng):
+- Python gửi mỗi filter một bias (2 bias mỗi word 64 bit): `ceil(F / 2)` word thay cho cả bản đồ. Bit `bias_per_filter` và trường `bias_groups` (số nhóm
+  filter = F / `kernels_per_calc`) nằm trong chỗ trống của word trạng thái (số word trạng thái không đổi ở cả 96 cấu hình DMA 32/64/128, CR 1–8, CC 1–4).
+- `GET_BIAS` ghi các bias vào bảng (LUTRAM, `QUANT_AMOUNT` ô). Ngay sau đó, trong lúc FSM chính làm tiếp (`GET_QUANTIZE`, chuyển iact, gửi weight), FSM
+  psum ghi lại bộ đệm: với mỗi nhóm filter g, dựng word của nhóm bằng **chính thanh ghi dịch cũ** của `GET_BIAS` (filter cuối của nhóm trước, mỗi filter
+  `CONV_BIAS_CYCLES / kernels_per_calc` lần, mỗi chu kỳ một lần dịch, lấy từ bảng thay vì DMA), rồi ghi word đó vào các địa chỉ g, g + số nhóm, ... (số
+  hàng × số lượt x địa chỉ, mỗi chu kỳ một địa chỉ). Bộ đệm giống hệt khi nhận luồng cũ. Xung `compute_reg` đến khi chưa ghi xong được giữ lại
+  (`compute_pending`); FSM chính không đổi, không thêm trạng thái (FSM 4 bit đã đủ 16 trạng thái), không thêm mux trên đường dữ liệu bộ đệm.
+- Python (`LayerParameters.set_bias_per_filter`) chỉ bật cho Conv2D khi luồng cũ đều đặn (DMA 32/64 bit, filter chia hết thành nhóm lấp đủ một địa chỉ,
+  F ≤ `QUANT_AMOUNT`); layer khác (Dense, depthwise, trường hợp lẻ) giữ luồng cũ, log ghi lý do.
+
+| File | Thay đổi |
+|---|---|
+| `hdl/psum_pipeline.v` | tham số `BIAS_PER_FILTER_EN`, bảng bias (generate), khối ghi lại trong `PSUM_IDLE`, `compute_pending`, reset các thanh ghi mới |
+| `hdl/OpenEye_FPGA.v` | tham số, 2 trường từ `dma_storage` tới `psum_pipeline` |
+| `test/cocotb_fpga/regmap.yaml` | `bias_per_filter` (1 bit), `bias_groups` (11 bit) |
+| `src/open_eye/open_eye_parameters.py`, `vh_file_creator.py` | `BIAS_PER_FILTER_EN` (biến môi trường, mặc định 0) |
+| `src/open_eye/layer_parameters.py`, `psum_stream_mapper.py`, `conv_mapper.py` | quyết định theo layer, luồng bias theo filter, đóng gói 2 trường |
+| test | `test/test_bias_per_filter.py` (19 unit test: mô hình `GET_BIAS` cũ và mô hình ghi lại cho cùng bộ đệm từng word ở 9 cấu hình, quy tắc bật / tắt), `test/cocotb_fpga/test_bias_per_filter.py` (10 test RTL, thêm vào `regression.sh`: Conv đơn CR 1/2/4, nhóm kernel, `NUM_GLB_PSUM` 2, chuỗi Conv, Conv → Pool → Conv, dense, MNIST đã huấn luyện) |
+
+**Kiểm chứng.**
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Lint (Verilator 5.020), tắt và bật | 0 cảnh báo mới (một dòng chỉ đổi dải bit thừa của `dma_storage` sinh tự động, 3 cảnh báo cũ hết); baseline `fpga` 443 → 440, `parallel` 36, đã cập nhật |
+| Unit test Python | 504 PASS (485 + 19 test mới) + 11 lỗi cũ đã biết |
+| 10 test RTL mới (bật) | 10/10 PASS; MNIST đã huấn luyện ảnh 0 khớp từng bit, cả 3 Conv dùng luồng mới |
+| Hồi quy đầy đủ, **bật** (`BIAS_PER_FILTER_EN=1 regression.sh`) | **221 test = 217 PASS + 4 xfail đã biết**; 136 test có Conv, tất cả dùng luồng mới, 0 lần quay về luồng cũ |
+| Hồi quy đầy đủ, **tắt** (mặc định) | **221 test = 217 PASS + 4 xfail đã biết** (10 test mới luôn bật chế độ này) |
+| 12 ca mốc, **tắt** (mặc định) | giống hệt `baseline_2026-11-04` từng chu kỳ và từng word DMA |
+| 12 ca mốc, **bật** (`doc/perf/bias_2026-11-17_on.md`) | −2,5 đến −26,1 % chu kỳ, −3,5 đến −62,9 % word DMA |
+| Vivado, **bật** (`doc/synth/2026-11-17_route4ns_bias_zu7ev`, 4 ns, place & route) | 0 CRITICAL; **đạt 250 MHz** (WNS +0,026 ns, mốc +0,042); LUT 59.548 → 59.982 (+434, +0,7 %), FF +99, LUTRAM +13; BRAM / URAM / DSP không đổi; đường găng vẫn là dây từ thanh ghi địa chỉ psum tới BRAM bộ đệm psum, không đường nào qua logic bias |
+| Bảng 3 (mạng Bảng 2, 16 cấu hình), **bật** (`doc/perf/paper_table3_2026-11-17_bias`) | **16/16 PASS**; −4,1 % (CR 1 X 2) đến −18,5 % (CR 8 X 4), tổng 16 cấu hình 8.807.505 → 7.923.685 ns (−10,0 %); `load_bias` 10.796–11.692 → 84 chu kỳ; tổng / paper từ 1,97–3,52 xuống 1,70–3,37 |
+
+| Ca mốc | Chu kỳ cũ → mới | Word DMA cũ → mới |
+|---|---|---|
+| `mnist1_28x28_c4_f32` | 54.936 → 40.616 (−26,1 %) | 30.062 → 15.742 (−47,6 %) |
+| `model_mnist16_c2` | 49.930 → 40.546 (−18,8 %) | 14.916 → 5.532 (−62,9 %) |
+| `model_mnist_real_c1` | 239.638 → 217.312 (−9,3 %) | 62.568 → 39.352 (−37,1 %) |
+| `32x3_f16` | 3.555 → 2.795 (−21,4 %) | 2.102 → 1.342 (−36,2 %) |
+
+Pha `load_bias` của MNIST thật: 23.308 → 92 chu kỳ. Việc ghi lại được giấu hoàn toàn ở Conv2 và Conv3; ở Conv1 lượt tính đầu ngắn hơn việc ghi lại
+(1.792 địa chỉ) nên lộ 890 chu kỳ (tính vào pha `writeback` của layer 0). Bảng 3: giấu hết khi mỗi địa chỉ chứa từ 16 psum trở lên (CR 2 X 4, CR 4, CR 8); khi địa chỉ nhỏ thì số địa chỉ phải ghi lại nhiều và lộ một phần:
+CR 1 X 2 (4 psum mỗi địa chỉ) 2.150 chu kỳ, CR 1 X 4 và CR 2 X 2 (8 psum) 718 chu kỳ, đều ở Conv1.
+
+### Sửa #49, kiểm tra Conv trước pooling, `BIAS_PER_FILTER_EN = 1` làm mặc định (2026-11-17, được bạn đồng ý; **chưa kiểm chứng**)
+
+Theo yêu cầu, ba thay đổi này được commit **trước khi chạy kiểm chứng**. Đã chạy: lint (Verilator 5.020: `fpga` 440, `parallel` 36, 0 mới), kiểm
+tra cú pháp Python. Chưa chạy: mọi mô phỏng.
+
+- **#49, `hdl/psum_pipeline.v`** (`chain_ready_terms`): nhánh mới `gen_pair_ready_rows`: ở `CLUSTER_ROWS >= 2`, GLB lẻ của mỗi cặp cũng phải sẵn sàng
+  khi nó là đầu chuỗi (bit 2 `router_mode_psum` của chính nó); CR 1 giữ nhánh `gen_pair_ready` của #28. Đúng bản vá đã thử trong worktree tạm
+  (`doc/experiments/2026-11-17_bug49/trial_fix_49.patch`: CR 2 X 2 Y 3 có ReLU, 0 lần bắt đầu sớm, mọi kiểm tra PASS).
+- **Testbench, `src/open_eye/rtl_test_utils.py`**: `compare_iact_storage` không còn bỏ qua bộ đệm khi layer sau là pooling; hàm mới
+  `compare_pooling_input` so từng giá trị output của Conv với tham chiếu theo layout của bộ đệm (nhóm 4 channel, hàng, cột:
+  byte `((c // 4 * Y + y) * X + x) * 4 + c % 4`; số channel không chia hết cho 4 thì ghi log và bỏ qua). Layout này mới được kiểm trên một cấu hình
+  (14×14×32, CR 2 X 2); nếu cấu hình khác dùng layout khác, phép kiểm tra sẽ báo sai giả và cần xem lại.
+- **`BIAS_PER_FILTER_EN = 1` mặc định** (`open_eye_parameters.py`, `OpenEye_FPGA.v`, `psum_pipeline.v`): mọi test và mốc từ nay chạy với bảng bias. Hệ
+  quả: `doc/perf/baseline_2026-11-04` và `paper_table3_2026-11-04` không còn là mốc của cấu hình mặc định (chạy so sánh sẽ thấy pha bias giảm); số đo
+  gần nhất là `doc/perf/bias_2026-11-17_on` và `paper_table3_2026-11-17_bias` (trước bản sửa #49); mốc phần cứng gần nhất
+  `doc/synth/2026-11-17_route4ns_bias_zu7ev` (trước bản sửa #49).
+- **Test**: `test/cocotb_fpga/test_bug49.py` (mạng Bảng 2 có ReLU, CR 2 X 2 Y 3 và Y 4, sparse); `test_bias_per_filter.py` thêm 2 ca phần cứng cũ
+  (`BIAS_PER_FILTER_EN=0`); `regression.sh` nay 225 test.
+
+**Kiểm chứng cần chạy** (từ thư mục repo):
+
+```bash
+venv/bin/python -m pytest -q test/test_*.py
+venv/bin/python -m pytest -q test/cocotb_fpga/test_bug49.py
+bash doc/experiments/2026-11-07_bug41_stride/regression.sh /tmp/reg_2026-11-18
+venv/bin/python tools/run_profile.py --jobs 6 --compare doc/perf/bias_2026-11-17_on --save doc/perf/baseline_2026-11-18 --report doc/perf/baseline_2026-11-18.md
+venv/bin/python tools/paper_table3.py --run --jobs 6 --save doc/perf/paper_table3_2026-11-18 --report doc/perf/paper_table3_2026-11-18.md
+venv/bin/python doc/experiments/2026-11-17_paper_dense_sparse/run_relu.py doc/perf/paper_table3_2026-11-18_relu_sparse 6
+venv/bin/python tools/export_vivado.py --clock-ns 4 --name default_2026-11-18
+```
+
+Kỳ vọng: unit test 504 PASS + 11 lỗi cũ; `test_bug49` 2/2 PASS; hồi quy 225 = 221 PASS + 4 xfail đã biết; 12 ca mốc như `bias_2026-11-17_on` (có thể
+lệch vài chu kỳ nơi việc gom psum nay chờ cột lẻ); Bảng 3 16/16 PASS như `paper_table3_2026-11-17_bias`; Bảng 3 có ReLU ở sparse **16/16** (trước bản
+sửa 14/16); Vivado (chạy riêng): 250 MHz, khoảng +434 LUT so với mốc 2026-11-09 cộng vài LUT của bản sửa #49. Sau đó cập nhật mốc trong README (mục 7, 6d)
+và memory.
+
 ## 9b. Kết quả lint RTL chi tiết (Verilator 5.020, 2026-10-10)
 
 **Số liệu mục này là của ngày 2026-10-10.** Hiện tại (baseline lint `tools/lint_baseline/`, sau các bản sửa #14, #19, #30, upstream `e78e5b7` và bước B của hàm kích hoạt, bản sửa #29, #38, hàng O #37/#17, #41c): `fpga` **443**, `parallel` **36** (#38: hết `WIDTHEXPAND` / `WIDTHTRUNC` của hai lát cắt trường lượng tử; #29: `wghts_per_pe` nay 13 bit như toán hạng nó được so sánh, bớt 1 `WIDTHEXPAND`; bước B: `data_dma_i_reg` nay dùng hết nên bớt 1 `UNUSEDSIGNAL`; `e78e5b7` bớt 1 `BLKSEQ` trong `OpenEye_FPGA.v`; #30 xoá cảnh báo
@@ -3981,3 +4284,64 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
 - **Sắp xếp `doc/reports/`**: mỗi báo cáo một thư mục cùng các hình của nó (`2026-10-10_TienDo/`, `2026-10-15_TienDo/`, `2026-10-31_TienDo/`,
   `2026-11-05_HamKichHoat/`, `2026-11-10_TienDo/`; `git mv`, nội dung không đổi); các script `tools/report/make_*.py` ghi vào thư mục của mình.
   Cập nhật mục 4 và các đường dẫn trong nhật ký.
+
+### 2026-11-11
+
+- **Đề xuất chế độ trộn** (không sửa RTL / Python; mục 2 "Chế độ trộn", mục 8c hàng P): iact sparse + weight 8 bit trần, dùng lại FSM sparse vì weight dense
+  là luồng CSC có overhead 0; ước lượng MNIST ReLU 203.000–209.000 chu kỳ (−4,5 đến −7 % so với sparse), SiLU / Leaky ReLU ngang dense; danh sách file
+  sẽ sửa (phương án A), phương án B (bỏ SPad địa chỉ weight). Ước lượng diện tích PE bằng Yosys: `doc/experiments/2026-11-11_mixed_mode/pe_area.sh`.
+
+### 2026-11-12
+
+- **Hàm kích hoạt × cách làm tròn × sparse / dense** (mục 6.16; không sửa toolchain / RTL): 8 lần chạy model đã huấn luyện với cách làm tròn ngược
+  mặc định (probe `doc/experiments/2026-11-12_rounding_modes/`), cùng 8 lần của 10/11 thành đủ 16 trường hợp, 16/16 khớp từng bit. Dense: làm tròn không
+  đổi chu kỳ; sparse: ReLU floor nhanh hơn 0,5 %, Leaky ReLU làm tròn nhanh hơn 1,1 %, SiLU / hard-swish chênh < 0,3 %. `test_activation_rtl.py` ở dense
+  12/12 PASS. Đo thêm ReLU so với ONNX Runtime (`measure_ort_relu.py`): làm tròn khớp 100 %.
+- **Báo cáo lần 5 sửa lại** (`doc/reports/2026-11-10_TienDo/`, `tools/report/make_progress_report_2026-11-10.py`): mục 7 thành bảng 16 trường hợp (tô
+  ô nhanh nhất), bản đồ nhiệt các trường hợp (thay hình cột sparse / dense), mục "Nên chọn gì"; Hình 2 thêm ReLU; mục 3.4 sửa câu "không tốn logic" (đúng là
+  0 chu kỳ nhưng +193 LUT cho 4 bộ lượng tử), thêm offset, cách làm tròn nửa đơn vị và lý do chọn floor / làm tròn; mục 6 thêm kết quả dense.
+- **Bão hoà của hàm kích hoạt trên dữ liệu thật** (câu hỏi về Hình 3 của báo cáo lần 5; `doc/experiments/2026-11-12_saturation.md`, script
+  `2026-11-12_saturation/saturation.py`, không sửa toolchain / RTL). Đoạn nằm ngang của Hình 3 là kẹp ở 127 × s_next: scale đầu ra được hiệu chỉnh theo
+  giá trị dương lớn nhất gặp trong 200 ảnh hiệu chỉnh, còn scale trước hàm kích hoạt (đối xứng) lớn hơn vì phía âm. Trên 10.000 ảnh test: tối đa
+  0,0003 % output của một layer bị kẹp, 1,4 % (ReLU) đến 5,1 % (SiLU) số ảnh có ít nhất một giá trị bị kẹp; khi bị kẹp lệch trung bình 2–8 đơn vị, tối
+  đa 43 đơn vị (25 %, SiLU Conv2); độ chính xác có và không có giới hạn trên **như nhau** ở cả 4 model. ONNX Runtime kẹp ở cùng giới hạn (tính chất của
+  lượng tử int8 tĩnh, không phải lỗi chip). Độ chính xác của toolchain hiện tại lệch tối đa 0,01 điểm so với số ngày 02/11 (Leaky ReLU 99,35, SiLU 99,28 %).
+
+### 2026-11-17
+
+- **Phân tích chọn sparse / dense theo từng layer** (không sửa RTL / Python; mục 2 "Chọn sparse / dense theo từng layer",
+  `doc/experiments/2026-11-17_per_layer_mode.md`): với định dạng hiện tại chỉ lợi −1,26 % cho ReLU; sau chế độ trộn theo toán hạng chỉ thêm 0,14–0,18 %,
+  đổi lại hai FSM trong mỗi PE (+8–16 % LUT). Khuyến nghị làm chế độ trộn theo toán hạng trước.
+- **Rà soát upstream `3e2e027`** (9 commit ngày 10–13/11; `doc/experiments/2026-11-17_upstream_3e2e027_review.md`; không lấy gì): tiếp bản viết lại nhóm 2
+  channel (ghi ngược, pooling), bỏ nhánh FC của bộ dựng iact, depthwise, hai bản sửa FSM dense, một thay đổi FSM sparse. 13 ca: upstream sparse 0/13, dense
+  8/13; `dev` dense 11/13 (sau #46, #47), sparse 11/13. Upstream dense ở 2 × 2 cluster vẫn có #46 và #47; fork không có lỗi kernel 1 × 1 mà `86e8d56` sửa.
+  Thêm đánh giá từng thuật toán (mục 4 của ghi chú): chỉ hai ý tưởng tốt hơn fork là 32 psum mỗi PE (đo được 6 %, chỉ cần sửa Python) và chia xen bank iact
+  (bộ nhớ, khi `NUM_GLB_IACT > 1`). Bản viết lại nhóm 2 channel không đáng sửa để lấy về.
+- **Chế độ trộn theo toán hạng: hoãn** theo quyết định của bạn. Ý tưởng, bảng ưu / nhược điểm và ước lượng trên mạng Bảng 2 (−3 đến −14 %) giữ ở mục 2 "Chế
+  độ trộn"; hàng P của lộ trình ghi "hoãn".
+- **Mạng Bảng 2 của paper ở sparse và dense** (mục 6.14b, `doc/experiments/2026-11-17_paper_dense_sparse.md`; chỉ chạy, không sửa RTL / Python). Dense
+  16/16 PASS, nhanh hơn sparse 6,4 % trên dữ liệu Bảng 3 và 2,7 % khi có ReLU. Sparse nhanh hơn ở CR 1 X 2 khi có ReLU. Biến thể ReLU ở sparse 14/16 PASS:
+  lỗi mới **#49** (max pooling sau Conv2 ở CR 2 X 2), chưa điều tra. Script mới `test_paper_relu.py`, `run_relu.py`, `compare.py`. Profile mới:
+  `doc/perf/paper_table3_2026-11-17_{dense,relu_sparse,relu_dense}` (+ `.md`).
+- **Đề xuất gửi bias theo filter, làm lại theo code hiện tại** (mục 8c, `doc/experiments/2026-11-17_bias_per_filter.md`; không sửa gì): phương án A
+  chạy nền, giữ cách cũ bằng một bit theo layer; ước lượng MNIST −9 đến −11 %, Bảng 2 −5 đến −18 %.
+- **Điều tra #49** (chỉ điều tra, không sửa RTL; `doc/experiments/2026-11-17_bug49.md`, công cụ `doc/experiments/2026-11-17_bug49/`, chạy trên worktree
+  sạch): lỗi ở **Conv2** (20/6.272 giá trị sai, x = 7, y = 1 và 3), không ở pooling; testbench bỏ qua kiểm tra bộ đệm khi layer sau là pooling nên lỗi lộ
+  ra một layer sau. Cơ chế của #28 ở `CLUSTER_ROWS = 2`: điều kiện ready chỉ xét GLB chẵn, 8/300 lần gom psum bắt đầu khi GLB lẻ (đầu chuỗi) chưa xong.
+  Bản vá thử (worktree tạm): 0 lần bắt đầu sớm, mọi kiểm tra PASS. Đề xuất sửa RTL và thêm kiểm tra Conv trước pooling, chờ đồng ý.
+- **Gửi bias theo filter, phương án A chạy nền: đã làm** (được bạn đồng ý; mục 9 "Gửi bias theo filter", `doc/experiments/2026-11-17_bias_per_filter.md`
+  mục 6). Phần cứng dựng với `BIAS_PER_FILTER_EN=1` (mặc định 0): Conv2D gửi `ceil(F / 2)` word bias thay cho cả bản đồ, chip tự ghi lại bộ đệm psum
+  trong lúc FSM chính làm tiếp. RTL `psum_pipeline.v`, `OpenEye_FPGA.v`; regmap 2 trường mới trong chỗ trống (số word trạng thái không đổi ở 96 cấu hình);
+  Python `open_eye_parameters.py`, `vh_file_creator.py`, `layer_parameters.py` (`set_bias_per_filter`), `psum_stream_mapper.py`, `conv_mapper.py`; test
+  `test/test_bias_per_filter.py` (19), `test/cocotb_fpga/test_bias_per_filter.py` (10, vào `regression.sh`). Kiểm chứng: lint 0 cảnh báo mới; unit test
+  485 PASS + 11 lỗi cũ; hồi quy 221 = 217 PASS + 4 xfail ở cả hai chế độ; 12 ca mốc khi tắt giống hệt từng chu kỳ, khi bật −2,5 đến −26,1 % chu kỳ (MNIST
+  thật −9,3 %, `load_bias` 23.308 → 92); Bảng 3 khi bật 16/16 PASS, −4,1 đến −18,5 % (tổng −10,0 %); Vivado khi bật: 250 MHz (WNS +0,026 ns), +434 LUT
+  (+0,7 %), +99 FF, BRAM / URAM / DSP không đổi (`doc/synth/2026-11-17_route4ns_bias_zu7ev`); lint baseline `fpga` 443 → 440. Profile mới
+  `doc/perf/bias_2026-11-17_{off,on}`, `doc/perf/paper_table3_2026-11-17_bias`.
+- **Sửa #49, kiểm tra Conv trước pooling, `BIAS_PER_FILTER_EN = 1` mặc định** (được bạn đồng ý; mục 9 "Sửa #49"): RTL `psum_pipeline.v` (nhánh
+  `gen_pair_ready_rows`), testbench `rtl_test_utils.compare_pooling_input`, mặc định mới trong `open_eye_parameters.py` / `OpenEye_FPGA.v` /
+  `psum_pipeline.v`, test `test_bug49.py` và 2 ca `_off`, `regression.sh` 225 test. **Commit theo yêu cầu trước khi kiểm chứng**: chỉ lint (0 mới) và
+  kiểm tra cú pháp Python đã chạy; danh sách lệnh kiểm chứng ở mục 9.
+- **Đánh giá đề xuất "Adaptive Sparsity"** (mục 2, `doc/experiments/2026-11-17_adaptive_sparsity_review.md`; không sửa gì): khác biệt sparse / dense
+  trên phần cứng này chủ yếu ở định dạng weight; layer FC luôn thích dense dù 74–85 % số 0; ngưỡng phụ thuộc cấu hình cluster; lợi tối đa 0–1,5 % cho
+  +8–16 % LUT. Khuyến nghị làm nghiên cứu ngưỡng dưới dạng đo đạc trước.
