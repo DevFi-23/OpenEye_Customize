@@ -1,0 +1,310 @@
+WARNING: [Synth 8-10788] illegal argument of type logic [packed dim count:1] in math function 'ceil()'; expected real type [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:246]
+WARNING: [Synth 8-7071] port 'wr_mask_i' of module 'RAM_SP' is unconnected for instance 'wght_buffer' [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:3063]
+WARNING: [Synth 8-7023] instance 'wght_buffer' of module 'RAM_SP' has 7 connections declared, but only 6 given [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:3063]
+WARNING: [Synth 8-7071] port 'valid_o' of module 'adder_tree' is unconnected for instance 'adder_tre' [C:/openeye_vivado/default_2026-11-18/rtl/PE.v:2468]
+WARNING: [Synth 8-7023] instance 'adder_tre' of module 'adder_tree' has 6 connections declared, but only 5 given [C:/openeye_vivado/default_2026-11-18/rtl/PE.v:2468]
+WARNING: [Synth 8-693] zero replication count - replication ignored [C:/openeye_vivado/default_2026-11-18/rtl/PE.v:845]
+WARNING: [Synth 8-6014] Unused sequential element iact_channel_counter_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:254]
+WARNING: [Synth 8-6014] Unused sequential element finished_y_lines_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:255]
+WARNING: [Synth 8-6014] Unused sequential element wght_counter_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:256]
+WARNING: [Synth 8-6014] Unused sequential element x_line_counter_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:257]
+WARNING: [Synth 8-6014] Unused sequential element iacts_in_one_trans_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:456]
+WARNING: [Synth 8-6014] Unused sequential element channels_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:462]
+WARNING: [Synth 8-6014] Unused sequential element pos_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:463]
+WARNING: [Synth 8-6014] Unused sequential element change_state_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:464]
+WARNING: [Synth 8-6014] Unused sequential element iact_router_counter_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:471]
+WARNING: [Synth 8-6014] Unused sequential element kernel_y_counter_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:472]
+WARNING: [Synth 8-6014] Unused sequential element needed_iact_router_cycles_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:473]
+WARNING: [Synth 8-6014] Unused sequential element wght_size_y_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:475]
+WARNING: [Synth 8-6014] Unused sequential element wr_cycle_loop_cnt_2_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:479]
+WARNING: [Synth 8-6014] Unused sequential element rd_cycle_loop_cnt_4_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:480]
+WARNING: [Synth 8-6014] Unused sequential element router_cycle_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:482]
+WARNING: [Synth 8-6014] Unused sequential element switching_cycle_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/iact_stream_constructor.v:483]
+WARNING: [Synth 8-6014] Unused sequential element valid_s2_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/quantization_unit.v:114]
+WARNING: [Synth 8-6014] Unused sequential element iact_channel_counter_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:401]
+WARNING: [Synth 8-6014] Unused sequential element fsm_psum_r_q_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:410]
+WARNING: [Synth 8-6014] Unused sequential element psum_cycle_loop_cnt_4_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:423]
+WARNING: [Synth 8-6014] Unused sequential element sending_cluster_rows_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:424]
+WARNING: [Synth 8-6014] Unused sequential element data_dma_o_q2_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:440]
+WARNING: [Synth 8-6014] Unused sequential element ready_dma_i_q1_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:443]
+WARNING: [Synth 8-6014] Unused sequential element ready_dma_i_q2_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:444]
+WARNING: [Synth 8-7137] Register psum_buffer_en_w_reg in module psum_pipeline has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:461]
+WARNING: [Synth 8-7137] Register pre_quantized_value_reg[7] in module psum_pipeline has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:972]
+WARNING: [Synth 8-7137] Register pre_quantized_value_reg[6] in module psum_pipeline has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:972]
+WARNING: [Synth 8-7137] Register pre_quantized_value_reg[5] in module psum_pipeline has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:972]
+WARNING: [Synth 8-7137] Register pre_quantized_value_reg[4] in module psum_pipeline has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:972]
+WARNING: [Synth 8-7137] Register pre_quantized_value_reg[3] in module psum_pipeline has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:972]
+WARNING: [Synth 8-7137] Register pre_quantized_value_reg[2] in module psum_pipeline has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:972]
+WARNING: [Synth 8-7137] Register pre_quantized_value_reg[1] in module psum_pipeline has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:972]
+WARNING: [Synth 8-7137] Register pre_quantized_value_reg[0] in module psum_pipeline has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/openeye_vivado/default_2026-11-18/rtl/psum_pipeline.v:972]
+WARNING: [Synth 8-6014] Unused sequential element valid_s1_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/ring_buffer_pipelined.v:91]
+WARNING: [Synth 8-6014] Unused sequential element first_spad_addr_delay_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/data_pipeline_wght.v:456]
+WARNING: [Synth 8-6014] Unused sequential element data_storage_1_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/data_pipeline_wght.v:381]
+WARNING: [Synth 8-6014] Unused sequential element temp_acc_overhead_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/data_pipeline_wght.v:381]
+WARNING: [Synth 8-6014] Unused sequential element address_temp_2_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/data_pipeline_wght.v:465]
+WARNING: [Synth 8-6014] Unused sequential element cycle_counter_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/data_pipeline_wght.v:466]
+WARNING: [Synth 8-6014] Unused sequential element overhead_pos_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/data_pipeline_wght.v:473]
+WARNING: [Synth 8-7137] Register gen_sparse_fsm.adder_tree_en_reg in module PE has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/openeye_vivado/default_2026-11-18/rtl/PE.v:1149]
+WARNING: [Synth 8-6014] Unused sequential element psum_ready_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/PE_cluster.v:267]
+WARNING: [Synth 8-6014] Unused sequential element iact_data_i_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:333]
+WARNING: [Synth 8-6014] Unused sequential element iact_enable_i_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:334]
+WARNING: [Synth 8-6014] Unused sequential element data_mode_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:398]
+WARNING: [Synth 8-6014] Unused sequential element compute_mask_i_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:407]
+WARNING: [Synth 8-6014] Unused sequential element compute_i_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:409]
+WARNING: [Synth 8-6014] Unused sequential element data_mode_i_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:411]
+WARNING: [Synth 8-6014] Unused sequential element gemm_mode_i_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:412]
+WARNING: [Synth 8-6014] Unused sequential element bano_cluster_mode_i_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:418]
+WARNING: [Synth 8-6014] Unused sequential element af_cluster_mode_i_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:419]
+WARNING: [Synth 8-6014] Unused sequential element kernel_per_pe_cluster_i_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:420]
+WARNING: [Synth 8-6014] Unused sequential element router_mode_iact_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:422]
+WARNING: [Synth 8-6014] Unused sequential element router_mode_psum_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:461]
+WARNING: [Synth 8-6014] Unused sequential element fsm_wght_current_state_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:510]
+WARNING: [Synth 8-6014] Unused sequential element wght_enable_i_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:511]
+WARNING: [Synth 8-6014] Unused sequential element wght_data_i_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:512]
+WARNING: [Synth 8-7137] Register iact_x_line_repetitions_reg_reg in module OpenEye_Parallel has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:443]
+WARNING: [Synth 8-7137] Register psum_ready_o_reg in module OpenEye_Parallel has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_Parallel.v:448]
+WARNING: [Synth 8-6014] Unused sequential element wght_buffer_rd_addr_storage_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1164]
+WARNING: [Synth 8-6014] Unused sequential element flat_help_var_send_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1169]
+WARNING: [Synth 8-6014] Unused sequential element prepared_iact_reg[3] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1171]
+WARNING: [Synth 8-6014] Unused sequential element prepared_iact_reg[2] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1171]
+WARNING: [Synth 8-6014] Unused sequential element prepared_iact_reg[1] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1171]
+WARNING: [Synth 8-6014] Unused sequential element prepared_iact_reg[0] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1171]
+WARNING: [Synth 8-6014] Unused sequential element temp_var_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1219]
+WARNING: [Synth 8-6014] Unused sequential element fsm_x_cl_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1583]
+WARNING: [Synth 8-6014] Unused sequential element fsm_y_cl_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1584]
+WARNING: [Synth 8-6014] Unused sequential element fsm_iact_r_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1585]
+WARNING: [Synth 8-6014] Unused sequential element fsm_wght_r_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1586]
+WARNING: [Synth 8-6014] Unused sequential element buffer_select_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1587]
+WARNING: [Synth 8-6014] Unused sequential element fifo_data_i_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1588]
+WARNING: [Synth 8-6014] Unused sequential element fifo_read_i_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1589]
+WARNING: [Synth 8-6014] Unused sequential element fifo_write_i_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1590]
+WARNING: [Synth 8-6014] Unused sequential element iact_ready_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1602]
+WARNING: [Synth 8-6014] Unused sequential element buffer_addr_upper_limit_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1603]
+WARNING: [Synth 8-6014] Unused sequential element limit_increase_reg_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1604]
+WARNING: [Synth 8-6014] Unused sequential element overhang_counter_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1605]
+WARNING: [Synth 8-6014] Unused sequential element overhang_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1606]
+WARNING: [Synth 8-6014] Unused sequential element overhang_delay_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1607]
+WARNING: [Synth 8-6014] Unused sequential element buffer_addr_lower_limit_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1608]
+WARNING: [Synth 8-6014] Unused sequential element iact_converter_buffer_addr_cycles_reg was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1615]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[31] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[30] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[29] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[28] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[27] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[26] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[25] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[24] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[23] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[22] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[21] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[20] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[19] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[18] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[17] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[16] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[15] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[14] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[13] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[12] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[11] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[10] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[9] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[8] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[7] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[6] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[5] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[4] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[3] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-6014] Unused sequential element pooling_regs_reg[2] was removed.  [C:/openeye_vivado/default_2026-11-18/rtl/OpenEye_FPGA.v:1627]
+WARNING: [Synth 8-7129] Port clk_i in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port rst_ni in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port data_write_enable_iact_i in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port data_write_enable_i in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_iact_addr_i[8] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_iact_addr_i[7] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_iact_addr_i[6] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_iact_addr_i[5] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_iact_addr_i[4] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_iact_addr_i[3] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_iact_addr_i[2] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_iact_addr_i[1] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_iact_addr_i[0] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[39] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[38] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[37] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[36] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[35] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[34] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[33] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[32] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[31] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[30] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[29] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[28] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[27] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[26] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[25] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[24] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[23] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[22] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[21] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[20] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[19] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[18] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[17] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[16] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[15] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[14] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[13] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[12] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[11] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[10] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[9] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[8] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[7] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[6] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[5] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[4] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[3] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[2] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[1] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port ext_mem_psum_addr_i[0] in module GLB_cluster is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_x_line_repetitions_i[3] in module data_pipeline_iact is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_x_line_repetitions_i[2] in module data_pipeline_iact is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_x_line_repetitions_i[1] in module data_pipeline_iact is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_x_line_repetitions_i[0] in module data_pipeline_iact is either unconnected or has no load
+WARNING: [Synth 8-7129] Port wm[0] in module RAM_SP_generic__parameterized6 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port wm[0] in module RAM_SP_generic__parameterized5 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port cenA in module RAM_DP_generic__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port wm[0] in module RAM_SP_generic__parameterized4 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port wm[0] in module RAM_SP_generic__parameterized3 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port data_stream_i[11] in module PE is either unconnected or has no load
+WARNING: [Synth 8-7129] Port data_stream_i[10] in module PE is either unconnected or has no load
+WARNING: [Synth 8-7129] Port data_stream_i[9] in module PE is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[7] in module PE is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[6] in module PE is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[5] in module PE is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[4] in module PE is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[3] in module PE is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[2] in module PE is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[1] in module PE is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[0] in module PE is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_enable_i in module PE is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_ready_i in module PE is either unconnected or has no load
+WARNING: [Synth 8-7129] Port gemm_mode_i in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port pe_router_psum_ready_i[3] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port pe_router_psum_ready_i[2] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port pe_router_psum_ready_i[1] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[23] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[22] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[21] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[20] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[19] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[18] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[17] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[16] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[15] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[14] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[13] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[12] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[11] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[10] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[9] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[8] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[7] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[6] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[5] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[4] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-7129] Port iact_pass_data_i[3] in module PE_cluster__parameterized0 is either unconnected or has no load
+WARNING: [Synth 8-6841] Block RAM (BUFFER[0].iact_buffer_SP/impl/gen_write_lane[1].mem_reg) originally specified as a Byte Wide Write Enable RAM cannot take advantage of ByteWide feature and is implemented with single write enable per RAM due to following reason.
+WARNING: [Synth 8-6841] Block RAM (BUFFER[0].iact_buffer_SP/impl/gen_write_lane[1].mem_reg) originally specified as a Byte Wide Write Enable RAM cannot take advantage of ByteWide feature and is implemented with single write enable per RAM due to following reason.
+WARNING: [Synth 8-6841] Block RAM (BUFFER[0].iact_buffer_SP/impl/gen_write_lane[1].mem_reg) originally specified as a Byte Wide Write Enable RAM cannot take advantage of ByteWide feature and is implemented with single write enable per RAM due to following reason.
+WARNING: [Synth 8-6841] Block RAM (BUFFER[0].iact_buffer_SP/impl/gen_write_lane[1].mem_reg) originally specified as a Byte Wide Write Enable RAM cannot take advantage of ByteWide feature and is implemented with single write enable per RAM due to following reason.
+WARNING: [Synth 8-6057] Memory: "impl/gen_write_lane[0].mem_reg" defined in module: "wght_buffer" implemented as Ultra-Ram has no pipeline registers. It is recommended to use pipeline registers to achieve high performance.
+WARNING: [Synth 8-6057] Memory: "BUFFER_A[3].iact_layer_buffer/impl/gen_write_lane[0].mem_reg" defined in module: "OpenEye_FPGA__GCB3" implemented as Ultra-Ram has no pipeline registers. It is recommended to use pipeline registers to achieve high performance.
+WARNING: [Synth 8-6057] Memory: "BUFFER_A[2].iact_layer_buffer/impl/gen_write_lane[0].mem_reg" defined in module: "OpenEye_FPGA__GCB3" implemented as Ultra-Ram has no pipeline registers. It is recommended to use pipeline registers to achieve high performance.
+WARNING: [Synth 8-6057] Memory: "BUFFER_A[1].iact_layer_buffer/impl/gen_write_lane[0].mem_reg" defined in module: "OpenEye_FPGA__GCB3" implemented as Ultra-Ram has no pipeline registers. It is recommended to use pipeline registers to achieve high performance.
+WARNING: [Synth 8-6057] Memory: "BUFFER_A[0].iact_layer_buffer/impl/gen_write_lane[0].mem_reg" defined in module: "OpenEye_FPGA__GCB3" implemented as Ultra-Ram has no pipeline registers. It is recommended to use pipeline registers to achieve high performance.
+WARNING: [Synth 8-6841] Block RAM (BUFFER[0].iact_buffer_SP/impl/gen_write_lane[1].mem_reg) originally specified as a Byte Wide Write Enable RAM cannot take advantage of ByteWide feature and is implemented with single write enable per RAM due to following reason.
+WARNING: [Synth 8-6841] Block RAM (BUFFER[0].iact_buffer_SP/impl/gen_write_lane[1].mem_reg) originally specified as a Byte Wide Write Enable RAM cannot take advantage of ByteWide feature and is implemented with single write enable per RAM due to following reason.
+WARNING: [Synth 8-6841] Block RAM (BUFFER[0].iact_buffer_SP/impl/gen_write_lane[1].mem_reg) originally specified as a Byte Wide Write Enable RAM cannot take advantage of ByteWide feature and is implemented with single write enable per RAM due to following reason.
+WARNING: [Synth 8-6841] Block RAM (BUFFER[0].iact_buffer_SP/impl/gen_write_lane[1].mem_reg) originally specified as a Byte Wide Write Enable RAM cannot take advantage of ByteWide feature and is implemented with single write enable per RAM due to following reason.
+WARNING: [Synth 8-6057] Memory: "impl/gen_write_lane[0].mem_reg" defined in module: "wght_buffer" implemented as Ultra-Ram has no pipeline registers. It is recommended to use pipeline registers to achieve high performance.
+WARNING: [Synth 8-6057] Memory: "BUFFER_A[3].iact_layer_buffer/impl/gen_write_lane[0].mem_reg" defined in module: "OpenEye_FPGA__GCB3" implemented as Ultra-Ram has no pipeline registers. It is recommended to use pipeline registers to achieve high performance.
+WARNING: [Synth 8-6057] Memory: "BUFFER_A[2].iact_layer_buffer/impl/gen_write_lane[0].mem_reg" defined in module: "OpenEye_FPGA__GCB3" implemented as Ultra-Ram has no pipeline registers. It is recommended to use pipeline registers to achieve high performance.
+WARNING: [Synth 8-6057] Memory: "BUFFER_A[1].iact_layer_buffer/impl/gen_write_lane[0].mem_reg" defined in module: "OpenEye_FPGA__GCB3" implemented as Ultra-Ram has no pipeline registers. It is recommended to use pipeline registers to achieve high performance.
+WARNING: [Synth 8-6057] Memory: "BUFFER_A[0].iact_layer_buffer/impl/gen_write_lane[0].mem_reg" defined in module: "OpenEye_FPGA__GCB3" implemented as Ultra-Ram has no pipeline registers. It is recommended to use pipeline registers to achieve high performance.
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk_i" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+WARNING: [DRC 23-814] Not all possible (connectivity based) DRCs may have been run because this design is seen as Out of Context.
+WARNING: [DRC 23-814] Not all possible (connectivity based) DRCs may have been run because this design is seen as Out of Context.
+WARNING: [DRC 23-814] Not all possible (connectivity based) DRCs may have been run because this design is seen as Out of Context.
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk_i" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew
+WARNING: [Route 35-197] Clock port "clk_i" does not have an associated HD.CLK_SRC. Without this constraint, timing analysis may not be accurate and upstream checks cannot be done to ensure correct clock placement.
+WARNING: [Route 35-198] Port "data_dma_i[0]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[0]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[6]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[6]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[30]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[30]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[27]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[27]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[31]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[31]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[26]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[26]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "rst_ni" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "rst_ni". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[28]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[28]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[4]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[4]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[46]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[46]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[7]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[7]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "ready_dma_i" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "ready_dma_i". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "enable_dma_i" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "enable_dma_i". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[2]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[2]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[1]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[1]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[3]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[3]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[43]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[43]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[42]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[42]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[40]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[40]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[33]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[33]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[49]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[49]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[62]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[62]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[58]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[58]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[51]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[51]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[47]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[47]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[24]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[24]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[56]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[56]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[63]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[63]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[55]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[55]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[50]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[50]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[48]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[48]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[41]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[41]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[59]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[59]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[54]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[54]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[35]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[35]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[57]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[57]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[52]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[52]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[60]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[60]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[61]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[61]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[53]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[53]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[32]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[32]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[45]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[45]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[44]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[44]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[10]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[10]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[17]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[17]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[20]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[20]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[16]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[16]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[15]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[15]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[13]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[13]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[12]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[12]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[39]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[39]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[38]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[38]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[37]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[37]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[36]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[36]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[18]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[18]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[14]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[14]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[29]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[29]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[11]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[11]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[19]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[19]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[9]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[9]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[8]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[8]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[34]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[34]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[23]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[23]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[21]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[21]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[22]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[22]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[5]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[5]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Route 35-198] Port "data_dma_i[25]" does not have an associated HD.PARTPIN_LOCS, which will prevent the partial routing of the signal "data_dma_i[25]". Without this partial route, timing analysis to/from this port will not be accurate, and no routing information for this port can be exported.
+WARNING: [Timing 38-242] The property HD.CLK_SRC of clock port "clk_i" is not set. In out-of-context mode, this prevents timing estimation for clock delay/skew

@@ -23,6 +23,7 @@ Typical Usage:
 """
 
 import math
+import os
 import numpy as np
 
 class DRAMContents(object):
@@ -302,6 +303,35 @@ class DRAMContents(object):
                 self.fmap[0][c] = np.random.randint(-16, 15)
                 if (self.fmap[0][c] == 0):
                     self.fmap[0][c] = int(np.random.choice([-1, 1]))
+
+        self.apply_iact_zero_fraction(layer_parameters)
+
+    def apply_iact_zero_fraction(self, layer_parameters):
+        """Test hook OPENEYE_IACT_ZERO_FRACTION=<f> (0 <= f <= 1): set round(f * N) of the N input activations of
+        layer 0 to zero, at positions drawn by a generator of their own (seed OPENEYE_SEED, default 0), so the weights,
+        biases and the other activations stay the same for every f and a larger f zeroes a superset of the positions
+        of a smaller one. For measuring sparse against dense hardware at a controlled zero share
+        (doc/experiments/2026-11-18_layer_mode_study.md). Unset: nothing changes (random activations have no zeros)."""
+        value = os.environ.get("OPENEYE_IACT_ZERO_FRACTION")
+        if not value:
+            return
+        fraction = float(value)
+        fmap = np.array(self.fmap[0], dtype=object)
+        shape = fmap.shape
+        flat = fmap.reshape(-1)
+        count = int(round(fraction * flat.size))
+        rng = np.random.RandomState(int(os.environ.get("OPENEYE_SEED", "0") or 0) + 4049)
+        for index in rng.permutation(flat.size)[:count]:
+            flat[index] = 0
+        zeroed = flat.reshape(shape)
+        if len(shape) == 1:
+            for c in range(shape[0]):
+                self.fmap[0][c] = int(zeroed[c])
+        else:
+            for c in range(shape[0]):
+                for x in range(shape[1]):
+                    for y in range(shape[2]):
+                        self.fmap[0][c][x][y] = int(zeroed[c][x][y])
 
     @staticmethod
     def dense_input_order(layer_parameters, l, layer):
