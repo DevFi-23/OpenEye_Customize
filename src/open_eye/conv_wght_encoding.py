@@ -76,3 +76,29 @@ def encode_columns(columns, parallel_macs, block_words, spad_words):
     spad.extend([list(e) for e in FILLER] for _ in range(block_words - len(spad)))
     spad.extend([[0, 0], [0, 0]] for _ in range(spad_words - len(spad)))
     return spad
+
+
+def encode_dense(columns, parallel_macs, block_words, spad_words):
+    """Dense layout for the sparse PE (per-layer weight format P1, README_FI section 2, step 2): every weight is an
+    entry (w, 0), zero weights included, each column padded to a word boundary with (0, 0); the rest of the block is
+    FILLER as in encode_columns. This is what a raw 8-bit weight stream expanded to 12-bit fields with overhead 0 gives
+    (no zero skipping: the PE multiplies zero weights too). Two zero weights in one word make an all-zero word, which
+    data_pipeline_wght drops unless raw_mode_i is set (count_zero_words)."""
+    if parallel_macs != 2:
+        raise ValueError("data_pipeline_wght decodes two entries per word")
+    spad = []
+    for column in columns:
+        entries = [[value, 0] for value in column]
+        if len(entries) % 2:
+            entries.append([0, 0])      # padding slot
+        spad.extend([entries[i], entries[i + 1]] for i in range(0, len(entries), 2))
+    if len(spad) > block_words:
+        raise ValueError("dense columns need %d words, the PE block has %d" % (len(spad), block_words))
+    spad.extend([list(e) for e in FILLER] for _ in range(block_words - len(spad)))
+    spad.extend([[0, 0], [0, 0]] for _ in range(spad_words - len(spad)))
+    return spad
+
+
+def count_zero_words(spad, block_words):
+    """All-zero words in the first block_words words of an SPad list (data_pipeline_wght skips them without raw mode)."""
+    return sum(1 for word in spad[:block_words] if all(value == 0 and overhead == 0 for value, overhead in word))

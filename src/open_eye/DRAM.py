@@ -305,6 +305,7 @@ class DRAMContents(object):
                     self.fmap[0][c] = int(np.random.choice([-1, 1]))
 
         self.apply_iact_zero_fraction(layer_parameters)
+        self.apply_wght_zero_fraction(layer_parameters)
 
     def apply_iact_zero_fraction(self, layer_parameters):
         """Test hook OPENEYE_IACT_ZERO_FRACTION=<f> (0 <= f <= 1): set round(f * N) of the N input activations of
@@ -332,6 +333,42 @@ class DRAMContents(object):
                 for x in range(shape[1]):
                     for y in range(shape[2]):
                         self.fmap[0][c][x][y] = int(zeroed[c][x][y])
+
+    def apply_wght_zero_fraction(self, layer_parameters):
+        """Test hook OPENEYE_WGHT_ZERO_FRACTION=<f> (0 <= f <= 1): in every Conv2D layer exactly round(f * N) of the
+        N weights are zero, at positions drawn by a generator of their own (seed OPENEYE_SEED, default 0, + 7919 +
+        layer); a weight outside that set that is zero becomes +-1, so the share is exact and the other weights stay
+        the same for every f (a larger f zeroes a superset of the positions of a smaller one). With
+        OPENEYE_WGHT_ZERO_PARITY=1 the zeros are drawn only where c + f + y + x is even (at most half of the weights):
+        two filters next to each other are then never both zero, so the dense weight layout of a sparse PE
+        (OPENEYE_WGHT_LAYOUT=dense) has no all-zero word when the words pair neighbouring filters. For measuring
+        the compute cost of zero weights (step 2 of README_FI section 2). Unset: nothing changes."""
+        value = os.environ.get("OPENEYE_WGHT_ZERO_FRACTION")
+        if not value:
+            return
+        fraction = float(value)
+        parity = os.environ.get("OPENEYE_WGHT_ZERO_PARITY") == "1"
+        seed = int(os.environ.get("OPENEYE_SEED", "0") or 0)
+        for l, params in enumerate(layer_parameters):
+            name = str(params.layer_name)
+            if "Conv" not in name or "Depthwise" in name or "Dw" in name:
+                continue
+            w = self.weights[l]                 # [c][f][y][x]
+            positions = [(c, f, y, x) for c in range(len(w)) for f in range(len(w[c]))
+                         for y in range(len(w[c][f])) for x in range(len(w[c][f][y]))]
+            rng = np.random.RandomState(seed + 7919 + l)
+            order = [positions[i] for i in rng.permutation(len(positions))]
+            count = int(round(fraction * len(positions)))
+            candidates = [p for p in order if sum(p) % 2 == 0] if parity else order
+            if count > len(candidates):
+                raise ValueError("OPENEYE_WGHT_ZERO_FRACTION=%s: layer %d has only %d candidate positions"
+                                 % (value, l, len(candidates)))
+            chosen = set(candidates[:count])
+            for (c, f, y, x) in order:
+                if (c, f, y, x) in chosen:
+                    w[c][f][y][x] = 0
+                elif w[c][f][y][x] == 0:
+                    w[c][f][y][x] = int(rng.choice([-1, 1]))
 
     @staticmethod
     def dense_input_order(layer_parameters, l, layer):

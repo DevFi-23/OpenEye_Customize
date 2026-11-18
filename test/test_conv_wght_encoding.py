@@ -88,6 +88,64 @@ def test_old_encoding_fails_in_the_rtl_model():
     assert decode(columns, 12)[1] == columns
 
 
+def nonzero(rng):
+    return rng.choice([v for v in range(-127, 128) if v])
+
+
+# Dense layout for the sparse PE (step 2 of the per-layer weight format P1, README_FI section 2): every weight an
+# entry with overhead 0, zero weights included
+@pytest.mark.parametrize("filters", [2, 3, 4, 5, 8, 16])
+@pytest.mark.parametrize("zeros", [0.0, 0.05, 0.3, 0.6, 1.0])
+@pytest.mark.parametrize("extra", [EXTRA_WORD, 0])
+def test_dense_layout_reads_back_in_raw_mode(filters, zeros, extra):
+    rng = random.Random(filters * 1000 + int(zeros * 100))
+    for _ in range(20):
+        columns = [[0 if rng.random() < zeros else nonzero(rng) for _ in range(filters)] for _ in range(6)]
+        block = 6 * math.ceil(filters / 2)
+        spad = cwe.encode_dense(columns, 2, block, block + 4)
+        assert [e for word in spad[:block] for e in word if e[1]] == []            # overhead 0 everywhere
+        addr, data, data_words = wpm.load(pack(spad, block), filters, extra_word=extra, raw_mode=True)
+        got, pointers = wpm.read_columns(addr, data, len(columns), filters)
+        assert got == columns
+        assert data_words >= pointers[len(columns) - 1]
+        assert pointers[:len(columns)] == [(k + 1) * math.ceil(filters / 2) for k in range(len(columns))]
+
+
+def test_dense_layout_without_raw_mode():
+    """Outside raw mode an all-zero word (two zero weights) is dropped and the layer reads wrong weights; without
+    such a word the dense layout reads back as it is."""
+    with_pair = [[1, 2, 0, 0, 5, 6, 7, 8], [1, 2, 3, 4, 5, 6, 7, 8]]
+    without = [[1, 0, 3, 0, 5, 0, 7, 0], [0, 2, 0, 4, 0, 6, 0, 8]]
+    for columns, ok in ((with_pair, False), (without, True)):
+        spad = cwe.encode_dense(columns, 2, 8, 10)
+        assert (cwe.count_zero_words(spad, 8) == 0) == ok
+        addr, data, _ = wpm.load(pack(spad, 8), 8, extra_word=EXTRA_WORD)
+        got, _ = wpm.read_columns(addr, data, 2, 8)
+        assert (got == columns) == ok
+        addr, data, _ = wpm.load(pack(spad, 8), 8, extra_word=EXTRA_WORD, raw_mode=True)
+        assert wpm.read_columns(addr, data, 2, 8)[0] == columns
+
+
+@pytest.mark.parametrize("zeros", [0.05, 0.3, 0.9])
+def test_zero_compressed_layout_is_the_same_in_raw_mode(zeros):
+    """Raw mode changes only what happens to all-zero words, and encode_columns makes none in the block."""
+    rng = random.Random(int(zeros * 100))
+    for extra in (EXTRA_WORD, 0):
+        columns = [[0 if rng.random() < zeros else nonzero(rng) for _ in range(16)] for _ in range(6)]
+        spad = cwe.encode_columns(columns, 2, 48, 52)
+        read = []
+        for raw in (False, True):
+            addr, data, data_words = wpm.load(pack(spad, 48), 16, extra_word=extra, raw_mode=raw)
+            got, pointers = wpm.read_columns(addr, data, 6, 16)
+            read.append((got, pointers[:6]))                # pointers beyond the used columns may differ
+        assert read[0] == read[1] and read[0][0] == columns
+
+
+def test_dense_layout_block_too_short():
+    with pytest.raises(ValueError):
+        cwe.encode_dense([[1, 2, 3]] * 4, 2, 7, 8)                    # 8 words needed (padding slot per column)
+
+
 tf = pytest.importorskip("tensorflow")
 from open_eye import layer_parameters as lp  # noqa: E402
 from open_eye import open_eye_parameters as oep  # noqa: E402
@@ -169,3 +227,51 @@ def test_dense_hardware_gets_the_plain_layout(width, channels, filters, monkeypa
                     want = [[e[0] & 0xFF for e in word] for word in dense[:block]]
                     assert got == want
     assert channels == 1 or zero_words > 0          # channel 0 is all zero: its words are sent, not skipped
+
+
+@pytest.mark.parametrize("width,channels,filters", [(20, 2, 8), (8, 8, 16), (8, 4, 32)])
+@pytest.mark.parametrize("zeros", [0.0, 0.3, "channel 1"])
+def test_mapper_dense_layout_in_raw_mode(width, channels, filters, zeros, monkeypatch):
+    """OPENEYE_WGHT_LAYOUT=dense (step 2 of P1): the same blocks as the zero-compressed layout when no weight is zero,
+    otherwise every weight in its slot; through the RTL model in raw mode the PE gets the layer's weights. Without
+    OPENEYE_FORCE_RAW_WGHT a block with an all-zero word is refused."""
+    params, L = mapper_layer(width, channels, filters, monkeypatch)
+    rng = random.Random(4)
+    w = [[[[0 if (zeros == "channel 1" and c == 1) or (zeros != "channel 1" and rng.random() < zeros)
+            else nonzero(rng) for x in range(3)] for y in range(3)]
+          for f in range(filters)] for c in range(channels)]
+    block = math.ceil(L.used_wght_per_PE / params.PARALLEL_MACS)
+    column_length = math.ceil(L.used_wght_per_PE / L.used_iact_per_PE)
+    filters_w = (L.used_psum_per_PE & 0x3F) or 16
+    zero_words = 0
+    for rep in range(L.needed_wght_transmissions):
+        mapper = wsm.ConvWghtStreamMapper(params, L, rep, w, 0)
+        for cx in range(params.Clusters_X):
+            for cy in range(params.Clusters_Y):
+                for router in range(params.Wght_Routers):
+                    if L.computing_mx[cx][cy][router][0] != 1:
+                        continue
+                    monkeypatch.delenv("OPENEYE_WGHT_LAYOUT", raising=False)
+                    compressed = mapper.write_wght_data_storage(cx, cy, router)
+                    dense = mapper.write_dense_wght_data_storage(cx, cy, router)
+                    wpc = math.ceil(column_length / 2)
+                    want = [[e[0] for word in dense[k * wpc:(k + 1) * wpc] for e in word][:column_length]
+                            for k in range(L.used_iact_per_PE)]
+                    monkeypatch.setenv("OPENEYE_WGHT_LAYOUT", "dense")
+                    monkeypatch.setenv("OPENEYE_FORCE_RAW_WGHT", "1")
+                    spad = mapper.write_wght_data_storage(cx, cy, router)
+                    if zeros == 0.0:
+                        assert spad == compressed
+                    words = mapper.create_pe_data_wght_stream(spad)
+                    assert len(words) == block
+                    zero_words += words.count(0)
+                    addr, data, data_words = wpm.load(words, filters_w, extra_word=EXTRA_WORD, raw_mode=True)
+                    got, pointers = wpm.read_columns(addr, data, L.used_iact_per_PE, column_length)
+                    assert got == want
+                    assert data_words >= pointers[L.used_iact_per_PE - 1]
+                    monkeypatch.delenv("OPENEYE_FORCE_RAW_WGHT")
+                    if words.count(0):
+                        with pytest.raises(ValueError):
+                            mapper.write_wght_data_storage(cx, cy, router)
+    monkeypatch.delenv("OPENEYE_WGHT_LAYOUT", raising=False)
+    assert (zero_words > 0) == (zeros != 0.0)

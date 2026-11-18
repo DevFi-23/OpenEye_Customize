@@ -1040,6 +1040,30 @@ def profile_set_layer_input(index, values):
                                            "negatives": sum(v < 0 for v in flat)}
 
 
+def profile_set_layer_weights(weights, layout=None):
+    """Weight count and zero weights of every layer with weights (the DRAM contents the mapper sends), and the conv
+    weight layout of the run ("csc" zero-compressed, today's sparse default; "dense" from OPENEYE_WGHT_LAYOUT; "plain"
+    on dense hardware), into the
+    layers' descriptions in profile.json. Zero weights are what the zero-compressed layout skips in compute."""
+    if layout is None:
+        layout = "plain" if os.environ.get("SPARSITY_EN") == "0" else (os.environ.get("OPENEYE_WGHT_LAYOUT") or "csc")
+    for index, w in enumerate(weights):
+        if index >= len(_PROFILE_LAYER_INFO):
+            return
+        flat = []
+
+        def walk(v):
+            if isinstance(v, (list, tuple)):
+                for item in v:
+                    walk(item)
+            else:
+                flat.append(int(v))
+        walk(_plain(w))
+        if len(flat) > 1:
+            _PROFILE_LAYER_INFO[index]["weights"] = {"values": len(flat), "zeros": sum(v == 0 for v in flat),
+                                                     "layout": layout}
+
+
 async def profile_dma_phases(ptp, dut, oep, path="profile.json"):
     """Cycle and DMA-beat profile of the FPGA top level (opt-in: OPENEYE_PROFILE=1).
 

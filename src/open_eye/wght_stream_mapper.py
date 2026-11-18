@@ -44,6 +44,7 @@ Typical Usage:
 
 import numpy as np
 import math
+import os
 import logging
 import open_eye.generic_test_utils as gtu
 import open_eye.stream_dicts as strdic
@@ -634,7 +635,21 @@ class ConvWghtStreamMapper(WghtStreamMapper):
         words_per_column = math.ceil(column_length / macs)      # every column starts at a word boundary
         columns = [[entry[0] for word in dense[k * words_per_column:(k + 1) * words_per_column] for entry in word]
                    [:column_length] for k in range(layer_params.used_iact_per_PE)]
-        return cwe.encode_columns(columns, macs, math.ceil(layer_params.used_wght_per_PE / macs), len(dense))
+        block_words = math.ceil(layer_params.used_wght_per_PE / macs)
+        layout = os.environ.get("OPENEYE_WGHT_LAYOUT", "")
+        if layout in ("dense", "dense_nocheck"):
+            # Experiment hook (step 2 of the per-layer weight format P1, README_FI section 2): every weight an entry with
+            # overhead 0, zero weights included, as a raw 8-bit stream expanded in GET_WGHT would give. Today's RTL keeps
+            # an all-zero word (two zero weights) only in raw mode (raw_wght_i = FC | GEMM); the testbench can force it
+            # (OPENEYE_FORCE_RAW_WGHT=1). "dense_nocheck" sends such words anyway (the negative control).
+            spad = cwe.encode_dense(columns, macs, block_words, len(dense))
+            zero_words = cwe.count_zero_words(spad, block_words)
+            if zero_words and layout == "dense" and os.environ.get("OPENEYE_FORCE_RAW_WGHT") != "1":
+                raise ValueError("OPENEYE_WGHT_LAYOUT=dense: PE block (%d, %d, %d) has %d all-zero word(s), which "
+                                 "data_pipeline_wght drops outside raw mode; set OPENEYE_FORCE_RAW_WGHT=1"
+                                 % (cl_x, cl_y, router, zero_words))
+            return spad
+        return cwe.encode_columns(columns, macs, block_words, len(dense))
 
     def write_dense_wght_data_storage(self, cl_x, cl_y, router):
         """Populate Conv2D weight data SPAD from DRAM for a specific PE, every weight in its slot (zeros included).

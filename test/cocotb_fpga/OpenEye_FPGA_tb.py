@@ -262,6 +262,14 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
         cocotb.start_soon(rtl_test_utils.trace_dma_input(ptp, dut))
     if os.environ.get("OPENEYE_PROFILE") and only_files == 0:
         cocotb.start_soon(rtl_test_utils.profile_dma_phases(ptp, dut, openeye_parameter))
+    if os.environ.get("OPENEYE_FORCE_RAW_WGHT") == "1" and only_files == 0:
+        # Experiment hook (step 2 of the per-layer weight format P1, README_FI section 2), simulation only, no RTL
+        # change: hold the raw_wght_i input of OpenEye_Parallel (today FC | GEMM) at 1 for every layer, so
+        # data_pipeline_wght keeps all-zero weight words, as P1 would set it for a layer sent in the dense layout
+        # (OPENEYE_WGHT_LAYOUT=dense). The input only reaches data_pipeline_wght.raw_mode_i.
+        from cocotb.handle import Force
+        dut.OpenEye_Parallel.raw_wght_i.value = Force(1)
+        logger.info("OPENEYE_FORCE_RAW_WGHT: OpenEye_Parallel.raw_wght_i forced to 1")
     if os.environ.get("OPENEYE_PROBE_FSM"):
         cocotb.start_soon(rtl_test_utils.probe_fsm_states(ptp, dut, oep=openeye_parameter))
         cocotb.start_soon(rtl_test_utils.monitor_iact_handoff(ptp, dut))
@@ -492,6 +500,7 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
     channel_pad.fill_padding_channels(model, dram)
     if os.environ.get("OPENEYE_PROFILE"):
         rtl_test_utils.profile_set_layer_input(0, dram.fmap[0])
+        rtl_test_utils.profile_set_layer_weights(dram.weights)
     # OPENEYE_KEEP_GOING: a failed iact buffer check between chained layers is
     # logged and the model runs on, so the profiler times every layer (the
     # later layers then compute on wrong inputs); the test still fails at the end.

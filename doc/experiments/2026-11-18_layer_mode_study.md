@@ -146,6 +146,13 @@ Ranges are over all 36 runs (`networks.md`, last table: MNIST in 4 activations, 
 2. **No extra cycles in `GET_WGHT`.** The row is written when the third DMA word instead of the fifth arrives. The estimate assumes the 8 → 12 bit expansion fits in that cycle, as in `p1_wght_row.v`.
 3. **All-zero weight words.** Outside raw mode, `data_pipeline_wght.v` takes an all-zero word as "no data" (#47). P1 must therefore send `raw_wght_i` for such layers, and the sparse PE must accept a dense layout with zero pairs. This is the purpose of step 2 (a Python experiment on today's RTL).
 
+**Step 2 measured limits 1 and 3** (`doc/experiments/2026-11-18_wght_layout_step2.md`):
+- **Limit 3:** the sparse PE computes the dense layout bit-exactly once `raw_wght_i` is set. It was forced in simulation, with no PE change. Without raw mode, an all-zero word hangs the layer.
+- **Limit 1:** the proportional bound is far too pessimistic:
+  - 0–26 cycles for a whole trained MNIST network, and at most 0.2 % on the Table 2 network;
+  - in single layers, ≤ 0.5 % compute at 5 % zero weights and ≤ 22.5 % at 50 %.
+- The measured P1 equals the estimate of section 4 within 0.2 points.
+
 ### 7. Verdict
 
 - **Step 1 gate** ("stop if choosing right per layer gains < about 3 % on the target networks"):

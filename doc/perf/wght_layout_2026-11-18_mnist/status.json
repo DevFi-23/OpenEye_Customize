@@ -1,0 +1,6 @@
+{
+ "relu": "PASS",
+ "leaky_relu": "PASS",
+ "hardswish": "PASS",
+ "silu": "PASS"
+}

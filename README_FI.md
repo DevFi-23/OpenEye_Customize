@@ -321,8 +321,8 @@ Kết luận của các phân tích trên: khác biệt chính giữa hai chế 
 |---|---|---|---|
 | 0 | Kiểm chứng trạng thái đã commit (`ae5665f`: #49, bias mặc định) và lập mốc mới: unit test, hồi quy 225, 12 ca mốc, Bảng 3 (sparse, dense, ReLU), MNIST 4 hàm × 2 chế độ, Vivado | Chạy, không sửa | **Xong 2026-11-18**: mọi thứ PASS (bảng kết quả bên dưới); mốc mới `baseline_2026-11-18`, `paper_table3_2026-11-18` (+ `_dense`, `_relu_sparse`), `activation_2026-11-18`, Vivado `2026-11-18_route4ns_default_zu7ev` |
 | 1 | (a) Bảng "chọn tốt nhất theo layer" cho MNIST và Bảng 2 trên mốc mới; (b) móc testbench đặt tỉ lệ số 0 của activation; (c) quét 0–90 % số 0 × vài dạng layer × CR / X × hai chế độ, chu kỳ từng pha → đường ngưỡng; (d) mô hình chi phí Python kiểm trên các profile | Python | **Dừng nếu** chọn đúng theo layer lợi < khoảng 3 % trên các mạng mục tiêu. **Xong 2026-11-18**: P2 (FSM theo layer) chỉ 0–1,7 %, sau P1 ≤ 0,4 % → **dừng P2**; P1 −2,8 đến −13,5 % (cận xấu −1,9 đến −10,1 %) → **đi tiếp bước 2** |
-| 2 | Thí nghiệm Python: FSM sparse với weight Conv layout dense (overhead 0) trên phần cứng hiện tại, khớp từng bit (dữ liệu không có cặp weight 0); **đo thêm** `compute` tăng bao nhiêu khi weight 0 cũng được nhân (giới hạn 1 của bước 1) | Python | Sai thì P1 phải sửa PE: đánh giá lại |
-| 3 | P1: regmap bit `wght_raw`; `OpenEye_FPGA.v` `GET_WGHT` gom 3 word thay vì 5 và giãn 8 → 12 bit; `raw_wght_i` = FC \| GEMM \| `wght_raw`; Python chọn theo layer (trần khi phần `load_wght` tiết kiệm > `compute` × tỉ lệ weight 0, theo bước 1; số filter lẻ mỗi PE → CSC), layout dense đóng gói 8 bit; test `test_wght_raw.py` | Sửa RTL + Python (cần đồng ý) | Đo thật, Vivado |
+| 2 | Thí nghiệm Python: FSM sparse với weight Conv layout dense (overhead 0) trên phần cứng hiện tại, khớp từng bit (dữ liệu không có cặp weight 0); **đo thêm** `compute` tăng bao nhiêu khi weight 0 cũng được nhân (giới hạn 1 của bước 1) | Python | Sai thì P1 phải sửa PE: đánh giá lại. **Xong 2026-11-18**: khớp từng bit (kể cả cặp weight 0, khi `raw_wght_i` được ép lên 1 trong mô phỏng), PE không cần sửa; weight 0 tốn 0–26 chu kỳ mỗi mạng MNIST, ≤ 0,2 % mạng Bảng 2 → P1 đo được = ước lượng bước 1 → **đi tiếp bước 3** (cần bạn đồng ý) |
+| 3 | P1: regmap bit `wght_raw`; `OpenEye_FPGA.v` `GET_WGHT` gom 3 word thay vì 5 và giãn 8 → 12 bit; `raw_wght_i` = FC \| GEMM \| `wght_raw`; PE và `data_pipeline_wght.v` không đổi (bước 2); Python chọn theo layer (trần mặc định; CSC khi `compute` thêm dự đoán > phần `load_wght` tiết kiệm: weight đã prune, layer đầu ở cấu hình nhỏ, ngưỡng đo ở bước 2; số filter lẻ mỗi PE → CSC), layout dense đóng gói 8 bit; test `test_wght_raw.py` | Sửa RTL + Python (cần đồng ý) | Đo thật, Vivado |
 | 4 | P2 (tuỳ chọn): FSM theo layer (`doc/experiments/2026-11-17_per_layer_mode.md`); hoặc rẻ hơn: giảm chi phí FSM sparse trên input không có số 0 | Sửa RTL | Chỉ khi bước 1 tìm ra layer lớn đáng làm |
 | 5 | Toolchain: `onnx2model` đo số 0 trên ảnh hiệu chỉnh, mô hình chi phí chọn chế độ, profiler ghi chế độ mỗi layer | Python | |
 
@@ -379,9 +379,62 @@ MNIST 4 hàm × 2 chế độ 8/8; kiểm tra output Conv trước pooling 129 l
   mạng Bảng 2 (weight ngẫu nhiên 1–5 % số 0) ở 5 %: −1,9 đến −10,1 % thay vì −3,3 đến −11,7 %. Quy tắc theo layer (trần chỉ khi `load_wght` tiết kiệm >
   `compute` × tỉ lệ weight 0) xử lý việc này, bước 2 đo con số thật. (2) Giả định 0 chu kỳ thêm ở `GET_WGHT` (hàng được ghi khi tới word thứ 3 thay vì
   thứ 5). (3) Word weight toàn 0: ngoài raw mode `data_pipeline_wght.v` coi là "không có dữ liệu" (#47), nên P1 phải bật `raw_wght_i` và PE sparse phải
-  nhận layout dense có cặp 0: việc của bước 2.
+  nhận layout dense có cặp 0: việc của bước 2. **Bước 2 đã đo (1) và (3)** (bên dưới): cận trên (1) quá bi quan, (3) đúng là cần `raw_wght_i`.
 - **Kết luận:** dừng P2; **P1 đáng làm** (bước 2: thí nghiệm Python trên RTL hiện tại, không sửa RTL; bước 3 sửa RTL cần bạn đồng ý). Nếu LUT là giới hạn
   thì bản dense HW là bản dựng đúng: −27 % LUT, và với datapath này không chậm hơn sparse trừ mạng ReLU ở CR nhỏ.
+
+#### Kết quả bước 2 (2026-11-18, `doc/experiments/2026-11-18_wght_layout_step2.md`)
+
+Không sửa RTL. Thêm các móc Python, tất cả tắt khi không đặt biến (bảng biến môi trường của testbench):
+`OPENEYE_WGHT_LAYOUT=dense` (mapper gửi weight Conv theo layout dense: mọi weight một ô `(w, 0)`, kể cả weight 0; `conv_wght_encoding.encode_dense`),
+`OPENEYE_FORCE_RAW_WGHT=1` (testbench ép `OpenEye_Parallel.raw_wght_i` = 1 bằng cocotb `Force`, chỉ trong mô phỏng Icarus, như P1 sẽ đặt cho layer
+gửi trần), `OPENEYE_WGHT_ZERO_FRACTION` / `OPENEYE_WGHT_ZERO_PARITY` (tỉ lệ weight 0 chính xác của mọi layer Conv), profiler ghi `info.weights` (số weight,
+số weight 0, layout). Mô hình chu kỳ `wght_pipeline_model.load` có thêm `raw_mode`; `test_conv_wght_encoding.py` +74 test (116). Chạy liền bằng
+`doc/experiments/2026-11-18_wght_layout_step2/step2.sh` (khoảng 3 giờ): 140 ca một layer (3 dạng Conv của mạng Bảng 2 × CR 1 X 2 / CR 2 X 4 / CR 8 X 4 ×
+input 0 / 50 % số 0 × weight 0 / 5 / 25 / 50 % số 0 × CSC / layout dense, + 5 ca đối chứng), mạng Bảng 2 không hàm kích hoạt và có ReLU (16 cấu hình mỗi
+loại), MNIST đã huấn luyện 4 hàm, tất cả ở layout dense với raw được ép. Kết quả trong `2026-11-18_wght_layout_step2/` (`single.md`, `networks.md`,
+`zero_weight_cost.png`); profile `doc/perf/wght_layout_2026-11-18`, `paper_table3_2026-11-18_wlayout`, `paper_table3_2026-11-18_relu_wlayout`,
+`wght_layout_2026-11-18_mnist`.
+
+- **Khớp từng bit:** PE sparse tính đúng layout dense ở 63/63 ca một layer, 32/32 mạng Bảng 2, 4/4 MNIST (weight 0 từ 0,3 đến 50 %, có cặp weight 0
+  trong một word), khi `raw_wght_i` = 1. Đối chứng: ép raw với CSC hôm nay giống hệt từng chu kỳ (CSC không có word toàn 0); layout dense không có word
+  toàn 0 chạy đúng cả khi không ép (RTL hôm nay nguyên trạng); layout dense có word toàn 0 mà không ép thì **treo** (FSM đứng 400.000 chu kỳ, #47).
+  → P1 chỉ cần bật `raw_wght_i` theo layer; **PE và `data_pipeline_wght.v` không cần sửa**. `load_wght` bằng nhau ở hai layout trong mọi lần chạy
+  (kích thước truyền cố định), nên bước 2 đo riêng phần `compute`.
+- **Chi phí nhân weight 0** (`compute` layout dense so với CSC, cùng dữ liệu, input không có số 0; trong ngoặc: phần trăm của cận tỉ lệ thuận bước 1):
+
+  | Layer | Cấu hình (filter mỗi cột) | 5 % weight 0 | 25 % | 50 % |
+  |---|---|---:|---:|---:|
+  | Conv 28×28×1 → 16 | CR 1 X 2, CR 2 X 4 (16) | +0,0 % | +4,2 / +4,7 % (17–19 %) | +11,2 / +12,6 % |
+  | | CR 8 X 4 (8) | +0,0 % | +1,4 % | +4,4 % |
+  | Conv 14×14×16 → 32 | CR 1 X 2, CR 2 X 4 (16) | +0,4 % (8 %) | +8,4 % (34 %) | +22,2 % (44 %) |
+  | | CR 8 X 4 (8) | −0,0 % | +2,7 % | +9,5 % |
+  | Conv 7×7×32 → 32 | CR 1 X 2, CR 2 X 4 (16) | +0,3 / +0,5 % | +7,0 / +8,3 % | +20,2 / +22,5 % |
+  | | CR 8 X 4 (4) | −0,5 % | −0,8 % | −0,8 % |
+
+  Thấp hơn nhiều so với cận tỉ lệ thuận (0–10 % của cận ở 5 % weight 0, 6–34 % ở 25 %): PE đọc 2 ô mỗi word, CSC chỉ đỡ tốn khi số 0 bớt được cả word, còn
+  với ít số 0 các quy tắc CSC thêm ô (ô đệm khi số ô lẻ, ô 0 tường minh cuối cột / tách khoảng); cột ngắn (4 filter) thì layout dense còn nhanh hơn.
+  Ở layout dense, `compute` không phụ thuộc số weight 0 hay vị trí của chúng (ca đối chứng đặt 0 khác vị trí cho đúng cùng số chu kỳ).
+- **Cả mạng, P1 đo được** (lần chạy layout dense trừ phần chênh `load_wght` sparse − dense HW):
+
+  | Mạng | sparse hôm nay | dense HW | P1 ước lượng bước 1 | **P1 đo được** | so với sparse | so với dense HW |
+  |---|---:|---:|---:|---:|---:|---:|
+  | MNIST ReLU | 196.238 | 202.895 | 180.686 | **180.686** | −7,9 % | −10,9 % |
+  | MNIST Leaky ReLU / SiLU / hard-swish | 215.363 / 217.512 / 217.569 | 202.895 / 202.959 / 202.959 | 199.811 / 201.960 / 202.017 | **199.837 / 201.973 / 202.017** | −7,1 đến −7,2 % | −0,5 đến −1,5 % |
+  | Bảng 2 ReLU, 16 cấu hình | | | | | **−2,8 đến −13,5 %** | −0,7 đến −6,6 % |
+  | Bảng 2 không hàm kích hoạt, 16 cấu hình | | | | | **−2,6 đến −13,3 %** | −0,3 đến +0,6 % |
+
+  P1 đo được lệch ước lượng bước 1 tối đa 376 chu kỳ (0,2 điểm; nhanh hơn ở 8/36 lần, bằng ở 2). MNIST đã huấn luyện: weight 0 ở Conv 0,3–2,0 %, chi
+  phí 0–26 chu kỳ cả mạng → cận xấu −6,9 % của bước 1 không xảy ra. Layer Dense hôm nay đã dùng layout dense (raw mode), P1 chỉ đổi phần truyền của nó.
+  Ở mọi layer Conv / Dense của 36 lần chạy, phần `load_wght` tiết kiệm > `compute` thêm: quy tắc theo layer không đổi gì trên các mạng này.
+- **Ngưỡng weight 0 mà trên đó CSC tốt hơn** (một layer, nội suy giữa các điểm đo, input 0 / 50 % số 0): Conv 28×28×1 → 16: 5–6 % (CR 1 X 2), 9 %
+  (CR 2 X 4), 46 % (CR 8 X 4); Conv 14×14×16 → 32: 6–7 %, 22–30 %, trên 50 %; Conv 7×7×32 → 32: 13–18 %, 43 % đến trên 50 %, trên 50 %. Mạng thật
+  (0,3–5 % weight 0) nằm dưới mọi ngưỡng; mạng đã prune (≥ 25 %) cần quy tắc theo layer. Mapper biết cả hai layout của từng khối PE (số word mỗi cột),
+  nên Python tính được quy tắc lúc map (bước 3 / 5).
+- **Kiểm tra không đổi khi tắt móc:** unit test 578 PASS (504 + 74) + 11 lỗi cũ; 12 ca mốc so với `baseline_2026-11-18`: 12/12 PASS, giống hệt từng chu kỳ và từng word DMA.
+- **Kết luận:** bước 2 đạt. **Bước 3 (sửa RTL, cần bạn đồng ý):** bit `wght_raw` trong regmap, `raw_wght_i = FC | GEMM | wght_raw`, `GET_WGHT` gom 3
+  word DMA mỗi hàng thay vì 5 và giãn 8 → 12 bit (ước lượng +281 LUT), Python chọn layout theo layer và đóng gói 8 bit. Giới hạn (2) của bước 1
+  (`GET_WGHT` ghi hàng ở word thứ 3) chỉ đo được ở bước 3.
 
 ### `551cf85` so với `dev`: hướng nào tốt hơn (phân tích 2026-10-31, `doc/experiments/2026-10-31_upstream_551cf85_iact.md`)
 
@@ -481,7 +534,7 @@ Một test cocotb là một tiến trình; máy 12 nhân / 7 GB RAM chạy song 
 venv/bin/python -m pytest -q test/test_*.py
 ```
 
-Hiện tại (2026-11-17): **504 pass, 11 fail** (2026-11-17: 19 test bias theo filter, `test_bias_per_filter.py`; 2026-11-09: thêm 3 test luồng weight dense, `test_conv_wght_encoding.py`; 2026-11-10: 8 test phép kiểm tra #48, `test_model_guards.py`) (15 test tham số stride trong `test_stride_params.py` + 56 test phép kiểm tra nhóm A của mục 8e trong `test_model_guards.py` + 5 test bộ đệm weight / iact của #29 / #37, `test_wght_buffer.py` + 8 test số bộ weight và 32 test phép kiểm tra `check_wght_sets` của #39, 34 test phép kiểm tra `check_full_passes` của #40, `test_channel_pad.py` + 129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8 + 6 test đường model thật so với ONNX Runtime + 22 test thứ tự stream bias của lỗi #32 + 31 test hàm kích hoạt, bước A và B + 3 test profiler hàm kích hoạt, bước C; 12 trong số đó cần checkpoint của `models/train_mnist.py`, không có thì skip). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
+Hiện tại (2026-11-18): **578 pass, 11 fail** (2026-11-18: 74 test layout dense / raw mode của bước 2 P1, `test_conv_wght_encoding.py`; 2026-11-17: 19 test bias theo filter, `test_bias_per_filter.py`; 2026-11-09: thêm 3 test luồng weight dense, `test_conv_wght_encoding.py`; 2026-11-10: 8 test phép kiểm tra #48, `test_model_guards.py`) (15 test tham số stride trong `test_stride_params.py` + 56 test phép kiểm tra nhóm A của mục 8e trong `test_model_guards.py` + 5 test bộ đệm weight / iact của #29 / #37, `test_wght_buffer.py` + 8 test số bộ weight và 32 test phép kiểm tra `check_wght_sets` của #39, 34 test phép kiểm tra `check_full_passes` của #40, `test_channel_pad.py` + 129 + 110 test mô hình ghi ngược FC của lỗi #26 + 12 test ghi ngược Conv của lỗi #25 + 11 test kẹp int8 + 6 test đường model thật so với ONNX Runtime + 22 test thứ tự stream bias của lỗi #32 + 31 test hàm kích hoạt, bước A và B + 3 test profiler hàm kích hoạt, bước C; 12 trong số đó cần checkpoint của `models/train_mnist.py`, không có thì skip). 11 fail đều ở `test/test_dense_output.py`, có từ trước (dùng `SimpleNamespace` thiếu `output_cycles`), không liên quan các
 thay đổi của fork. Các file của fork: `test_profile_report.py`, `test_profile_phases.py`, `test_channel_pad.py`, `test_conv_wght_encoding.py`, `test_paper_table3.py`,
 `test_memory_model.py`, `test_fc_writeback.py`, `test_conv_writeback.py`, `test_int8_clamp.py`, `test_onnx_model_flow.py` (cần `torch`, `onnxruntime`, file `.pth` đã huấn luyện),
 `test_psum_bias_order.py`, `test_activation.py`, `test_model_guards.py` (64 test, các phép kiểm tra nhóm A của mục 8e và #48, cần `torch`, `onnxruntime`), `test_stride_params.py` (15 test, #41b/#41d).
@@ -578,6 +631,10 @@ Chi tiết: mục 6 (profiler), 6.13 (model nhiều layer), 6.14 (Bảng 3), 6.1
 | `OPENEYE_PROFILE=1` | Bật profiler, ghi `profile.json` | tắt (`test_profile.py` tự bật) |
 | `OPENEYE_SEED=<n>` | Cố định model Keras và dữ liệu ngẫu nhiên (`tf.keras.utils.set_random_seed`) | không cố định |
 | `OPENEYE_IACT_ZERO_FRACTION=<0..1>` | Đặt đúng tỉ lệ này của input layer đầu về 0 (vị trí ngẫu nhiên theo `OPENEYE_SEED` + 4049; `DRAM.py`, `apply_iact_zero_fraction`), để đo theo tỉ lệ số 0 (bước 1b của kế hoạch theo layer, 2026-11-18) | không đặt: dữ liệu như cũ |
+| `OPENEYE_WGHT_LAYOUT=dense` | Phần cứng sparse: weight Conv gửi theo layout dense (mọi weight một ô overhead 0, kể cả weight 0; `conv_wght_encoding.encode_dense`); mapper từ chối khối PE có word toàn 0 nếu không đặt `OPENEYE_FORCE_RAW_WGHT=1`; `dense_nocheck` gửi luôn (đối chứng âm). Bước 2 của P1, 2026-11-18 | không đặt: CSC như cũ |
+| `OPENEYE_FORCE_RAW_WGHT=1` | Chỉ mô phỏng (cocotb `Force`, Icarus): ép `OpenEye_Parallel.raw_wght_i` = 1 cho mọi layer (hôm nay FC \| GEMM), để `data_pipeline_wght` giữ word weight toàn 0 như P1 sẽ làm. Không sửa RTL | tắt |
+| `OPENEYE_WGHT_ZERO_FRACTION=<0..1>` | Mọi layer Conv có đúng tỉ lệ weight 0 này (vị trí theo `OPENEYE_SEED` + 7919 + layer; weight 0 khác thành ±1; `DRAM.py`, `apply_wght_zero_fraction`) | không đặt: weight như cũ |
+| `OPENEYE_WGHT_ZERO_PARITY=1` | Cùng móc trên, chỉ đặt 0 ở vị trí c + f + y + x chẵn (hai filter cạnh nhau không cùng 0: layout dense không có word toàn 0) | tắt |
 | `OPENEYE_DUMP_VERIFY=1` | Ghi `verify_layer0.pkl` cho `tools/verify_conv_output.py` | tắt |
 | `OPENEYE_PAD_CHANNELS=1` | Bật lại đệm channel (workaround cũ của lỗi #17, để so với số đo trước bản sửa RTL 2026-11-04) | tắt (bật đến 2026-11-04) |
 | `OPENEYE_TFLITE_CONV=<file>:<tensor>` | Weight Conv layer 0 lấy từ model TFLite int8 | tắt |
@@ -660,7 +717,7 @@ OpenEye_orig/
 │   ├── memory_model.py        ★  Mô hình DDR + AXI DMA (mục 6c)
 │   ├── channel_pad.py         ★  Đệm input 1 channel thành 2 channel (workaround cũ của lỗi #17; từ bản sửa RTL 2026-11-04 chỉ khi OPENEYE_PAD_CHANNELS=1)
 │   ├── conv_wght_encoding.py  ★  Mã hóa weight Conv có số 0 theo đúng cách RTL giải mã (sửa lỗi #22, mục 9)
-│   ├── wght_pipeline_model.py ★  Mô hình chu kỳ của data_pipeline_wght.v (khớp RTL), dùng trong unit test
+│   ├── wght_pipeline_model.py ★  Mô hình chu kỳ của data_pipeline_wght.v (khớp RTL; có raw mode từ 2026-11-18), dùng trong unit test
 │   ├── writeback_model.py     ★  Mô hình chu kỳ của pha ghi ngược psum → iact (vòng đọc + bộ đóng gói), dùng trong unit test (#25, #26)
 │   └── profile_report.py      ★  Báo cáo và so sánh profile (mục 6.5)
 ├── test/
@@ -690,7 +747,7 @@ OpenEye_orig/
 │   ├── test_profile_report.py ★  Unit test của công cụ báo cáo (kể cả bảng hàm kích hoạt, bước C)
 │   ├── test_profile_phases.py ★  Unit test quy tắc gán pha của profiler (kể cả `load_act`, input của layer)
 │   ├── test_channel_pad.py    ★  Unit test đệm channel (workaround cũ của lỗi #17, nay tắt mặc định)
-│   ├── test_conv_wght_encoding.py ★ Unit test mã hóa weight Conv có số 0 (lỗi #22)
+│   ├── test_conv_wght_encoding.py ★ Unit test mã hóa weight Conv có số 0 (lỗi #22), layout dense / raw mode (bước 2 P1)
 │   ├── test_paper_table3.py   ★  Unit test của công cụ Bảng 3
 │   ├── test_fc_writeback.py   ★  Mô hình chu kỳ của pha ghi ngược FC (lỗi #26): 110 test
 │   ├── test_conv_writeback.py ★  Mô hình chu kỳ của pha ghi ngược Conv với 2/4 lane (lỗi #25): 12 test
@@ -1384,6 +1441,7 @@ Chỉ Python (testbench và báo cáo); RTL là của bước B, dây trace `act
 | `activation_cycles` của layer | dây `UNPACKED_TRACES.act_capture` đọc mỗi chu kỳ: pha ghi ngược lấy 4 giá trị lane đã qua hàm kích hoạt | Số chu kỳ khối kích hoạt làm việc; **nằm trong `writeback`**, không phải chu kỳ thêm |
 | `info.activation` (mode, round, keep_table) | `LayerParameters` | Layer dùng hàm gì |
 | `info.input` (values, zeros, negatives) | tham chiếu của testbench sau `batchnorm_output` (= đúng thứ RTL tính, các kiểm tra bộ đệm khớp từng bit) | Số 0 ở input = thứ mà bỏ-qua-số-0 bỏ qua: chi phí gián tiếp của hàm kích hoạt |
+| `info.weights` (values, zeros, layout) | `DRAMContents.weights` sau các móc (từ 2026-11-18, `profile_set_layer_weights`) | Weight 0 = thứ CSC bỏ qua; layout `csc` / `dense` (`OPENEYE_WGHT_LAYOUT`) / `plain` (dense HW) |
 | Payload 256 byte | `layer_payload_bytes` | Hiệu suất bus của bảng trong bảng layer |
 
 `profile_report` in thêm **bảng hàm kích hoạt** (mỗi layer: hàm, `load_act` chu kỳ / word, chu kỳ ghi ngược, chu kỳ kích hoạt, % số 0 và số âm ở input);
@@ -4472,3 +4530,11 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   độ; P1 −2,8 đến −13,5 % chu kỳ cho khoảng +281 LUT (Yosys) → đáng làm; P2 sau P1 chỉ ≤ 0,4 % cho +8–16 % LUT → dừng; mô hình chi phí từ phép quét
   chọn đúng 28/28 layer (26/28 khi có P1); dense HW tốt nhất theo diện tích (−24 đến −37 % chu kỳ × LUT) nhưng chậm hơn P1 trên mạng ReLU. Giới hạn chính
   của ước lượng P1: weight 0 bị nhân ở định dạng trần (cận xấu MNIST −6,9 % thay vì −7,9 %), bước 2 đo.
+- **Commit `728827f`** (bước 0 và 1, mốc mới, push lên `origin dev`).
+- **Bước 2: FSM sparse với layout weight dense trên RTL hiện tại** (mục 2 "Kết quả bước 2", `doc/experiments/2026-11-18_wght_layout_step2.md`; không
+  sửa RTL): móc Python `OPENEYE_WGHT_LAYOUT`, `OPENEYE_FORCE_RAW_WGHT` (ép `raw_wght_i` trong mô phỏng), `OPENEYE_WGHT_ZERO_FRACTION` / `_PARITY`,
+  `conv_wght_encoding.encode_dense` / `count_zero_words`, `wght_pipeline_model.load(raw_mode=)`, profiler `info.weights`; +74 unit test (578 PASS + 11 cũ).
+  Chạy `step2.sh` (140 ca một layer, Bảng 2 × 2 × 16, MNIST × 4): khớp từng bit ở mọi lần chạy khi `raw_wght_i` = 1, treo khi word toàn 0 mà không có raw
+  (đối chứng); PE không cần sửa. Weight 0 tốn ít hơn nhiều so với cận bước 1 (5 % → ≤ 0,5 % `compute`, 25 % → ≤ 8,4 %, 50 % → ≤ 22,5 %); P1 đo được
+  MNIST −7,1 đến −7,9 %, Bảng 2 −2,6 đến −13,5 %, lệch ước lượng bước 1 ≤ 0,2 điểm. Ngưỡng weight 0 mà CSC tốt hơn: 5–18 % (CR 1 X 2) đến trên 50 %
+  (CR 8 X 4). Bước tiếp: bước 3 (RTL `GET_WGHT` + bit `wght_raw`) cần bạn đồng ý.
