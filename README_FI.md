@@ -780,7 +780,8 @@ OpenEye_orig/
 │   ├── lint/                  ★  Output lint gốc
 │   ├── reports/               ★  Báo cáo tiến độ (Word), mỗi báo cáo một thư mục cùng các hình của nó (từ 2026-11-10):
 │   │                             2026-10-10_TienDo/ (1 hình), 2026-10-15_TienDo/ (2 hình), 2026-10-31_TienDo/ (5 hình),
-│   │                             2026-11-05_HamKichHoat/ (4 hình), 2026-11-10_TienDo/ (lần 5, hàm kích hoạt chi tiết, 5 hình);
+│   │                             2026-11-05_HamKichHoat/ (4 hình), 2026-11-10_TienDo/ (lần 5, hàm kích hoạt chi tiết, 5 hình),
+│   │                             2026-11-18_TienDo/ (lần 6, hằng tuần: sparse / dense theo layer theo 4 giai đoạn, 3 hình);
 │   │                             sinh bằng tools/report/make_*.py (~/tools/docenv), mỗi script ghi vào thư mục của nó
 │   ├── OpenEye_FPGA_documentation.md, test_status_handover.md   Tài liệu của upstream
 │   └── demo_notebooks/           Notebook demo của upstream
@@ -4538,3 +4539,10 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   (đối chứng); PE không cần sửa. Weight 0 tốn ít hơn nhiều so với cận bước 1 (5 % → ≤ 0,5 % `compute`, 25 % → ≤ 8,4 %, 50 % → ≤ 22,5 %); P1 đo được
   MNIST −7,1 đến −7,9 %, Bảng 2 −2,6 đến −13,5 %, lệch ước lượng bước 1 ≤ 0,2 điểm. Ngưỡng weight 0 mà CSC tốt hơn: 5–18 % (CR 1 X 2) đến trên 50 %
   (CR 8 X 4). Bước tiếp: bước 3 (RTL `GET_WGHT` + bit `wght_raw`) cần bạn đồng ý.
+- **Commit `6cd2084`** (bước 2, push lên `origin dev`).
+- **Báo cáo tiến độ hằng tuần lần 6** (Word, `doc/reports/2026-11-18_TienDo/BaoCao_TienDo_OpenEye_2026-11-18.docx` + 3 hình, sinh bằng
+  `~/tools/docenv/bin/python tools/report/make_progress_report_2026-11-18.py` từ các profile đã đo, tuần 11/11 – 18/11): sparse / dense theo layer
+  đối chiếu với đề xuất 4 giai đoạn (profiling, mô hình chi phí, RTL, kiểm chứng): đánh giá từng giai đoạn (thứ tự tốt; giai đoạn 3 thu hẹp thành
+  P1 theo số đo, không cần Scheduler phần cứng), đối chiếu với bước 0–5 (project ở cuối giai đoạn 2), lý do chọn hướng này, chu kỳ từng pha (MNIST
+  ReLU cả mạng, MNIST 4 hàm, Bảng 2 có / không ReLU ở 3 cấu hình, từng layer, một layer theo tỉ lệ số 0 và ngưỡng, chi phí weight 0), throughput
+  hiệu dụng (GOPS, bản đầu), tài nguyên, các việc trong tuần, các bước tiếp và rủi ro.
