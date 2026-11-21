@@ -19,7 +19,7 @@ README.md gốc của OpenEye vẫn giữ nguyên: đó là tài liệu của nh
 | Tên | Trỏ tới | Vai trò |
 |---|---|---|
 | remote `upstream` | `github.com/Learning-Chips-Lab/OpenEye` | Repo gốc, **chỉ đọc** (fetch) |
-| remote `origin` | [`github.com/DevFi-23/OpenEye`](https://github.com/DevFi-23/OpenEye) (private) | Repo của bạn, nơi push mọi thay đổi. Branch mặc định: `dev` |
+| remote `origin` | [`github.com/DevFi-23/OpenEye_Customize`](https://github.com/DevFi-23/OpenEye_Customize) (public; tên cũ `OpenEye`, private, đổi ngày 20/11/2026) | Repo của bạn, nơi push mọi thay đổi. Branch mặc định: `dev` |
 | branch `main` | bản sao của `upstream/main` | Không commit vào đây; dùng để so sánh |
 | branch `dev` | `main` cộng các thay đổi của bạn | **Branch làm việc chính** |
 
@@ -781,7 +781,8 @@ OpenEye_orig/
 │   ├── reports/               ★  Báo cáo tiến độ (Word), mỗi báo cáo một thư mục cùng các hình của nó (từ 2026-11-10):
 │   │                             2026-10-10_TienDo/ (1 hình), 2026-10-15_TienDo/ (2 hình), 2026-10-31_TienDo/ (5 hình),
 │   │                             2026-11-05_HamKichHoat/ (4 hình), 2026-11-10_TienDo/ (lần 5, hàm kích hoạt chi tiết, 5 hình),
-│   │                             2026-11-18_TienDo/ (lần 6, hằng tuần: sparse / dense theo layer theo 4 giai đoạn, 3 hình);
+│   │                             2026-11-18_TienDo/ (lần 6, hằng tuần: sparse / dense theo layer theo 4 giai đoạn, 5 hình +
+│   │                             dataset_theo_layer_2026-11-18.csv);
 │   │                             sinh bằng tools/report/make_*.py (~/tools/docenv), mỗi script ghi vào thư mục của nó
 │   ├── OpenEye_FPGA_documentation.md, test_status_handover.md   Tài liệu của upstream
 │   └── demo_notebooks/           Notebook demo của upstream
@@ -4546,3 +4547,69 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   P1 theo số đo, không cần Scheduler phần cứng), đối chiếu với bước 0–5 (project ở cuối giai đoạn 2), lý do chọn hướng này, chu kỳ từng pha (MNIST
   ReLU cả mạng, MNIST 4 hàm, Bảng 2 có / không ReLU ở 3 cấu hình, từng layer, một layer theo tỉ lệ số 0 và ngưỡng, chi phí weight 0), throughput
   hiệu dụng (GOPS, bản đầu), tài nguyên, các việc trong tuần, các bước tiếp và rủi ro.
+- **Báo cáo lần 6 viết lại theo yêu cầu** (cùng file và script; `3ce63a9` là bản đầu): bảng và hình chỉ so sparse với dense (và "theo layer" tính
+  từ hai lần chạy đó), không còn cột P1; P1 chỉ còn là thử nghiệm của giai đoạn 3 (mục 5.2) và một hướng trong bảng so sánh các hướng (mục 7).
+  Bố cục theo đúng 4 giai đoạn của bạn: 1 profiling (model, tỉ lệ số 0 weight / activation theo layer, kích thước dữ liệu dense / sparse, overhead
+  metadata, chu kỳ theo pha, nhược điểm từng chế độ), 2 cost model (MAC, nạp weight / activation, decode PE, ngưỡng hoà vốn, mô hình dự đoán: đúng
+  55/56 layer, layer sai mất 274 chu kỳ; lợi của chọn theo layer: 0 đến −1,4 % MNIST với định dạng hôm nay, −0,5 đến −8,1 % khi tách Weight /
+  Activation), 3 RTL (thiết kế Adaptive theo từng mục: tách `SPARSITY_EN`, hai FSM chọn lúc chạy, Scheduler trong toolchain, thanh ghi cấu hình
+  layer, psum khi chuyển layer; +8–17 % LUT; thứ tự 3a → 3d), 4 benchmark (latency từng layer, word DMA, MOPS); so sánh 6 hướng; Adaptive đầy đủ
+  là hướng sẽ làm. Các trường hợp là 16 lần chạy MNIST của báo cáo 10/11 (4 hàm × 2 cách làm tròn × 2 chế độ): chạy lại 8 lần làm tròn không mặc
+  định trên RTL hiện tại (8/8 khớp từng bit; mỗi trường hợp −22.326 / −22.358 chu kỳ so với 12/11, đúng phần bias theo filter), cùng 8 lần mặc
+  định của `activation_2026-11-18` gom vào `doc/perf/activation_2026-11-18_rounding`. Dataset giai đoạn 1: `dataset_theo_layer_2026-11-18.csv`
+  (272 dòng: model, layer, MAC, số 0 weight / input, kích thước weight dense / CSC / chip, word DMA, chu kỳ mọi pha ở hai chế độ).
+- **Báo cáo lần 6, sửa mục 3.3 / 3.4** (câu hỏi của bạn về đơn vị KB và vì sao nạp activation bằng nhau): mục 3.3 thêm cột số weight, cột thực
+  truyền (word DMA × 64 bit, KB) và chú thích công thức (KB = bit / 8 / 1024; Conv2: 3.072 hàng × 24 ô = 4 lần nạp 18.432 weight, 5 / 3 word mỗi
+  hàng); **sửa câu sai** "activation trên chip ô 12 bit ở cả hai chế độ": activation qua DMA và trong bộ đệm là 8 bit trần ở cả hai chế độ, overhead
+  4 bit chỉ thêm khi chuyển vào cluster ở sparse (`IACT_WOH_Bitwidth` 12 / 8). Mục 3.4 thêm lý do nạp activation bằng nhau: chỉ input layer đầu qua
+  DMA, 784 × 8 bit / 64 = 98 word + 2 word đệm cho đủ nhóm 4 ô (`buffer_words_to_dma_stream`) = 100 word, luồng DMA của hai chế độ giống hệt từng
+  word (đã so file `dma_stream_input.txt`).
+- **Báo cáo lần 6, ghi cấu hình phần cứng của các hình** (câu hỏi: hình chạy model nào, cấu hình nào): mục 3.1 thêm gạch đầu dòng phần cứng
+  (lưới CR × 2 cluster, X × Y PE mỗi cluster với X = `NUM_GLB_PSUM` = số cột PE, Y = `NUM_GLB_WGHT` = số hàng PE, 2 MAC / PE, DMA 64 bit;
+  CR 1 X 2 Y 3 = 12 PE, CR 2 X 4 Y 3 = 48 PE, CR 8 X 4 Y 3 = 192 PE) và ghi đủ Y 3 cho MNIST; chú thích Hình 1, 3, 4 ghi "MNIST, ảnh test 0,
+  CR 2 X 4 Y 3 (48 PE)", Hình 2 ghi "từng layer của mạng Bảng 2 chạy riêng, weight int8 ngẫu nhiên (seed 1), không hàm kích hoạt, Y 3".
+- **Báo cáo lần 6, mục 4.1 (số MAC)**: **sửa lỗi** cột "MAC sparse ước lượng, SiLU" dùng tỉ lệ weight 0 của model ReLU (mỗi model có weight
+  riêng; SiLU Conv1 / Conv2 / Conv3 / Dense: 224.224 / 3.163.947 / 1.651.240 / 28.769, trước là 225.008 / 3.163.250 / 1.651.150 / 28.410); thêm
+  cột chu kỳ tính toán sparse của SiLU; gạch đầu dòng giải thích công thức MAC, hiệu suất dense (40 / 96 MAC mỗi chu kỳ ở Conv2, Conv3) và vì sao
+  chu kỳ sparse không giảm theo MAC: hàm mới `fixed_share` khớp tuyến tính phép quét, phần cố định của chu kỳ tính toán sparse là 60–64 % ở
+  CR 2 X 4 (Conv3 ReLU: −87,5 % MAC nhưng −29,4 % chu kỳ).
+- **Báo cáo lần 6, viết lại mục 4.1** (yêu cầu thêm chú thích và công thức cho dễ hiểu): ký hiệu A (MAC dense = H × W × F × C × Kx × Ky,
+  Dense: input × output), za / zw (tỉ lệ số 0 input / weight), B = A × (1 − za) × (1 − zw), C / D (chu kỳ tính toán dense / sparse), A / C so
+  với đỉnh 96 MAC mỗi chu kỳ; bảng cũ tách thành **bảng a** (số MAC: công thức từng layer, za, zw, B, B / A; ReLU floor và SiLU làm tròn) và
+  **bảng b** (C, A / C, D, D / C đặt cạnh B / A); ví dụ Conv3 ReLU 5 bước; giải thích D / C ≫ B / A bằng khớp D ≈ a + b × (1 − za) trên phép
+  quét (hàm `sweep_fit` thay `fixed_share`; Conv 7×7: a = 7.202, b = 4.174, dự đoán 68,7 % so với đo 70,6 %).
+- **Báo cáo lần 6, mục 4.1 gọn lại** (yêu cầu: chú thích ngắn hơn, bỏ các biến A, B, C, D): cột và chú thích dùng tên đầy đủ (MAC dense, MAC
+  sparse, chu kỳ dense / sparse, thời gian còn lại, phép nhân còn lại); công thức chuyển vào chú thích hai bảng; bỏ phần ký hiệu, ví dụ 5 bước
+  và phần kiểm công thức; giữ 3 gạch đầu dòng (Conv3 ReLU còn 12,5 % phép nhân nhưng 70,6 % thời gian; phần cố định 60–64 %; cost model dùng
+  tỉ số chu kỳ đo được).
+- **Báo cáo lần 6, thêm hình và bảng cho mục 4.2 / 4.3** (câu hỏi: vì sao 4.2, 4.3 không có bảng hay hình): 4.2 thêm **Hình 2**
+  (`dong_goi_weight_2026-11-18.png`: một hàng 24 weight trên DMA 64 bit, sparse 24 × 12 = 288 bit → 5 word, 32 bit đệm; dense 192 bit → 3 word;
+  theo `transform_n_to_m_chunked`, các ô nối liền nhau qua ranh giới word, đệm cuối hàng), bảng nạp theo layer (số weight, số hàng, số ô ÷ số
+  weight 4 / 4 / 2 / 1,21, nạp weight sparse / dense, nạp và chuyển activation S = D) và bảng word mỗi hàng theo CR × Y (đã kiểm khớp số đo ở
+  mọi layer của 16 cấu hình mạng Bảng 2, X không ảnh hưởng; activation bằng nhau đúng từng chu kỳ ở cả 16). 4.3 thêm bảng chu kỳ tính toán
+  sparse / dense khi input không có số 0 (phép quét, 4 dạng × 3 cấu hình + MNIST Conv1): −2,3 đến +4,2 %; **sửa** câu cũ "+0,2 đến +2,1 %,
+  −1,9 % ở CR 8" không khớp dữ liệu quét hiện tại. Hình cũ 2 / 3 / 4 thành 3 / 4 / 5.
+
+### 2026-11-20
+
+- **Repo đổi tên và công khai**: `DevFi-23/OpenEye` (private) thành `DevFi-23/OpenEye_Customize` (public). Remote `origin` đổi sang
+  `git@github.com:DevFi-23/OpenEye_Customize.git` (`git remote set-url`); SSH fetch được, HTTPS không đăng nhập cũng đọc được (`git ls-remote`),
+  `dev` trên GitHub = 3ce63a9, khớp bản local. `upstream` giữ nguyên, vẫn khoá push.
+- **Hàm kích hoạt theo từng layer + quét số 0 của weight × activation, sparse và dense**
+  (`doc/experiments/2026-11-20_act_wzero.md`, thư mục `2026-11-20_act_wzero/`: `test_act_wzero.py`, `test_grid.py`, `run.py`,
+  `analyse.py`, `plot.py`, `results.md`, 3 hình; profile `doc/perf/act_wzero_2026-11-20/`, `doc/perf/zero_grid_2026-11-20/`).
+  230 lần chạy ở CR 2 X 4 Y 3, tất cả PASS (50 lần Conv 7×7 "đúng giá trị, file tham chiếu khác ở ô đệm" như phép quét 18/11).
+  Móc `OPENEYE_WGHT_ZERO_FRACTION` thêm `OPENEYE_WGHT_ZERO_DENSE=1` (đặt số 0 cả cho weight layer Dense; Python, Conv2D không
+  đổi), test mới `test/test_wght_zero_fraction.py` 8/8. Kết quả:
+  - Hàm kích hoạt (mạng Bảng 2): tính hàm 0 chu kỳ ở cả 4 hàm (khối kích hoạt chạy trong writeback, writeback không đổi);
+    SiLU / hard-swish +32 chu kỳ mỗi layer (nạp bảng 32 word), kể cả layer đầu. Dense: không hàm = ReLU = Leaky = 70.369,
+    SiLU = hard-swish +128 (+0,18 %). Sparse: có hàm nhanh hơn không hàm (ReLU −4,5 %, Leaky −2,1 %, SiLU −1,2 %,
+    hard-swish −1,5 %) nhờ số 0 cho layer sau.
+  - Nạp weight không đổi theo tỉ lệ weight bằng 0 (0–80 %) và activation bằng 0, ở cả hai chế độ, mọi layer; dense luôn
+    −40 %. Phần nạp thêm của sparse: 8–10 % tổng mạng (MNIST +15.552, Bảng 2 +7.380 chu kỳ); trong một layer từ 0,4 %
+    (Conv1) đến 35 % (Dense 1568) của layer dense.
+  - Tính toán dense không đổi; sparse giảm theo cả weight và input bằng 0 (Conv 14×14: −31 % / −26 % / −39 % ở 80 % weight /
+    input / cả hai). **Layer Dense trên sparse không bỏ qua weight bằng 0** (weight gửi không nén, `raw_wght_i = 1`), nên
+    Dense 1568 sparse luôn chậm hơn dense (125–136 %).
+  - Cả mạng: Bảng 2 (không hàm) dense nhanh hơn khi weight bằng 0 ≤ 40 %, sparse từ 60 %; MNIST (ReLU) sparse luôn nhanh
+    hơn (3,4 % → 22 %).

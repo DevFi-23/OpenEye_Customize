@@ -341,21 +341,29 @@ class DRAMContents(object):
         the same for every f (a larger f zeroes a superset of the positions of a smaller one). With
         OPENEYE_WGHT_ZERO_PARITY=1 the zeros are drawn only where c + f + y + x is even (at most half of the weights):
         two filters next to each other are then never both zero, so the dense weight layout of a sparse PE
-        (OPENEYE_WGHT_LAYOUT=dense) has no all-zero word when the words pair neighbouring filters. For measuring
-        the compute cost of zero weights (step 2 of README_FI section 2). Unset: nothing changes."""
+        (OPENEYE_WGHT_LAYOUT=dense) has no all-zero word when the words pair neighbouring filters. With
+        OPENEYE_WGHT_ZERO_DENSE=1 the Dense (fully connected) layers get the same share too, over their [out][in]
+        weights (added 2026-11-20 for the weight-zero sweep of whole networks). For measuring the cost of zero weights
+        (step 2 of README_FI section 2). Unset: nothing changes."""
         value = os.environ.get("OPENEYE_WGHT_ZERO_FRACTION")
         if not value:
             return
         fraction = float(value)
         parity = os.environ.get("OPENEYE_WGHT_ZERO_PARITY") == "1"
+        include_dense = os.environ.get("OPENEYE_WGHT_ZERO_DENSE") == "1"
         seed = int(os.environ.get("OPENEYE_SEED", "0") or 0)
         for l, params in enumerate(layer_parameters):
             name = str(params.layer_name)
-            if "Conv" not in name or "Depthwise" in name or "Dw" in name:
+            if "Depthwise" in name or "Dw" in name:
                 continue
-            w = self.weights[l]                 # [c][f][y][x]
-            positions = [(c, f, y, x) for c in range(len(w)) for f in range(len(w[c]))
-                         for y in range(len(w[c][f])) for x in range(len(w[c][f][y]))]
+            w = self.weights[l]
+            if "Conv" in name:                  # [c][f][y][x]
+                positions = [(c, f, y, x) for c in range(len(w)) for f in range(len(w[c]))
+                             for y in range(len(w[c][f])) for x in range(len(w[c][f][y]))]
+            elif "Dense" in name and include_dense:     # [out][in]
+                positions = [(x, c) for x in range(len(w)) for c in range(len(w[x]))]
+            else:
+                continue
             rng = np.random.RandomState(seed + 7919 + l)
             order = [positions[i] for i in rng.permutation(len(positions))]
             count = int(round(fraction * len(positions)))
@@ -364,11 +372,14 @@ class DRAMContents(object):
                 raise ValueError("OPENEYE_WGHT_ZERO_FRACTION=%s: layer %d has only %d candidate positions"
                                  % (value, l, len(candidates)))
             chosen = set(candidates[:count])
-            for (c, f, y, x) in order:
-                if (c, f, y, x) in chosen:
-                    w[c][f][y][x] = 0
-                elif w[c][f][y][x] == 0:
-                    w[c][f][y][x] = int(rng.choice([-1, 1]))
+            for p in order:
+                row = w
+                for i in p[:-1]:
+                    row = row[i]
+                if p in chosen:
+                    row[p[-1]] = 0
+                elif row[p[-1]] == 0:
+                    row[p[-1]] = int(rng.choice([-1, 1]))
 
     @staticmethod
     def dense_input_order(layer_parameters, l, layer):
