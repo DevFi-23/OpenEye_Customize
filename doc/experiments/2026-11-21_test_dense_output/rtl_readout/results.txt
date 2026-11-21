@@ -1,0 +1,15 @@
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout[k64_n40_cr1] ============================== 1 passed in 24.04s ==============================
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout[k16_n64] ============================== 1 passed in 25.70s ==============================
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout[k64_n34] ============================== 1 passed in 28.31s ==============================
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout[k64_n40] ============================== 1 passed in 28.55s ==============================
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout[k64_n100] ============================== 1 passed in 41.53s ==============================
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout[k64_n40_psum2] ============================== 1 passed in 21.96s ==============================
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout[k64_n40_dense] ============================== 1 passed in 23.15s ==============================
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout[k64_n40_iact3] ============================== 1 passed in 28.95s ==============================
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout[k64_n40_cr4] ============================== 1 passed in 34.29s ==============================
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout[k64_n32_n40] ============================== 1 passed in 26.27s ==============================
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout[k64_n64_n40] ============================== 1 passed in 27.56s ==============================
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout[k1568_n40] ========================= 1 passed in 96.44s (0:01:36) =========================
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout_gemm[cx1_k64_n40] ======================== 1 passed in 223.25s (0:03:43) =========================
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout_gemm[pm1_k64_n40] ======================== 1 passed in 223.84s (0:03:43) =========================
+test/cocotb_fpga/test_dense_readout.py::test_dense_readout_gemm[os_k64_n40] ======================== 1 passed in 222.15s (0:03:42) =========================

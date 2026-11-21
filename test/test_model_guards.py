@@ -4,8 +4,9 @@
 
 Before 2026-11-07 each of these ran to the end and gave wrong outputs without any sign: stride above 1 on an RTL built
 with STRIDE_ENABLED=0 (bug #41), a padding other than kernel // 2 (#42), unsupported ONNX nodes, branches, grouped /
-dilated convolutions (#43), an odd input channel count above 1 (#7), pooling inputs 4 or fewer pixels wide (#27), a last
-Dense layer with more than one psum pass (#21). doc/experiments/2026-11-07_bug41_stride.md has the measurements.
+dilated convolutions (#43), an odd input channel count above 1 (#7), pooling inputs 4 or fewer pixels wide (#27).
+doc/experiments/2026-11-07_bug41_stride.md has the measurements. The refusal of a last Dense layer with more than one
+psum pass (#21) went on 2026-11-21: the testbench decoder was wrong, not the RTL (doc/experiments/2026-11-21_test_dense_output.md).
 Since 2026-11-10 also an odd number of filters per PE on dense hardware (#48, doc/experiments/2026-11-10_bug46_47.md).
 """
 import os
@@ -223,26 +224,17 @@ def test_pooling_window(pool, strides, monkeypatch):
         lp.check_pooling_geometry(layer)
 
 
-# --- Dense read-out (#21) ----------------------------------------------------------------------------------------------
+# --- Dense read-out (#21): no longer refused -----------------------------------------------------------------------
 
-@pytest.mark.parametrize("outputs,refused", [(10, False), (32, False), (40, True), (64, True)])
-def test_dense_readout(outputs, refused, monkeypatch):
-    # Bug #21: a last Dense layer with more than 32 outputs (two psum passes at 2 cluster columns): only the first
-    # used_psum_per_PE outputs come out right
+@pytest.mark.parametrize("outputs,passes", [(10, 1), (32, 1), (40, 2), (64, 2)])
+def test_dense_readout_accepted(outputs, passes, monkeypatch):
+    # Bug #21 (2026-11-21): a last Dense layer with more than 32 outputs (two psum passes at 2 cluster columns) is
+    # computed and sent right; only the testbench decoder was wrong, so the refusal of 2026-11-07 went
+    # (doc/experiments/2026-11-21_test_dense_output.md; round trip in test_dense_output.py)
     params = platform(monkeypatch)
     layer = build(keras((64,), tf.keras.layers.Dense(outputs)), params)[0]
-    assert layer.send_values_out == 1 and layer.needed_psum_transmissions == (2 if outputs > 32 else 1)
-    if refused:
-        with pytest.raises(NotImplementedError, match="bug #21"):
-            lp.check_dense_readout(layer)
-    else:
-        assert lp.check_dense_readout(layer) is layer
-
-
-def test_dense_written_back_is_accepted():
-    # The same layer written back on chip for the next layer is right (doc/experiments/2026-10-24_bug26...)
-    layer = types.SimpleNamespace(layer_name="Dense", filters=64, needed_psum_transmissions=2, send_values_out=0)
-    assert lp.check_dense_readout(layer) is layer
+    assert layer.send_values_out == 1 and layer.needed_psum_transmissions == passes
+    assert not hasattr(lp, "check_dense_readout")
 
 
 # --- onnx2model (#43) --------------------------------------------------------------------------------------------------

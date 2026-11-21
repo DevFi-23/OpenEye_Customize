@@ -3488,13 +3488,20 @@ async def compare_stream_Dense(ptp, dut, layer_number, layer_repetition, layer_p
 
     # FC reduces cluster rows into row 0 and emits one signed accumulator
     # per DMA beat. Columns are interleaved within each buffer address.
+    # A layer with more than 16 x Clusters_X outputs sends output_cycles
+    # (= needed_psum_transmissions) psum passes one after another, in the
+    # order of the psum buffer and make_ref: pass r, address a, column c,
+    # so beat r*CX*P + a*CX + c carries output r*CX*P + c*P + a (bug #21:
+    # the old decoder placed every pass after the first wrong,
+    # doc/experiments/2026-11-21_test_dense_output.md).
     columns = oep.Clusters_X
     per_column = math.ceil(layer_parameters.used_psum_per_PE)
+    words_per_pass = columns * per_column
     tile = ((layer_repetition // layer_parameters.iact_transmissions_pe)
             % layer_parameters.psum_transmissions_pe)
     offset = tile * columns * per_column
     les.x = offset
-    expected_words = columns * per_column * layer_parameters.output_cycles
+    expected_words = words_per_pass * layer_parameters.output_cycles
     assert layer_parameters.psum_output_words == expected_words, (
         "Dense DMA output count disagrees with column/address layout")
     beat = 0
@@ -3504,7 +3511,9 @@ async def compare_stream_Dense(ptp, dut, layer_number, layer_repetition, layer_p
         # Do not swallow unknown data or indexing errors: that hid missing
         # outputs as zeros in the old two-column-only reader.
         word = int(dut.data_dma_o.value)
-        f = offset + (beat % columns) * per_column + beat // columns
+        psum_pass, within_pass = divmod(beat, words_per_pass)
+        address, column = divmod(within_pass, columns)
+        f = offset + psum_pass * words_per_pass + column * per_column + address
         value = _signed(word & ((1 << oep.DATA_PSUM_BITWIDTH) - 1),
                         oep.DATA_PSUM_BITWIDTH)
         if f < len(dram.fmap[layer_number + 1]):

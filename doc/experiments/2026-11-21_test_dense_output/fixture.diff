@@ -1,0 +1,21 @@
+--- test/test_dense_output.py	2026-10-09 10:47:39.584479535 +0700
++++ test/test_dense_output.py	2026-11-21 10:08:38.195642398 +0700
+@@ -13,7 +13,8 @@
+     per_column = (count + columns - 1) // columns
+     layer = NS(used_psum_per_PE=per_column, iact_transmissions_pe=1,
+                psum_transmissions_pe=tiles, used_Y_cluster=2,
+-               psum_output_words=per_column * columns)
++               psum_output_words=per_column * columns,
++               output_cycles=1)
+     params = NS(Clusters_X=columns, Clusters_Y=2, DATA_PSUM_BITWIDTH=20,
+                 DMA_BITWIDTH=64, PSUM_Trans_Bitwidth=40)
+     class Word(int):
+@@ -85,7 +86,7 @@
+     params = NS(SERIAL=1, Clusters_X=columns, DMA_BITWIDTH=64, DATA_PSUM_BITWIDTH=20)
+     layer = NS(layer_name="Dense", used_psum_per_PE=(5 + columns - 1) // columns,
+                needed_total_transmissions=1, iact_transmissions_pe=1,
+-               psum_transmissions_pe=1)
++               psum_transmissions_pe=1, needed_psum_transmissions=1)
+     tum.make_ref(params, layer, 0, None, dict(enumerate([11, -12, 13, -14, 15])))
+     lines = (tmp_path / "demo/layer_0_0/dma_stream_ref.txt").read_text().splitlines()
+     assert len(lines) == len(expected)

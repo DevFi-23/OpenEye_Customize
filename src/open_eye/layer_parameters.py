@@ -314,21 +314,6 @@ def check_pooling_geometry(layer_params):
     return layer_params
 
 
-def check_dense_readout(layer_params):
-    """Stop a Dense layer that sends its results out (the last layer) while it needs more than one psum pass (bug #21):
-    the final read-out of the second pass is wrong, only the first used_psum_per_PE outputs are right (K = 64: 40 outputs
-    10 right, 48 outputs 12 right; doc/experiments/2026-10-21_bug19_dense_k512.md). One pass holds 16 x Clusters_X
-    outputs (32 at 2 cluster columns). A Dense layer written back on chip for the next layer is right
-    (doc/experiments/2026-10-24_bug26_dense_writeback.md). Returns layer_params."""
-    passes = layer_params.needed_psum_transmissions
-    if layer_params.send_values_out and passes > 1:
-        refuse(
-            f"{layer_params.layer_name}: {layer_params.filters} outputs need {passes} psum passes; the final read-out "
-            f"of more than one pass is wrong (bug #21); split the outputs into layers of at most "
-            f"{math.ceil(layer_params.filters / passes)}")
-    return layer_params
-
-
 def activation_registers(layer_params):
     """The status register fields of a layer's activation (act_mode, act_round, act_neg_mant, act_neg_shift,
     act_keep_table), checked by check_rtl_activation."""

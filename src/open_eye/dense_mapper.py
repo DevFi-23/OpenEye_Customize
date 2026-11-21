@@ -125,13 +125,12 @@ class DenseMapper(LayerMapper):
         # === REGISTER PACKING ===
         # Pack all layer configuration parameters into hardware register format
         # Uses pack_registers() utility from regmap_pack module
-            from open_eye.layer_parameters import (activation_registers, check_dense_readout, check_iact_buffer,
-                                                   check_wght_buffer)
+            from open_eye.layer_parameters import activation_registers, check_iact_buffer, check_wght_buffer
             from open_eye.generator import pack_registers
-            # a last layer must not need more than one psum pass (bug #21);
             # the weights of this layer must fit the weight staging buffer (bug #29): all K passes are stored at once;
-            # a pass of activations the iact buffer (bug #37)
-            check_dense_readout(layer_params)
+            # a pass of activations the iact buffer (bug #37). A last layer with more than one psum pass is fine: the
+            # refusal of bug #21 went on 2026-11-21, the wrong outputs came from the testbench decoder
+            # (doc/experiments/2026-11-21_test_dense_output.md)
             check_wght_buffer(params, len(self.WghtStreamCreator.get_wght_stream()), str(layer_params.layer_name))
             check_iact_buffer(layer_params)
             words = pack_registers({
