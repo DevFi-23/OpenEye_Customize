@@ -1,0 +1,4 @@
+<worktrees>/dev_fc dev_fc sparse k1_gemm4096_10 GEMM 4096 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/dev_fc dev_fc sparse k2_gemm4200_10 GEMM 4200 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/up_new up_new dense k3_gemm2046_10 GEMM 2046 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/up_new up_new dense k4_gemm2050_10 GEMM 2050 1 1 1 2 4 1 OUTPUT_SIZE=10

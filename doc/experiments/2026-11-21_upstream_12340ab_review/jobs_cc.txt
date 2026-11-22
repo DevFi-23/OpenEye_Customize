@@ -1,0 +1,6 @@
+<worktrees>/dev_fc dev_fc sparse h1_4x4c4f8_cc1 Convolution_Single 4 4 4 8 4 4 1 CC=1
+<worktrees>/dev_fc dev_fc sparse h2_6x2c1f16_cc1 Convolution_Single 6 2 1 16 4 4 1 CC=1
+<worktrees>/dev_fc dev_fc sparse h3_4x8c16f8_cc1 Convolution_Single 4 8 16 8 4 4 1 CC=1
+<worktrees>/dev_p1 dev_p1 sparse h1_4x4c4f8_cc1 Convolution_Single 4 4 4 8 4 4 1 CC=1
+<worktrees>/dev_p1 dev_p1 sparse h2_6x2c1f16_cc1 Convolution_Single 6 2 1 16 4 4 1 CC=1
+<worktrees>/dev_p1 dev_p1 sparse h3_4x8c16f8_cc1 Convolution_Single 4 8 16 8 4 4 1 CC=1

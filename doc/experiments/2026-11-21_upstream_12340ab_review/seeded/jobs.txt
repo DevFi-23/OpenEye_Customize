@@ -1,0 +1,14 @@
+<repo> test/cocotb_fpga/test_conv_const.py::test_conv_bias_order[2_kernels] seed
+<worktrees>/dev_p1 test/cocotb_fpga/test_conv_const.py::test_conv_bias_order[2_kernels] seed
+<repo> test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c32_f32] seed
+<worktrees>/dev_p1 test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c32_f32] seed
+<repo> test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c8_f64] seed
+<worktrees>/dev_p1 test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c8_f64] seed
+<repo> test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c64_f64] seed
+<worktrees>/dev_p1 test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c64_f64] seed
+<repo> test/cocotb_fpga/test_mnist_layers.py::test_random_data[14x14_c32_f32] seed
+<worktrees>/dev_p1 test/cocotb_fpga/test_mnist_layers.py::test_random_data[14x14_c32_f32] seed
+<repo> test/cocotb_fpga/test_mnist_layers.py::test_random_data[mnist_conv2_14x14_c32_f64] seed
+<worktrees>/dev_p1 test/cocotb_fpga/test_mnist_layers.py::test_random_data[mnist_conv2_14x14_c32_f64] seed
+<worktrees>/dev_p1 test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter_trained_mnist -
+<worktrees>/dev_p1 test/cocotb_fpga/test_real_model.py::test_real_model[0] -

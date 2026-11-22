@@ -1,0 +1,14 @@
+<repo> test/cocotb_fpga/test_conv_const.py::test_conv_bias_order[2_kernels] ============================== 1 passed in 17.78s ==============================
+<worktrees>/dev_p1 test/cocotb_fpga/test_conv_const.py::test_conv_bias_order[2_kernels] ============================== 1 passed in 18.58s ==============================
+<repo> test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c8_f64] ========================= 1 passed in 68.70s (0:01:08) =========================
+<worktrees>/dev_p1 test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c8_f64] ========================= 1 passed in 68.87s (0:01:08) =========================
+<repo> test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c32_f32] ======================== 1 passed in 104.57s (0:01:44) =========================
+<worktrees>/dev_p1 test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c32_f32] ======================== 1 passed in 108.62s (0:01:48) =========================
+<repo> test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c64_f64] ======================== 1 passed in 342.86s (0:05:42) =========================
+<worktrees>/dev_p1 test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c64_f64] ======================== 1 passed in 358.02s (0:05:58) =========================
+<repo> test/cocotb_fpga/test_mnist_layers.py::test_random_data[14x14_c32_f32] ======================== 1 passed in 439.14s (0:07:19) =========================
+<worktrees>/dev_p1 test/cocotb_fpga/test_mnist_layers.py::test_random_data[14x14_c32_f32] ======================== 1 passed in 434.35s (0:07:14) =========================
+<repo> test/cocotb_fpga/test_mnist_layers.py::test_random_data[mnist_conv2_14x14_c32_f64] ======================== 1 passed in 674.05s (0:11:14) =========================
+<worktrees>/dev_p1 test/cocotb_fpga/test_mnist_layers.py::test_random_data[mnist_conv2_14x14_c32_f64] ======================== 1 passed in 667.91s (0:11:07) =========================
+<worktrees>/dev_p1 test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter_trained_mnist ======================== 1 passed in 859.54s (0:14:19) =========================
+<worktrees>/dev_p1 test/cocotb_fpga/test_real_model.py::test_real_model[0] ======================== 1 passed in 690.08s (0:11:30) =========================

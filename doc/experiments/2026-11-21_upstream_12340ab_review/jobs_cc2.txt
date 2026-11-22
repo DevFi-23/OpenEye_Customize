@@ -1,0 +1,2 @@
+<worktrees>/dev_fc dev_fc sparse n1_8x4c4f16_cr2_cc1 Convolution_Single 8 4 4 16 2 4 1 CC=1
+<worktrees>/dev_fc dev_fc sparse n2_4x4c4f8_cr2_cc1 Convolution_Single 4 4 4 8 2 4 1 CC=1

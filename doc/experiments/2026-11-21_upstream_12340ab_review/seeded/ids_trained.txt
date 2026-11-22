@@ -1,0 +1,2 @@
+test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter_trained_mnist
+test/cocotb_fpga/test_real_model.py::test_real_model[0]

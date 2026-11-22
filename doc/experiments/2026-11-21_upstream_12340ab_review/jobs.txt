@@ -1,0 +1,184 @@
+<worktrees>/up_old up_old dense c1_8x4c4 Convolution_Single 8 4 4 16 2 4
+<worktrees>/up_old up_old dense c2_8x4c2 Convolution_Single 8 4 2 16 2 4
+<worktrees>/up_old up_old dense c3_8x4c3 Convolution_Single 8 4 3 16 2 4
+<worktrees>/up_old up_old dense c4_8x4c8 Convolution_Single 8 4 8 16 2 4
+<worktrees>/up_old up_old dense c5_8x4c16 Convolution_Single 8 4 16 16 2 4
+<worktrees>/up_old up_old dense c6_8x8c4_g3 Convolution_Single 8 8 4 16 2 4 1 GLBI=3
+<worktrees>/up_old up_old dense c7_8x8c2_g3 Convolution_Single 8 8 2 16 2 4 1 GLBI=3
+<worktrees>/up_old up_old dense c8_28x28c1 Convolution_Single 28 28 1 32 2 4
+<worktrees>/up_old up_old dense c9_stack_c4 Convolution_Stack 8 4 4 4 2 4 2
+<worktrees>/up_old up_old dense c10_stack_c4_p2 Convolution_Stack 8 4 4 4 2 2 2
+<worktrees>/up_old up_old dense c11_cpc Conv_Pool_Conv 8 4 2 8 2 4 3
+<worktrees>/up_old up_old dense c12_stack_c8 Convolution_Stack 8 4 8 8 2 4 2
+<worktrees>/up_old up_old dense c13_16x4c6 Convolution_Single 16 4 6 16 2 4
+<worktrees>/up_old up_old dense d1_gemm64_10 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/up_old up_old dense d2_gemm256_32 GEMM 256 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/up_old up_old dense d3_gemm1568_32 GEMM 1568 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/up_old up_old dense d4_gemm3136_10 GEMM 3136 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/up_old up_old dense d5_gemm64_40 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=40
+<worktrees>/up_old up_old dense d6_mlp MLP 6 1 1 1 2 4 3
+<worktrees>/up_old up_old dense d7_upfc8 UP_FC 8 8 4 8 2 4 3 OUTPUT_SIZE=10
+<worktrees>/up_old up_old dense d8_upfc14 UP_FC 14 14 16 32 2 4 3 OUTPUT_SIZE=10
+<worktrees>/up_old up_old dense d9_convdense Conv_Dense 8 8 4 4 2 4 2 OUTPUT_SIZE=10
+<worktrees>/up_old up_old dense d10_mnist MNIST 28 28 1 16 2 4 6
+<worktrees>/up_old up_old sparse c1_8x4c4 Convolution_Single 8 4 4 16 2 4
+<worktrees>/up_old up_old sparse c2_8x4c2 Convolution_Single 8 4 2 16 2 4
+<worktrees>/up_old up_old sparse c3_8x4c3 Convolution_Single 8 4 3 16 2 4
+<worktrees>/up_old up_old sparse c4_8x4c8 Convolution_Single 8 4 8 16 2 4
+<worktrees>/up_old up_old sparse c5_8x4c16 Convolution_Single 8 4 16 16 2 4
+<worktrees>/up_old up_old sparse c6_8x8c4_g3 Convolution_Single 8 8 4 16 2 4 1 GLBI=3
+<worktrees>/up_old up_old sparse c7_8x8c2_g3 Convolution_Single 8 8 2 16 2 4 1 GLBI=3
+<worktrees>/up_old up_old sparse c8_28x28c1 Convolution_Single 28 28 1 32 2 4
+<worktrees>/up_old up_old sparse c9_stack_c4 Convolution_Stack 8 4 4 4 2 4 2
+<worktrees>/up_old up_old sparse c10_stack_c4_p2 Convolution_Stack 8 4 4 4 2 2 2
+<worktrees>/up_old up_old sparse c11_cpc Conv_Pool_Conv 8 4 2 8 2 4 3
+<worktrees>/up_old up_old sparse c12_stack_c8 Convolution_Stack 8 4 8 8 2 4 2
+<worktrees>/up_old up_old sparse c13_16x4c6 Convolution_Single 16 4 6 16 2 4
+<worktrees>/up_old up_old sparse d1_gemm64_10 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/up_old up_old sparse d2_gemm256_32 GEMM 256 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/up_old up_old sparse d3_gemm1568_32 GEMM 1568 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/up_old up_old sparse d4_gemm3136_10 GEMM 3136 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/up_old up_old sparse d5_gemm64_40 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=40
+<worktrees>/up_old up_old sparse d6_mlp MLP 6 1 1 1 2 4 3
+<worktrees>/up_old up_old sparse d7_upfc8 UP_FC 8 8 4 8 2 4 3 OUTPUT_SIZE=10
+<worktrees>/up_old up_old sparse d8_upfc14 UP_FC 14 14 16 32 2 4 3 OUTPUT_SIZE=10
+<worktrees>/up_old up_old sparse d9_convdense Conv_Dense 8 8 4 4 2 4 2 OUTPUT_SIZE=10
+<worktrees>/up_old up_old sparse d10_mnist MNIST 28 28 1 16 2 4 6
+<worktrees>/up_new up_new dense c1_8x4c4 Convolution_Single 8 4 4 16 2 4
+<worktrees>/up_new up_new dense c2_8x4c2 Convolution_Single 8 4 2 16 2 4
+<worktrees>/up_new up_new dense c3_8x4c3 Convolution_Single 8 4 3 16 2 4
+<worktrees>/up_new up_new dense c4_8x4c8 Convolution_Single 8 4 8 16 2 4
+<worktrees>/up_new up_new dense c5_8x4c16 Convolution_Single 8 4 16 16 2 4
+<worktrees>/up_new up_new dense c6_8x8c4_g3 Convolution_Single 8 8 4 16 2 4 1 GLBI=3
+<worktrees>/up_new up_new dense c7_8x8c2_g3 Convolution_Single 8 8 2 16 2 4 1 GLBI=3
+<worktrees>/up_new up_new dense c8_28x28c1 Convolution_Single 28 28 1 32 2 4
+<worktrees>/up_new up_new dense c9_stack_c4 Convolution_Stack 8 4 4 4 2 4 2
+<worktrees>/up_new up_new dense c10_stack_c4_p2 Convolution_Stack 8 4 4 4 2 2 2
+<worktrees>/up_new up_new dense c11_cpc Conv_Pool_Conv 8 4 2 8 2 4 3
+<worktrees>/up_new up_new dense c12_stack_c8 Convolution_Stack 8 4 8 8 2 4 2
+<worktrees>/up_new up_new dense c13_16x4c6 Convolution_Single 16 4 6 16 2 4
+<worktrees>/up_new up_new dense d1_gemm64_10 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/up_new up_new dense d2_gemm256_32 GEMM 256 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/up_new up_new dense d3_gemm1568_32 GEMM 1568 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/up_new up_new dense d4_gemm3136_10 GEMM 3136 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/up_new up_new dense d5_gemm64_40 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=40
+<worktrees>/up_new up_new dense d6_mlp MLP 6 1 1 1 2 4 3
+<worktrees>/up_new up_new dense d7_upfc8 UP_FC 8 8 4 8 2 4 3 OUTPUT_SIZE=10
+<worktrees>/up_new up_new dense d8_upfc14 UP_FC 14 14 16 32 2 4 3 OUTPUT_SIZE=10
+<worktrees>/up_new up_new dense d9_convdense Conv_Dense 8 8 4 4 2 4 2 OUTPUT_SIZE=10
+<worktrees>/up_new up_new dense d10_mnist MNIST 28 28 1 16 2 4 6
+<worktrees>/up_new up_new sparse c1_8x4c4 Convolution_Single 8 4 4 16 2 4
+<worktrees>/up_new up_new sparse c2_8x4c2 Convolution_Single 8 4 2 16 2 4
+<worktrees>/up_new up_new sparse c3_8x4c3 Convolution_Single 8 4 3 16 2 4
+<worktrees>/up_new up_new sparse c4_8x4c8 Convolution_Single 8 4 8 16 2 4
+<worktrees>/up_new up_new sparse c5_8x4c16 Convolution_Single 8 4 16 16 2 4
+<worktrees>/up_new up_new sparse c6_8x8c4_g3 Convolution_Single 8 8 4 16 2 4 1 GLBI=3
+<worktrees>/up_new up_new sparse c7_8x8c2_g3 Convolution_Single 8 8 2 16 2 4 1 GLBI=3
+<worktrees>/up_new up_new sparse c8_28x28c1 Convolution_Single 28 28 1 32 2 4
+<worktrees>/up_new up_new sparse c9_stack_c4 Convolution_Stack 8 4 4 4 2 4 2
+<worktrees>/up_new up_new sparse c10_stack_c4_p2 Convolution_Stack 8 4 4 4 2 2 2
+<worktrees>/up_new up_new sparse c11_cpc Conv_Pool_Conv 8 4 2 8 2 4 3
+<worktrees>/up_new up_new sparse c12_stack_c8 Convolution_Stack 8 4 8 8 2 4 2
+<worktrees>/up_new up_new sparse c13_16x4c6 Convolution_Single 16 4 6 16 2 4
+<worktrees>/up_new up_new sparse d1_gemm64_10 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/up_new up_new sparse d2_gemm256_32 GEMM 256 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/up_new up_new sparse d3_gemm1568_32 GEMM 1568 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/up_new up_new sparse d4_gemm3136_10 GEMM 3136 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/up_new up_new sparse d5_gemm64_40 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=40
+<worktrees>/up_new up_new sparse d6_mlp MLP 6 1 1 1 2 4 3
+<worktrees>/up_new up_new sparse d7_upfc8 UP_FC 8 8 4 8 2 4 3 OUTPUT_SIZE=10
+<worktrees>/up_new up_new sparse d8_upfc14 UP_FC 14 14 16 32 2 4 3 OUTPUT_SIZE=10
+<worktrees>/up_new up_new sparse d9_convdense Conv_Dense 8 8 4 4 2 4 2 OUTPUT_SIZE=10
+<worktrees>/up_new up_new sparse d10_mnist MNIST 28 28 1 16 2 4 6
+<worktrees>/dev_fc dev_fc dense c1_8x4c4 Convolution_Single 8 4 4 16 2 4
+<worktrees>/dev_fc dev_fc dense c2_8x4c2 Convolution_Single 8 4 2 16 2 4
+<worktrees>/dev_fc dev_fc dense c3_8x4c3 Convolution_Single 8 4 3 16 2 4
+<worktrees>/dev_fc dev_fc dense c4_8x4c8 Convolution_Single 8 4 8 16 2 4
+<worktrees>/dev_fc dev_fc dense c5_8x4c16 Convolution_Single 8 4 16 16 2 4
+<worktrees>/dev_fc dev_fc dense c6_8x8c4_g3 Convolution_Single 8 8 4 16 2 4 1 GLBI=3
+<worktrees>/dev_fc dev_fc dense c7_8x8c2_g3 Convolution_Single 8 8 2 16 2 4 1 GLBI=3
+<worktrees>/dev_fc dev_fc dense c8_28x28c1 Convolution_Single 28 28 1 32 2 4
+<worktrees>/dev_fc dev_fc dense c9_stack_c4 Convolution_Stack 8 4 4 4 2 4 2
+<worktrees>/dev_fc dev_fc dense c10_stack_c4_p2 Convolution_Stack 8 4 4 4 2 2 2
+<worktrees>/dev_fc dev_fc dense c11_cpc Conv_Pool_Conv 8 4 2 8 2 4 3
+<worktrees>/dev_fc dev_fc dense c12_stack_c8 Convolution_Stack 8 4 8 8 2 4 2
+<worktrees>/dev_fc dev_fc dense c13_16x4c6 Convolution_Single 16 4 6 16 2 4
+<worktrees>/dev_fc dev_fc dense d1_gemm64_10 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/dev_fc dev_fc dense d2_gemm256_32 GEMM 256 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/dev_fc dev_fc dense d3_gemm1568_32 GEMM 1568 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/dev_fc dev_fc dense d4_gemm3136_10 GEMM 3136 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/dev_fc dev_fc dense d5_gemm64_40 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=40
+<worktrees>/dev_fc dev_fc dense d6_mlp MLP 6 1 1 1 2 4 3
+<worktrees>/dev_fc dev_fc dense d7_upfc8 UP_FC 8 8 4 8 2 4 3 OUTPUT_SIZE=10
+<worktrees>/dev_fc dev_fc dense d8_upfc14 UP_FC 14 14 16 32 2 4 3 OUTPUT_SIZE=10
+<worktrees>/dev_fc dev_fc dense d9_convdense Conv_Dense 8 8 4 4 2 4 2 OUTPUT_SIZE=10
+<worktrees>/dev_fc dev_fc dense d10_mnist MNIST 28 28 1 16 2 4 6
+<worktrees>/dev_fc dev_fc sparse c1_8x4c4 Convolution_Single 8 4 4 16 2 4
+<worktrees>/dev_fc dev_fc sparse c2_8x4c2 Convolution_Single 8 4 2 16 2 4
+<worktrees>/dev_fc dev_fc sparse c3_8x4c3 Convolution_Single 8 4 3 16 2 4
+<worktrees>/dev_fc dev_fc sparse c4_8x4c8 Convolution_Single 8 4 8 16 2 4
+<worktrees>/dev_fc dev_fc sparse c5_8x4c16 Convolution_Single 8 4 16 16 2 4
+<worktrees>/dev_fc dev_fc sparse c6_8x8c4_g3 Convolution_Single 8 8 4 16 2 4 1 GLBI=3
+<worktrees>/dev_fc dev_fc sparse c7_8x8c2_g3 Convolution_Single 8 8 2 16 2 4 1 GLBI=3
+<worktrees>/dev_fc dev_fc sparse c8_28x28c1 Convolution_Single 28 28 1 32 2 4
+<worktrees>/dev_fc dev_fc sparse c9_stack_c4 Convolution_Stack 8 4 4 4 2 4 2
+<worktrees>/dev_fc dev_fc sparse c10_stack_c4_p2 Convolution_Stack 8 4 4 4 2 2 2
+<worktrees>/dev_fc dev_fc sparse c11_cpc Conv_Pool_Conv 8 4 2 8 2 4 3
+<worktrees>/dev_fc dev_fc sparse c12_stack_c8 Convolution_Stack 8 4 8 8 2 4 2
+<worktrees>/dev_fc dev_fc sparse c13_16x4c6 Convolution_Single 16 4 6 16 2 4
+<worktrees>/dev_fc dev_fc sparse d1_gemm64_10 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/dev_fc dev_fc sparse d2_gemm256_32 GEMM 256 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/dev_fc dev_fc sparse d3_gemm1568_32 GEMM 1568 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/dev_fc dev_fc sparse d4_gemm3136_10 GEMM 3136 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/dev_fc dev_fc sparse d5_gemm64_40 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=40
+<worktrees>/dev_fc dev_fc sparse d6_mlp MLP 6 1 1 1 2 4 3
+<worktrees>/dev_fc dev_fc sparse d7_upfc8 UP_FC 8 8 4 8 2 4 3 OUTPUT_SIZE=10
+<worktrees>/dev_fc dev_fc sparse d8_upfc14 UP_FC 14 14 16 32 2 4 3 OUTPUT_SIZE=10
+<worktrees>/dev_fc dev_fc sparse d9_convdense Conv_Dense 8 8 4 4 2 4 2 OUTPUT_SIZE=10
+<worktrees>/dev_fc dev_fc sparse d10_mnist MNIST 28 28 1 16 2 4 6
+<worktrees>/dev_p1 dev_p1 dense c1_8x4c4 Convolution_Single 8 4 4 16 2 4
+<worktrees>/dev_p1 dev_p1 dense c2_8x4c2 Convolution_Single 8 4 2 16 2 4
+<worktrees>/dev_p1 dev_p1 dense c3_8x4c3 Convolution_Single 8 4 3 16 2 4
+<worktrees>/dev_p1 dev_p1 dense c4_8x4c8 Convolution_Single 8 4 8 16 2 4
+<worktrees>/dev_p1 dev_p1 dense c5_8x4c16 Convolution_Single 8 4 16 16 2 4
+<worktrees>/dev_p1 dev_p1 dense c6_8x8c4_g3 Convolution_Single 8 8 4 16 2 4 1 GLBI=3
+<worktrees>/dev_p1 dev_p1 dense c7_8x8c2_g3 Convolution_Single 8 8 2 16 2 4 1 GLBI=3
+<worktrees>/dev_p1 dev_p1 dense c8_28x28c1 Convolution_Single 28 28 1 32 2 4
+<worktrees>/dev_p1 dev_p1 dense c9_stack_c4 Convolution_Stack 8 4 4 4 2 4 2
+<worktrees>/dev_p1 dev_p1 dense c10_stack_c4_p2 Convolution_Stack 8 4 4 4 2 2 2
+<worktrees>/dev_p1 dev_p1 dense c11_cpc Conv_Pool_Conv 8 4 2 8 2 4 3
+<worktrees>/dev_p1 dev_p1 dense c12_stack_c8 Convolution_Stack 8 4 8 8 2 4 2
+<worktrees>/dev_p1 dev_p1 dense c13_16x4c6 Convolution_Single 16 4 6 16 2 4
+<worktrees>/dev_p1 dev_p1 dense d1_gemm64_10 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/dev_p1 dev_p1 dense d2_gemm256_32 GEMM 256 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/dev_p1 dev_p1 dense d3_gemm1568_32 GEMM 1568 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/dev_p1 dev_p1 dense d4_gemm3136_10 GEMM 3136 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/dev_p1 dev_p1 dense d5_gemm64_40 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=40
+<worktrees>/dev_p1 dev_p1 dense d6_mlp MLP 6 1 1 1 2 4 3
+<worktrees>/dev_p1 dev_p1 dense d7_upfc8 UP_FC 8 8 4 8 2 4 3 OUTPUT_SIZE=10
+<worktrees>/dev_p1 dev_p1 dense d8_upfc14 UP_FC 14 14 16 32 2 4 3 OUTPUT_SIZE=10
+<worktrees>/dev_p1 dev_p1 dense d9_convdense Conv_Dense 8 8 4 4 2 4 2 OUTPUT_SIZE=10
+<worktrees>/dev_p1 dev_p1 dense d10_mnist MNIST 28 28 1 16 2 4 6
+<worktrees>/dev_p1 dev_p1 sparse c1_8x4c4 Convolution_Single 8 4 4 16 2 4
+<worktrees>/dev_p1 dev_p1 sparse c2_8x4c2 Convolution_Single 8 4 2 16 2 4
+<worktrees>/dev_p1 dev_p1 sparse c3_8x4c3 Convolution_Single 8 4 3 16 2 4
+<worktrees>/dev_p1 dev_p1 sparse c4_8x4c8 Convolution_Single 8 4 8 16 2 4
+<worktrees>/dev_p1 dev_p1 sparse c5_8x4c16 Convolution_Single 8 4 16 16 2 4
+<worktrees>/dev_p1 dev_p1 sparse c6_8x8c4_g3 Convolution_Single 8 8 4 16 2 4 1 GLBI=3
+<worktrees>/dev_p1 dev_p1 sparse c7_8x8c2_g3 Convolution_Single 8 8 2 16 2 4 1 GLBI=3
+<worktrees>/dev_p1 dev_p1 sparse c8_28x28c1 Convolution_Single 28 28 1 32 2 4
+<worktrees>/dev_p1 dev_p1 sparse c9_stack_c4 Convolution_Stack 8 4 4 4 2 4 2
+<worktrees>/dev_p1 dev_p1 sparse c10_stack_c4_p2 Convolution_Stack 8 4 4 4 2 2 2
+<worktrees>/dev_p1 dev_p1 sparse c11_cpc Conv_Pool_Conv 8 4 2 8 2 4 3
+<worktrees>/dev_p1 dev_p1 sparse c12_stack_c8 Convolution_Stack 8 4 8 8 2 4 2
+<worktrees>/dev_p1 dev_p1 sparse c13_16x4c6 Convolution_Single 16 4 6 16 2 4
+<worktrees>/dev_p1 dev_p1 sparse d1_gemm64_10 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/dev_p1 dev_p1 sparse d2_gemm256_32 GEMM 256 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/dev_p1 dev_p1 sparse d3_gemm1568_32 GEMM 1568 1 1 1 2 4 1 OUTPUT_SIZE=32
+<worktrees>/dev_p1 dev_p1 sparse d4_gemm3136_10 GEMM 3136 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/dev_p1 dev_p1 sparse d5_gemm64_40 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=40
+<worktrees>/dev_p1 dev_p1 sparse d6_mlp MLP 6 1 1 1 2 4 3
+<worktrees>/dev_p1 dev_p1 sparse d7_upfc8 UP_FC 8 8 4 8 2 4 3 OUTPUT_SIZE=10
+<worktrees>/dev_p1 dev_p1 sparse d8_upfc14 UP_FC 14 14 16 32 2 4 3 OUTPUT_SIZE=10
+<worktrees>/dev_p1 dev_p1 sparse d9_convdense Conv_Dense 8 8 4 4 2 4 2 OUTPUT_SIZE=10
+<worktrees>/dev_p1 dev_p1 sparse d10_mnist MNIST 28 28 1 16 2 4 6

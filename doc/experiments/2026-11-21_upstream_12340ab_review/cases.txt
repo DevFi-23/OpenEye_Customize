@@ -1,0 +1,23 @@
+c1_8x4c4 Convolution_Single 8 4 4 16 2 4
+c2_8x4c2 Convolution_Single 8 4 2 16 2 4
+c3_8x4c3 Convolution_Single 8 4 3 16 2 4
+c4_8x4c8 Convolution_Single 8 4 8 16 2 4
+c5_8x4c16 Convolution_Single 8 4 16 16 2 4
+c6_8x8c4_g3 Convolution_Single 8 8 4 16 2 4 1 GLBI=3
+c7_8x8c2_g3 Convolution_Single 8 8 2 16 2 4 1 GLBI=3
+c8_28x28c1 Convolution_Single 28 28 1 32 2 4
+c9_stack_c4 Convolution_Stack 8 4 4 4 2 4 2
+c10_stack_c4_p2 Convolution_Stack 8 4 4 4 2 2 2
+c11_cpc Conv_Pool_Conv 8 4 2 8 2 4 3
+c12_stack_c8 Convolution_Stack 8 4 8 8 2 4 2
+c13_16x4c6 Convolution_Single 16 4 6 16 2 4
+d1_gemm64_10 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=10
+d2_gemm256_32 GEMM 256 1 1 1 2 4 1 OUTPUT_SIZE=32
+d3_gemm1568_32 GEMM 1568 1 1 1 2 4 1 OUTPUT_SIZE=32
+d4_gemm3136_10 GEMM 3136 1 1 1 2 4 1 OUTPUT_SIZE=10
+d5_gemm64_40 GEMM 64 1 1 1 2 4 1 OUTPUT_SIZE=40
+d6_mlp MLP 6 1 1 1 2 4 3
+d7_upfc8 UP_FC 8 8 4 8 2 4 3 OUTPUT_SIZE=10
+d8_upfc14 UP_FC 14 14 16 32 2 4 3 OUTPUT_SIZE=10
+d9_convdense Conv_Dense 8 8 4 4 2 4 2 OUTPUT_SIZE=10
+d10_mnist MNIST 28 28 1 16 2 4 6

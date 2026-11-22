@@ -1,0 +1,6 @@
+dev_fc sparse h1_4x4c4f8_cc1 | 15850.00 ns | dev_fc_sparse_h1_4x4c4f8_cc1 Convolution_Single 4x4x4->8 CR4 GLB_PSUM4: FAIL (SystemExit); ['result check failed: values differ, reference file differs', '4 of 8 feature maps differ', 'Difference found at line 5']
+dev_fc sparse h2_6x2c1f16_cc1 | 11490.00 ns | dev_fc_sparse_h2_6x2c1f16_cc1 Convolution_Single 6x2x1->16 CR4 GLB_PSUM4: FAIL (SystemExit); ['result check failed: values differ, reference file differs', '8 of 16 feature maps differ', 'Difference found at line 5']
+dev_fc sparse h3_4x8c16f8_cc1 | 58200.00 ns | dev_fc_sparse_h3_4x8c16f8_cc1 Convolution_Single 4x8x16->8 CR4 GLB_PSUM4: FAIL (SystemExit); ['result check failed: values differ, reference file differs', '4 of 8 feature maps differ', 'Difference found at line 5']
+dev_p1 sparse h1_4x4c4f8_cc1 | 15850.00 ns | dev_p1_sparse_h1_4x4c4f8_cc1 Convolution_Single 4x4x4->8 CR4 GLB_PSUM4: PASS; []
+dev_p1 sparse h2_6x2c1f16_cc1 | 11490.00 ns | dev_p1_sparse_h2_6x2c1f16_cc1 Convolution_Single 6x2x1->16 CR4 GLB_PSUM4: PASS; []
+dev_p1 sparse h3_4x8c16f8_cc1 | 58200.00 ns | dev_p1_sparse_h3_4x8c16f8_cc1 Convolution_Single 4x8x16->8 CR4 GLB_PSUM4: PASS; []

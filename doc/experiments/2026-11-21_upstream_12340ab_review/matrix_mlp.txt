@@ -1,0 +1,4 @@
+up_old dense d6b_mlp2 | 9880.00 ns | up_old_dense_d6b_mlp2 MLP 6x1x1->1 CR2 GLB_PSUM4: FAIL (SystemExit); ['Error found in Iact storage; word: 0 cell: 0 addr: 0']
+up_old sparse d6b_mlp2 | 10170.00 ns | up_old_sparse_d6b_mlp2 MLP 6x1x1->1 CR2 GLB_PSUM4: FAIL (SystemExit); ['Error found in Iact storage; word: 0 cell: 0 addr: 0']
+up_new dense d6b_mlp2 | 9880.00 ns | up_new_dense_d6b_mlp2 MLP 6x1x1->1 CR2 GLB_PSUM4: FAIL (SystemExit); ['Error found in Iact storage; word: 0 cell: 0 addr: 0']
+up_new sparse d6b_mlp2 | 10170.00 ns | up_new_sparse_d6b_mlp2 MLP 6x1x1->1 CR2 GLB_PSUM4: FAIL (SystemExit); ['Error found in Iact storage; word: 0 cell: 0 addr: 0']

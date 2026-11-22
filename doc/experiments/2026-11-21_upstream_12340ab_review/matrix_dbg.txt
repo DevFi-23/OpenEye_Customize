@@ -1,0 +1,2 @@
+up_new dense d5d_gemm64_40_dbg | 15480.00 ns | up_new_dense_d5d_gemm64_40_dbg GEMM 64x1x1->1 CR2 GLB_PSUM4: FAIL (SystemExit); ['result check failed: values differ, reference file ok', '30 of 40 outputs differ']
+(comparison above used the wrong directory; upstream names it demo/layer_dense)

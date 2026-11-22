@@ -1,0 +1,4 @@
+dev_fc sparse k5_gemm4000_10 | 189080.00 ns | dev_fc_sparse_k5_gemm4000_10 GEMM 4000x1x1->1 CR2 GLB_PSUM4: PASS; []
+dev_fc sparse k6_gemm4088_10 | 192300.00 ns | dev_fc_sparse_k6_gemm4088_10 GEMM 4088x1x1->1 CR2 GLB_PSUM4: PASS; []
+dev_fc sparse k5_gemm4000_10 | 189080.00 ns | dev_fc_sparse_k5_gemm4000_10 GEMM 4000x1x1->1 CR2 GLB_PSUM4: PASS; []
+dev_fc sparse k6_gemm4088_10 | 192300.00 ns | dev_fc_sparse_k6_gemm4088_10 GEMM 4088x1x1->1 CR2 GLB_PSUM4: PASS; []

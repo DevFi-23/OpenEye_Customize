@@ -1,0 +1,4 @@
+dev_fc sparse k1_gemm4096_10 | 174980.00 ns | dev_fc_sparse_k1_gemm4096_10 GEMM 4096x1x1->1 CR2 GLB_PSUM4: FAIL (SystemExit); ['result check failed: values differ, reference file differs', 'Difference found at line 1', '10 of 10 outputs differ']
+dev_fc sparse k2_gemm4200_10 | 198740.00 ns | dev_fc_sparse_k2_gemm4200_10 GEMM 4200x1x1->1 CR2 GLB_PSUM4: FAIL (SystemExit); ['result check failed: values differ, reference file differs', 'Difference found at line 1', '10 of 10 outputs differ']
+up_new dense k3_gemm2046_10 | 80150.00 ns | up_new_dense_k3_gemm2046_10 GEMM 2046x1x1->1 CR2 GLB_PSUM4: PASS; []
+up_new dense k4_gemm2050_10 | 80150.00 ns | up_new_dense_k4_gemm2050_10 GEMM 2050x1x1->1 CR2 GLB_PSUM4: FAIL (SystemExit); ['result check failed: values differ, reference file differs', 'Difference found at line 1', '10 of 10 outputs differ']

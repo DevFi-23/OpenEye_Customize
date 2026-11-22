@@ -1,0 +1,103 @@
+test/cocotb_fpga/test_conv_const.py::test_conv_const_single_layer[1-2] ======================== 1 passed in 278.82s (0:04:38) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_const_single_layer[1-8] ======================== 1 passed in 279.14s (0:04:39) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_const_single_layer[1-1] ======================== 1 passed in 280.13s (0:04:40) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_const_single_layer[2-1] ======================== 1 passed in 280.87s (0:04:40) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_const_single_layer[2-2] ======================== 1 passed in 281.97s (0:04:41) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_const_single_layer[2-8] ======================== 1 passed in 282.88s (0:04:42) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_const_two_layers[iact3_ch1-1-8] ======================== 1 passed in 283.81s (0:04:43) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_const_two_layers[iact3_ch1-1-1] ======================== 1 passed in 283.85s (0:04:43) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_const_two_layers[iact1_ch4-1-1] ======================== 1 passed in 307.03s (0:05:07) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_const_two_layers[iact1_ch4-1-8] ======================== 1 passed in 307.13s (0:05:07) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_const_two_layers[iact3_ch1-2-8] ======================== 1 passed in 312.35s (0:05:12) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_const_two_layers[iact3_ch1-2-1] ======================== 1 passed in 312.76s (0:05:12) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_ramp_writeback[4-32] ======================== 1 passed in 312.29s (0:05:12) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_ramp_writeback[4-20] ======================== 1 passed in 312.41s (0:05:12) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_const_two_layers[iact1_ch4-2-8] ======================== 1 passed in 313.40s (0:05:13) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_const_two_layers[iact1_ch4-2-1] ======================== 1 passed in 314.26s (0:05:14) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_input_mapping[1-1] ======================== 1 passed in 327.33s (0:05:27) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_input_mapping[1-3] ======================== 1 passed in 327.11s (0:05:27) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_input_mapping[4-3] ======================== 1 passed in 329.22s (0:05:29) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_ramp_writeback[8-32] ======================== 1 passed in 337.53s (0:05:37) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_ramp_writeback[8-20] ======================== 1 passed in 338.23s (0:05:38) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_input_mapping[4-1] ======================== 1 passed in 329.60s (0:05:29) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_channel_order ======================== 1 passed in 337.05s (0:05:37) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_single_channel_writeback[1] ======================== 1 passed in 334.78s (0:05:34) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_tall_input[1-1] ======================== 1 passed in 310.59s (0:05:10) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_single_channel_writeback[3] ======================== 1 passed in 316.77s (0:05:16) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_tall_input[3-1] ======================== 1 passed in 311.44s (0:05:11) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_tall_ramp[1-3] ======================== 1 passed in 311.67s (0:05:11) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_tall_input[3-4] ======================== 1 passed in 313.30s (0:05:13) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_tall_input[1-4] ======================== 1 passed in 313.79s (0:05:13) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_tall_ramp[1-4] ======================== 1 passed in 312.23s (0:05:12) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_tall_ramp[3-3] ======================== 1 passed in 309.95s (0:05:09) =========================
+test/cocotb_fpga/test_glb_psum2.py::test_glb_psum2[conv_single] ============================== 1 passed in 19.49s ==============================
+test/cocotb_fpga/test_conv_const.py::test_conv_bias_order[2_kernels] ============================== 1 passed in 22.84s ==============================
+test/cocotb_fpga/test_conv_const.py::test_conv_bias_order[4_kernels] ============================== 1 passed in 23.49s ==============================
+test/cocotb_fpga/test_glb_psum2.py::test_glb_psum2[conv_stack] ============================== 1 passed in 22.77s ==============================
+test/cocotb_fpga/test_glb_psum2.py::test_glb_psum2[conv_stack_w14] ============================== 1 passed in 30.35s ==============================
+test/cocotb_fpga/test_glb_psum2.py::test_glb_psum2[conv_pool_conv_w8] ============================== 1 passed in 21.38s ==============================
+test/cocotb_fpga/test_glb_psum2.py::test_glb_psum2[conv_pool_conv_w6] ============================== 1 passed in 21.04s ==============================
+test/cocotb_fpga/test_glb_psum2.py::test_glb_psum2[conv_pool_conv_x2] ============================== 1 passed in 34.93s ==============================
+test/cocotb_fpga/test_glb_psum2.py::test_glb_psum2[conv_stack_c16] ========================= 1 passed in 63.11s (0:01:03) =========================
+test/cocotb_fpga/test_stride.py::test_stride2[single_8x8] ============================== 1 passed in 18.15s ==============================
+test/cocotb_fpga/test_stride.py::test_stride2[single_4x8] ============================== 1 passed in 17.84s ==============================
+test/cocotb_fpga/test_stride.py::test_stride2[single_12x8] ============================== 1 passed in 19.77s ==============================
+test/cocotb_fpga/test_stride.py::test_stride2[single_7x7] ============================== 1 passed in 17.92s ==============================
+test/cocotb_fpga/test_stride.py::test_stride2[single_7x8_glbp2] ============================== 1 passed in 14.99s ==============================
+test/cocotb_fpga/test_stride.py::test_stride2[single_24x8] ============================== 1 passed in 22.24s ==============================
+test/cocotb_fpga/test_stride.py::test_stride2[stack_8x8] ============================== 1 passed in 21.59s ==============================
+test/cocotb_fpga/test_stride.py::test_stride2[stack_14x8] ============================== 1 passed in 21.84s ==============================
+test/cocotb_fpga/test_stride.py::test_stride2[stack_16x14] ============================== 1 passed in 25.53s ==============================
+test/cocotb_fpga/test_stride.py::test_stride2[conv_pool_conv_28] ============================== 1 passed in 33.42s ==============================
+test/cocotb_fpga/test_stride.py::test_stride2[conv_dense_8x8] ============================== 1 passed in 20.77s ==============================
+test/cocotb_fpga/test_stride.py::test_stride2[conv_dense_16x14] ============================== 1 passed in 24.61s ==============================
+test/cocotb_fpga/test_conv_const.py::test_conv_tall_ramp[3-4] ======================== 1 passed in 316.83s (0:05:16) =========================
+test/cocotb_fpga/test_conv_const.py::test_conv_tall_writeback ======================== 1 passed in 326.77s (0:05:26) =========================
+test/cocotb_fpga/test_pooling.py::test_conv_maxpool_conv[2-8] ======================== 1 passed in 337.73s (0:05:37) =========================
+test/cocotb_fpga/test_pooling.py::test_conv_maxpool_conv[2-6] ======================== 1 passed in 342.79s (0:05:42) =========================
+test/cocotb_fpga/test_pooling.py::test_conv_maxpool_conv[4-6] ======================== 1 passed in 344.26s (0:05:44) =========================
+test/cocotb_fpga/test_pooling.py::test_conv_maxpool_conv[4-8] ======================== 1 passed in 347.58s (0:05:47) =========================
+test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter[single_c4_f16] ======================== 1 passed in 325.54s (0:05:25) =========================
+test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter[single_c4_f4] ======================== 1 passed in 318.49s (0:05:18) =========================
+test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter_trained_mnist ============================== 1 skipped in 0.19s ==============================
+test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter[single_c4_f16_cr1] ======================== 1 passed in 294.43s (0:04:54) =========================
+test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter[single_c4_f16_cr4] ======================== 1 passed in 298.09s (0:04:58) =========================
+test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter[stack_c4_f4_glbp2] ======================== 1 passed in 266.57s (0:04:26) =========================
+test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter[single_c4_f16_dense] ======================== 1 passed in 275.79s (0:04:35) =========================
+test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter[conv_pool_conv_c2_f8] ======================== 1 passed in 282.55s (0:04:42) =========================
+test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter[stack_c4_f16] ======================== 1 passed in 314.95s (0:05:14) =========================
+test/cocotb_fpga/test_int8_clamp.py::test_int8_clamp[sat_conv_stack] ============================== 1 passed in 25.41s ==============================
+test/cocotb_fpga/test_int8_clamp.py::test_int8_clamp[relu_conv_stack] ============================== 1 passed in 24.46s ==============================
+test/cocotb_fpga/test_int8_clamp.py::test_int8_clamp[relu_sat_conv_stack] ============================== 1 passed in 24.81s ==============================
+test/cocotb_fpga/test_int8_clamp.py::test_int8_clamp[relu_sat_conv_pool_conv] ============================== 1 passed in 25.35s ==============================
+test/cocotb_fpga/test_int8_clamp.py::test_int8_clamp[relu_sat_dense_chain] ============================== 1 passed in 20.66s ==============================
+test/cocotb_fpga/test_int8_clamp.py::test_int8_clamp[relu_mlp] ============================== 1 passed in 20.04s ==============================
+test/cocotb_fpga/test_int8_clamp.py::test_int8_clamp[sat_conv_stack_psum2] ============================== 1 passed in 19.45s ==============================
+test/cocotb_fpga/test_mnist_layers.py::test_iact_channel_mapping[1-1] ============================== 1 passed in 18.40s ==============================
+test/cocotb_fpga/test_mnist_layers.py::test_iact_channel_mapping[1-2] ============================== 1 passed in 20.54s ==============================
+test/cocotb_fpga/test_int8_clamp.py::test_int8_clamp[relu_sat_conv_stack_c16] ========================= 1 passed in 92.93s (0:01:32) =========================
+test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter_off[single_c4_f16_off] ======================== 1 passed in 268.86s (0:04:28) =========================
+test/cocotb_fpga/test_mnist_layers.py::test_iact_channel_mapping[1-3] ============================= 1 xfailed in 22.41s ==============================
+test/cocotb_fpga/test_mnist_layers.py::test_iact_channel_mapping[1-4] ============================== 1 passed in 22.64s ==============================
+test/cocotb_fpga/test_mnist_layers.py::test_iact_channel_mapping[1-8] ============================== 1 passed in 26.82s ==============================
+test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter[stack_c4_f16_dense] ======================== 1 passed in 303.87s (0:05:03) =========================
+test/cocotb_fpga/test_mnist_layers.py::test_iact_channel_mapping[3-1] ============================== 1 passed in 21.76s ==============================
+test/cocotb_fpga/test_mnist_layers.py::test_iact_channel_mapping[3-2] ============================== 1 passed in 21.91s ==============================
+test/cocotb_fpga/test_mnist_layers.py::test_iact_channel_mapping[3-3] ============================= 1 xfailed in 23.25s ==============================
+test/cocotb_fpga/test_mnist_layers.py::test_iact_channel_mapping[3-4] ============================== 1 passed in 23.79s ==============================
+test/cocotb_fpga/test_mnist_layers.py::test_iact_channel_mapping[3-8] ============================== 1 passed in 30.09s ==============================
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c8_f4] ============================== 1 passed in 31.79s ==============================
+test/cocotb_fpga/test_bias_per_filter.py::test_bias_per_filter_off[conv_pool_conv_c2_f8_off] ======================== 1 passed in 276.09s (0:04:36) =========================
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c8_f64] ========================= 1 passed in 76.01s (0:01:16) =========================
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[20x8_c1_f8] ============================== 1 passed in 38.51s ==============================
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c32_f32] ======================== 1 passed in 118.40s (0:01:58) =========================
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[40x8_c1_f8] ============================== 1 passed in 45.43s ==============================
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c1_f64] ============================== 1 passed in 41.45s ==============================
+test/cocotb_fpga/test_real_model.py::test_real_model[0] ============================== 1 skipped in 0.31s ==============================
+test/cocotb_fpga/test_bug49.py::test_bug49[paper_relu_cr2_x2_y3] ======================== 1 passed in 451.11s (0:07:31) =========================
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[28x28_c1_f32] ======================== 1 passed in 189.19s (0:03:09) =========================
+test/cocotb_fpga/test_bug49.py::test_bug49[paper_relu_cr2_x2_y4] ======================== 1 passed in 543.65s (0:09:03) =========================
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c64_f64] ======================== 1 passed in 340.86s (0:05:40) =========================
+test/cocotb_fpga/test_int8_clamp.py::test_int8_clamp[relu_paper_network] ======================== 1 passed in 490.87s (0:08:10) =========================
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[14x14_c32_f32] ======================== 1 passed in 374.68s (0:06:14) =========================
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[mnist_conv2_14x14_c32_f64] ======================== 1 passed in 465.85s (0:07:45) =========================

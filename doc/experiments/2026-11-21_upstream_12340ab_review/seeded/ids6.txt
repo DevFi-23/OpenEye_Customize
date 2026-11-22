@@ -1,0 +1,6 @@
+test/cocotb_fpga/test_conv_const.py::test_conv_bias_order[2_kernels]
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[14x14_c32_f32]
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c32_f32]
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c64_f64]
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[8x4_c8_f64]
+test/cocotb_fpga/test_mnist_layers.py::test_random_data[mnist_conv2_14x14_c32_f64]

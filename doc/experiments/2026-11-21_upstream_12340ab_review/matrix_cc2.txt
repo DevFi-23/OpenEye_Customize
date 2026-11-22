@@ -1,0 +1,2 @@
+dev_fc sparse n2_4x4c4f8_cr2_cc1 | 14250.00 ns | dev_fc_sparse_n2_4x4c4f8_cr2_cc1 Convolution_Single 4x4x4->8 CR2 GLB_PSUM4: PASS; []
+dev_fc sparse n1_8x4c4f16_cr2_cc1 | 21650.00 ns | dev_fc_sparse_n1_8x4c4f16_cr2_cc1 Convolution_Single 8x4x4->16 CR2 GLB_PSUM4: PASS; []

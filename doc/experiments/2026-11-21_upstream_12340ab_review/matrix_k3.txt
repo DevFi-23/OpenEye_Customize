@@ -1,0 +1,1 @@
+dev_fc sparse k7_gemm4094_10 | 192340.00 ns | dev_fc_sparse_k7_gemm4094_10 GEMM 4094x1x1->1 CR2 GLB_PSUM4: PASS; []

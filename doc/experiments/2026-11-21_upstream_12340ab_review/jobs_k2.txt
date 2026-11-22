@@ -1,0 +1,2 @@
+<worktrees>/dev_fc dev_fc sparse k5_gemm4000_10 GEMM 4000 1 1 1 2 4 1 OUTPUT_SIZE=10
+<worktrees>/dev_fc dev_fc sparse k6_gemm4088_10 GEMM 4088 1 1 1 2 4 1 OUTPUT_SIZE=10

@@ -1,0 +1,4 @@
+<worktrees>/up_old up_old dense d6b_mlp2 MLP 6 1 1 1 2 4 2
+<worktrees>/up_old up_old sparse d6b_mlp2 MLP 6 1 1 1 2 4 2
+<worktrees>/up_new up_new dense d6b_mlp2 MLP 6 1 1 1 2 4 2
+<worktrees>/up_new up_new sparse d6b_mlp2 MLP 6 1 1 1 2 4 2
