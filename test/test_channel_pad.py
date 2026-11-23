@@ -1,6 +1,7 @@
 # This file is part of the OpenEye project.
 # SPDX-License-Identifier: SHL-2.1
-"""One-channel input padded to two channels (open_eye.channel_pad, workaround for RTL bug #17)."""
+"""Padding of the first layer's input channels (open_eye.channel_pad): an odd count above 1 to the next even count
+(bug #7, on by default since 2026-11-22) and one channel to two (former workaround for RTL bug #17)."""
 import types
 
 import numpy as np
@@ -212,3 +213,54 @@ def test_check_full_passes_bug40_controls(monkeypatch):
     p = lp.LayerParameters([0], conv_layer(8, channels=1, filters=48), oep.get_oep(1), 0, 1)
     with pytest.raises(NotImplementedError, match="64 filter slots"):
         lp.check_full_passes(p)
+
+
+# --- odd channel counts (bug #7) ---------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("channels,padded_to", [(1, None), (2, None), (3, 4), (4, None), (5, 8), (7, 8), (8, None),
+                                                (9, 12), (11, 12), (13, 16)])
+def test_odd_channels_are_padded(channels, padded_to, monkeypatch):
+    """An odd count above 1 gets zero channels up to 4 or the next multiple of 4 (6 and 10 channels are wrong, #45),
+    whatever OPENEYE_PAD_CHANNELS says; the padded layer passes check_conv_geometry, the original one is refused."""
+    model = [conv_layer(8, channels), "next layer"]
+    params = parameters(model[0], monkeypatch)
+    for env in ("0", "1"):     # 8 pixels wide: one x pass, so the bug #17 padding never applies here
+        monkeypatch.setenv(channel_pad.PAD_CHANNELS_ENV, env)
+        assert channel_pad.needs_even_channels(params) == (padded_to is not None)
+        assert channel_pad.padded_channels(params) == padded_to
+        padded, done = channel_pad.pad_first_layer(model, [params])
+        if padded_to is None:
+            assert (padded, done) == (model, False)
+            continue
+        assert done and isinstance(padded[0], channel_pad.ChannelPaddedConv2D) and padded[1] == "next layer"
+        assert (padded[0].original_channels, padded[0].pad_channels) == (channels, padded_to - channels)
+        assert tuple(padded[0].input.shape)[3] == padded_to
+        assert np.all(padded[0].kernel[:, :, channels:, :] == 0)      # the float model: the zero channel adds nothing
+        assert np.array_equal(padded[0].kernel[:, :, :channels, :], np.asarray(model[0].weights[0]))
+        new = parameters(padded[0], monkeypatch)
+        assert new.channels == padded_to and not channel_pad.needs_even_channels(new)
+        assert (new.iact_size_x, new.iact_size_y, new.filters, new.psum_size_x) == \
+               (params.iact_size_x, params.iact_size_y, params.filters, params.psum_size_x)
+        assert lp.check_conv_geometry(new, oep.get_oep(1)) is new
+        with pytest.raises(NotImplementedError, match="bug #7"):
+            lp.check_conv_geometry(params, oep.get_oep(1))
+
+
+def test_odd_channel_padding_is_for_convolutions_only():
+    dense = types.SimpleNamespace(layer_name="Dense", channels=3, iact_x_line_repetitions=1)
+    pool = types.SimpleNamespace(layer_name="Pooling", channels=3, iact_x_line_repetitions=1)
+    assert channel_pad.pad_first_layer(["dense"], [dense]) == (["dense"], False)
+    assert channel_pad.pad_first_layer(["pool"], [pool]) == (["pool"], False)
+
+
+def test_fill_three_channels_padded_to_four():
+    layer = channel_pad.ChannelPaddedConv2D(conv_layer(4, channels=3, filters=2), 4)
+    fmap = [[[c * 100 + x * 4 + y + 1 for y in range(4)] for x in range(4)] for c in range(4)]
+    weights = [[[[c + 2] * 3] * 3 for _ in range(2)] for c in range(4)]       # [c][f][ky][kx]
+    dram = types.SimpleNamespace(fmap=[fmap, "layer 1"], weights=[weights, "layer 1"])
+    assert channel_pad.fill_padding_channels([layer], dram) == 1
+    for c in range(3):                                                         # data channels kept
+        assert dram.fmap[0][c] == [[c * 100 + x * 4 + y + 1 for y in range(4)] for x in range(4)]
+        assert dram.weights[0][c] == [[[c + 2] * 3] * 3] * 2
+    assert dram.fmap[0][3] == [[0] * 4] * 4
+    assert dram.weights[0][3] == [[[channel_pad.PAD_WEIGHT] * 3] * 3] * 2

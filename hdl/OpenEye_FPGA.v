@@ -968,10 +968,13 @@ reg [1023:0] fst_path;
           iact_converter_x <= iact_converter_x + (NUM_GLB_WGHT * iact_channels_per_pe >> 1);
         end else begin
           if (((((iact_converter_x + (CLUSTER_COLUMNS * iact_x_per_cluster)) * iact_x_line_repetitions) >= iact_x_add_up * needed_y_cls_reg))) begin
+            // Every kernel group starts its row sweep at x = 0 (bug #51). A
+            // branch here started the next kernel group at iact_x_per_cluster
+            // when the last tile of the row reached the end: never true at 2
+            // cluster columns, but at CLUSTER_COLUMNS = 1 with several kernel
+            // groups (CR 4 / 8) it skipped the first tile, and half the feature
+            // maps came out wrong. Removed as in upstream 12340ab.
             iact_converter_x <= 0;
-            if (((iact_converter_x + iact_x_per_cluster) >= iact_x_add_up) & (kernels_per_calc != 1) & (iact_x_per_cluster < iact_x_add_up)) begin
-              iact_converter_x <= iact_x_per_cluster;
-            end
             fsm_iact_params_kernel <= fsm_iact_params_kernel + 1;
             if (fsm_iact_params_kernel == kernels_per_calc - 1) begin
               fsm_iact_params_kernel <= 0;

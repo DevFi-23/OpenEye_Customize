@@ -125,12 +125,15 @@ class DenseMapper(LayerMapper):
         # === REGISTER PACKING ===
         # Pack all layer configuration parameters into hardware register format
         # Uses pack_registers() utility from regmap_pack module
-            from open_eye.layer_parameters import activation_registers, check_iact_buffer, check_wght_buffer
+            from open_eye.layer_parameters import (activation_registers, check_dense_input, check_iact_buffer,
+                                                   check_wght_buffer, dense_add_up_register)
             from open_eye.generator import pack_registers
+            # the input must stay below the clamped iact_x_add_up in input pairs (bug #50);
             # the weights of this layer must fit the weight staging buffer (bug #29): all K passes are stored at once;
             # a pass of activations the iact buffer (bug #37). A last layer with more than one psum pass is fine: the
             # refusal of bug #21 went on 2026-11-21, the wrong outputs came from the testbench decoder
             # (doc/experiments/2026-11-21_test_dense_output.md)
+            check_dense_input(layer_params, params)
             check_wght_buffer(params, len(self.WghtStreamCreator.get_wght_stream()), str(layer_params.layer_name))
             check_iact_buffer(layer_params)
             words = pack_registers({
@@ -237,7 +240,8 @@ class DenseMapper(LayerMapper):
             # by the Dense path, so they go out as 0 until write_dense_layer sets
             # them - sending them here at least makes that visible in one place.
             "iact_x_per_cluster": layer_params.iact_x_per_cluster,
-            "iact_x_add_up": layer_params.iact_x_add_up,
+            # K itself, clamped to the 12-bit field (bug #50, dense_add_up_register)
+            "iact_x_add_up": dense_add_up_register(layer_params),
             "psum_x_all_cluster": layer_params.psum_x_all_cluster,
             "overhang_discrepancy": layer_params.overhang_discrepancy,
             "start_param_array" : layer_params.start_param_array,

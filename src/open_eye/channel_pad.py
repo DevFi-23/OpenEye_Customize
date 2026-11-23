@@ -1,6 +1,21 @@
 # This file is part of the OpenEye project.
 # SPDX-License-Identifier: SHL-2.1
-"""Pad a one-channel convolution input to two channels (former Python workaround for RTL bug #17).
+"""Pad the input channels of the first convolution: an odd count above 1 with zero channels (bug #7, on by default
+since 2026-11-22; 3 to 4, 5 and 7 to 8, 9 to 12), and one channel to two (former Python workaround for RTL bug #17, off by
+default).
+
+Bug #7: the input stream of layer 0 packs the channels of a pixel back to back (3 bytes for 3 channels) while the RTL
+moves activations in channel pairs (PARALLEL_MACS = 2, ceil(C / 2) transfers per pixel), so with an odd count the
+pixels straddle the transfers and every output was wrong (doc/experiments/2026-10-14_channel_bugs.md, part 2). Zero
+channels make the count one the RTL handles: 3 becomes 4; above 4 the count must also be a multiple of 4 (bug #45: 6
+and 10 channels are wrong, 8 and 12 right), so 5 and 7 become 8 and 9 becomes 12. The outputs are exactly those of the
+layer (the products of a zero channel are 0) and the sparse PE skips the zero activations, so the cost is about that of
+the padded channel count (8 x 4 x 3 -> 8: 10,480 / 9,110 ns padded to 4, against 10,650 / 9,270 ns for a real 4-channel
+input; doc/experiments/2026-11-22_bug50_51.md, section 6). A middle layer with an odd input count (the layer before
+has an odd filter count) is still refused by check_conv_geometry: its input comes from the write-back, not from the
+host.
+
+Bug #17, as it was:
 
 Bug #17 is fixed in the RTL since 2026-11-04 (as upstream 36395dd: a one-channel
 pixel is a word of its own, no row-pair packing), so the padding is OFF by
@@ -23,9 +38,10 @@ harmless next to zero activations. The cost is the second channel on the DMA
 input stream, in the converter and in the weight stream; the zero activations
 are skipped by the sparse PE datapath.
 
-Used by the testbench (OpenEye_FPGA_tb.py) when OPENEYE_PAD_CHANNELS=1 (was on
-by default until the bug #17 fix). Only layer 0 is padded, the only layer
-whose activations come from the DMA stream through the converter.
+Used by the testbench (OpenEye_FPGA_tb.py): for an odd channel count always, for
+bug #17 when OPENEYE_PAD_CHANNELS=1 (was on by default until the bug #17 fix).
+Only layer 0 is padded, the only layer whose activations come from the DMA stream
+through the converter.
 """
 
 import os
@@ -44,9 +60,29 @@ def padding_enabled():
 
 
 def needs_padding(layer_params):
-    """True for the layers bug #17 breaks: a convolution with one input channel and more than one x pass."""
+    """True for the layers bug #17 broke: a convolution with one input channel and more than one x pass."""
     return (layer_params.layer_name == "Convolution2D" and layer_params.channels == 1
             and layer_params.iact_x_line_repetitions > 1)
+
+
+def needs_even_channels(layer_params):
+    """True for the layers bug #7 breaks: a convolution with an odd number of input channels above 1."""
+    return (layer_params.layer_name == "Convolution2D" and layer_params.channels > 1
+            and layer_params.channels % 2 == 1)
+
+
+def even_channel_count(channels):
+    """The channel count an odd count above 1 is padded to: 4 for 3, the next multiple of 4 above (bug #45)."""
+    return 4 if channels < 4 else -(-channels // 4) * 4
+
+
+def padded_channels(layer_params):
+    """The input channel count layer 0 is padded to, or None when it is not padded (see pad_first_layer)."""
+    if needs_even_channels(layer_params):
+        return even_channel_count(layer_params.channels)
+    if padding_enabled() and needs_padding(layer_params):
+        return 2
+    return None
 
 
 class ChannelPaddedConv2D:
@@ -84,14 +120,15 @@ class ChannelPaddedConv2D:
 
 
 def pad_first_layer(model, layer_parameters):
-    """Return (model, padded): layer 0 wrapped in ChannelPaddedConv2D when needs_padding says so.
+    """Return (model, padded): layer 0 wrapped in ChannelPaddedConv2D when padded_channels says so.
 
     model is the list of layers the testbench runs; the caller rebuilds the
     layer parameters from the returned model when padded is True.
     """
-    if not padding_enabled() or not needs_padding(layer_parameters[0]):
+    channels = padded_channels(layer_parameters[0])
+    if channels is None:
         return model, False
-    return [ChannelPaddedConv2D(model[0])] + list(model[1:]), True
+    return [ChannelPaddedConv2D(model[0], channels)] + list(model[1:]), True
 
 
 def fill_padding_channels(model, dram):

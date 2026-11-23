@@ -256,8 +256,9 @@ def check_conv_geometry(layer_params, params):
       dense one).
     * An odd number of input channels above 1 (bug #7): the input stream packs the channels of a pixel back to back
       (3 bytes for 3 channels) while the RTL moves activations in channel pairs, so pixels straddle the pairs
-      (doc/experiments/2026-10-14_channel_bugs.md, part 2; test_mnist_layers mapping 3 channels xfail). Pad the input to
-      an even count with a zero channel."""
+      (doc/experiments/2026-10-14_channel_bugs.md, part 2). Since 2026-11-22 the testbench pads such a first layer
+      with a zero channel (channel_pad.pad_first_layer), so only a layer whose input comes from the write-back of an
+      odd filter count is refused here."""
     name = layer_params.layer_name
     stride = (layer_params.strideX, layer_params.strideY)
     kernel = tuple(layer_params.kernel_size)
@@ -285,8 +286,8 @@ def check_conv_geometry(layer_params, params):
     if layer_params.channels > 1 and layer_params.channels % 2:
         refuse(
             f"{name}: {layer_params.channels} input channels; an odd count above 1 is packed back to back while the RTL "
-            f"moves channel pairs, so the activations reach the wrong PEs (bug #7); pad the input to "
-            f"{layer_params.channels + 1} channels with a zero channel")
+            f"moves channel pairs, so the activations reach the wrong PEs (bug #7); the first layer is padded with zero "
+            f"channels (channel_pad), a later one needs an even filter count in the layer before")
     return layer_params
 
 
@@ -311,6 +312,68 @@ def check_pooling_geometry(layer_params):
         refuse(
             f"{name}: input {layer_params.iact_size_x} pixels wide; pooling inputs 4 or fewer pixels wide come out "
             f"wrong (bug #27)")
+    return layer_params
+
+
+# The iact_x_add_up register is 12 bits wide (regmap.yaml) and a Dense layer sets it to its input count K
+# (write_dense_layer). The FC write path of iact_stream_constructor.v compares its input-pair counters with it; below
+# 4096 inputs they never reach it, from 4096 on the field wrapped (K mod 4096) and every output was wrong (bug #50).
+# The Dense mapper sends min(K, ADD_UP_REGISTER_MAX) instead, which behaves as K as long as check_dense_input lets the
+# layer through.
+ADD_UP_REGISTER_MAX = (1 << 12) - 1
+
+
+def dense_add_up_register(layer_params):
+    """The iact_x_add_up register value of a Dense layer: its input count, clamped to the 12-bit field (bug #50)."""
+    return min(layer_params.iact_x_add_up, ADD_UP_REGISTER_MAX)
+
+
+def dense_pair_counters(layer_params, params):
+    """The largest values the FC write path of iact_stream_constructor.v gives its two input-pair counters for a Dense
+    layer: (window start computed after the last window, largest position x_pos_in_w_cycle).
+
+    Cluster row r starts at x_start = r * (NUM_GLB_WGHT * used_iact_per_PE / 2) (OpenEye_FPGA.v, iact_converter_x) and
+    writes one window of iact_values_per_cluster_transmit = used_iact_per_PE * PEs_Y / 2 pairs per pass, the windows
+    iact_x_pos_inc pairs apart; when it leaves its last window (of diff_iact_layer) it computes one more start, and it
+    leaves the write state one position later (all of its writes done). Measured on the RTL 2026-11-22 with a monitor in
+    the constructor (CR 1 / 2, K 4000 / 8100 / 8180: every value the counters reached; doc/experiments/
+    2026-11-22_bug50_51.md, section 6)."""
+    window = (layer_params.used_iact_per_PE * params.PEs_Y) // 2
+    step = layer_params.iact_x_pos_inc
+    last_row = (params.Clusters_Y - 1) * ((params.NUM_GLB_WGHT * layer_params.used_iact_per_PE) >> 1)
+    passes = layer_params.diff_iact_layer
+    return last_row + passes * step, last_row + (passes - 1) * step + window + 1
+
+
+def check_dense_input(layer_params, params):
+    """Stop a Dense layer whose input-pair position would reach the clamped iact_x_add_up (bug #50).
+
+    Up to ADD_UP_REGISTER_MAX inputs the register holds K and the pair counters (about K / 2) never reach it. Above,
+    the mapper sends ADD_UP_REGISTER_MAX (dense_add_up_register). The constructor then behaves exactly as with K as long
+    as its position x_pos_in_w_cycle stays below ADD_UP_REGISTER_MAX - 1, where it resets (iact_x_add_up + kernel - stride
+    - 1): every window start it writes from is then below the bound as well (no window reset, no 12-bit wrap of the
+    start or of start + window). The start computed after the last window may pass the bound, but nothing is written
+    from it before the write state ends. Limit: 8172 inputs at CR 1 (where the weight buffer, #29, also ends), 8136 at
+    CR 2 (113 passes of 72), 8064 at CR 4 and CR 8. RTL 2026-11-22: right at every limit; above it K 8180 at CR 2 is
+    wrong (a window that holds inputs never written), while one pass above the limit (CR 2 8137, CR 4 8065) still
+    came out right only because the broken windows held nothing but padding pairs with zero weights, which this check
+    does not rely on. Before the clamp every K >= 4096 was wrong (the field wrapped). Returns layer_params."""
+    inputs = layer_params.iact_size_x
+    if inputs <= ADD_UP_REGISTER_MAX:
+        return layer_params
+    _, position = dense_pair_counters(layer_params, params)
+    if position <= ADD_UP_REGISTER_MAX - 2:
+        return layer_params
+    per_pass = layer_params.used_iact_per_PE * params.PEs_Y * params.Clusters_Y
+    window = (layer_params.used_iact_per_PE * params.PEs_Y) // 2
+    step = layer_params.iact_x_pos_inc
+    last_row = position - (layer_params.diff_iact_layer - 1) * step - window - 1
+    passes = (ADD_UP_REGISTER_MAX - 3 - last_row - window) // step + 1
+    refuse(
+        f"{layer_params.layer_name}: {inputs} inputs ({layer_params.diff_iact_layer} passes of {per_pass}); the "
+        f"input-pair position of the FC write path would reach {position} >= {ADD_UP_REGISTER_MAX - 1}, where it resets "
+        f"with the 12-bit iact_x_add_up clamped to {ADD_UP_REGISTER_MAX} (bug #50): this platform reads at most "
+        f"{passes * per_pass} inputs right; reduce the input before the Dense layer (pooling, fewer channels)")
     return layer_params
 
 

@@ -7,7 +7,9 @@ with STRIDE_ENABLED=0 (bug #41), a padding other than kernel // 2 (#42), unsuppo
 dilated convolutions (#43), an odd input channel count above 1 (#7), pooling inputs 4 or fewer pixels wide (#27).
 doc/experiments/2026-11-07_bug41_stride.md has the measurements. The refusal of a last Dense layer with more than one
 psum pass (#21) went on 2026-11-21: the testbench decoder was wrong, not the RTL (doc/experiments/2026-11-21_test_dense_output.md).
-Since 2026-11-10 also an odd number of filters per PE on dense hardware (#48, doc/experiments/2026-11-10_bug46_47.md).
+Since 2026-11-10 also an odd number of filters per PE on dense hardware (#48, doc/experiments/2026-11-10_bug46_47.md),
+since 2026-11-22 a Dense layer whose input-pair counters reach the clamped 12-bit iact_x_add_up (#50: above
+8136 inputs at 2 x 2 clusters; doc/experiments/2026-11-22_bug50_51.md).
 """
 import os
 import types
@@ -235,6 +237,62 @@ def test_dense_readout_accepted(outputs, passes, monkeypatch):
     layer = build(keras((64,), tf.keras.layers.Dense(outputs)), params)[0]
     assert layer.send_values_out == 1 and layer.needed_psum_transmissions == passes
     assert not hasattr(lp, "check_dense_readout")
+
+
+# --- Dense input size (#50) --------------------------------------------------------------------------------------------
+
+def platform_rows(monkeypatch, cluster_rows):
+    """The test platform with another CLUSTER_ROWS."""
+    platform(monkeypatch)
+    monkeypatch.setenv("CLUSTER_ROWS", str(cluster_rows))
+    return oep.get_oep(1)
+
+
+@pytest.mark.parametrize("inputs,register", [(10, 10), (4095, 4095), (4096, 4095), (8136, 4095), (20000, 4095)])
+def test_dense_add_up_register(inputs, register, monkeypatch):
+    # Bug #50: the 12-bit iact_x_add_up register held K mod 4096; the mapper sends min(K, 4095)
+    params = platform(monkeypatch)
+    layer = build(keras((inputs,), tf.keras.layers.Dense(10)), params)[0]
+    assert layer.iact_x_add_up == inputs
+    assert lp.dense_add_up_register(layer) == register
+
+
+@pytest.mark.parametrize("cluster_rows,limit", [(1, 8172), (2, 8136), (4, 8064), (8, 8064)])
+def test_dense_input_limit(cluster_rows, limit, monkeypatch, caplog):
+    # RTL 2026-11-22: right at the limit of CR 1 / 2 / 4 / 8 (one input above, the position reaches the reset value)
+    params = platform_rows(monkeypatch, cluster_rows)
+    for inputs in (3136, 4095, 4096, 6001, limit):
+        layer = build(keras((inputs,), tf.keras.layers.Dense(10)), params)[0]
+        assert lp.check_dense_input(layer, params) is layer
+    layer = build(keras((limit + 1,), tf.keras.layers.Dense(10)), params)[0]
+    with pytest.raises(NotImplementedError, match=f"bug #50.*at most {limit} inputs"):
+        lp.check_dense_input(layer, params)
+    monkeypatch.setenv(lp.ALLOW_UNSUPPORTED_ENV, "1")
+    assert lp.check_dense_input(layer, params) is layer
+    assert "bug #50" in caplog.text
+
+
+def test_dense_pair_counters(monkeypatch):
+    # The largest counter values the monitor of 2026-11-22 recorded (CR 2: K 4000 -> 2034 / 2017, K 8100 -> 4086 / 4069)
+    params = platform(monkeypatch)
+    for inputs, counters in ((4000, (2034, 2017)), (8100, (4086, 4069)), (8180, (4122, 4105))):
+        layer = build(keras((inputs,), tf.keras.layers.Dense(10)), params)[0]
+        assert lp.dense_pair_counters(layer, params) == counters
+
+
+@pytest.mark.parametrize("filters,refused", [(64, False), (127, False), (128, True)])
+def test_dense_input_after_flatten(filters, refused, monkeypatch):
+    # The Dense layer after Conv 8 x 8 x 4 -> filters and a flatten reads 64 * filters inputs from the write-back:
+    # 4096 was wrong on the RTL too (the iact buffer before it was right), 8192 is above the CR 2 limit 8136
+    params = platform(monkeypatch)
+    dense = keras((8, 8, filters), tf.keras.layers.Flatten(), tf.keras.layers.Dense(10))[-1]
+    layer = lp.LayerParameters([0], dense, params, 0, 1)
+    assert layer.iact_size_x == 64 * filters
+    if refused:
+        with pytest.raises(NotImplementedError, match="bug #50"):
+            lp.check_dense_input(layer, params)
+    else:
+        assert lp.check_dense_input(layer, params) is layer
 
 
 # --- onnx2model (#43) --------------------------------------------------------------------------------------------------

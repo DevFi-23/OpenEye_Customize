@@ -228,9 +228,8 @@
 1	VARHIDDEN | hdl/psum_pipeline.v | Declaration of signal hides declaration in upper scope: 'DMA_BITWIDTH'
 1	VARHIDDEN | hdl/router_configurator.v | Declaration of signal hides declaration in upper scope: 'DMA_BITWIDTH'
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 12 bits on the LHS, but LHS's VARREF 'iact_converter_c' generates 8 bits.
-3	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 12 bits on the LHS, but LHS's VARREF 'iact_converter_x' generates 8 bits.
+2	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 12 bits on the LHS, but LHS's VARREF 'iact_converter_x' generates 8 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 12 bits on the RHS, but RHS's VARREF 'iact_channels_per_pe' generates 4 bits.
-1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 12 bits on the RHS, but RHS's VARREF 'iact_x_per_cluster' generates 4 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 32 bits on the LHS, but LHS's VARREF 'iact_converter_cycles' generates 8 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 32 or 12 bits on the LHS, but LHS's VARREF 'fsm_iact_params' generates 8 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ADD expects 32 or 12 bits on the LHS, but LHS's VARREF 'iact_converter_x' generates 8 bits.
@@ -244,7 +243,6 @@
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 48 bits on the Assign RHS, but Assign RHS's SEL generates 16 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 48 bits on the Assign RHS, but Assign RHS's SEL generates 8 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 6 bits on the Assign RHS, but Assign RHS's VARREF 'fsm_row_offset' generates 5 bits.
-1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator ASSIGNDLY expects 8 bits on the Assign RHS, but Assign RHS's VARREF 'iact_x_per_cluster' generates 4 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator COND expects 11 bits on the Conditional False, but Conditional False's ARRAYSEL generates 10 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator COND expects 14 bits on the Conditional False, but Conditional False's VARREF 'iact_size_x' generates 12 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 12 bits on the LHS, but LHS's VARREF 'current_y' generates 8 bits.
@@ -258,7 +256,6 @@
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 32 or 12 bits on the LHS, but LHS's VARREF 'iact_converter_cycles' generates 8 bits.
 5	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator EQ expects 32 or 8 bits on the LHS, but LHS's VARREF 'iact_channels_counter' generates 5 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator LT expects 12 bits on the LHS, but LHS's VARREF 'iact_to_psum_x_pos_counter' generates 10 bits.
-1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator LT expects 12 bits on the LHS, but LHS's VARREF 'iact_x_per_cluster' generates 4 bits.
 1	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator LT expects 14 bits on the LHS, but LHS's VARREF 'current_x' generates 12 bits.
 2	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator NEGATE expects 12 bits on the LHS, but LHS's VARREF 'padding_x' generates 4 bits.
 2	WIDTHEXPAND | hdl/OpenEye_FPGA.v | Operator NEGATE expects 8 bits on the LHS, but LHS's VARREF 'padding_y' generates 4 bits.

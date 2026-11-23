@@ -340,16 +340,17 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
         return list(reversed(layer_parameters))
 
     layer_parameters = build_layer_parameters(model)
-    # Former bug #17 workaround, off by default since the RTL fix (OPENEYE_PAD_CHANNELS=1
-    # turns it on): a one-channel first layer wider than one x pass gets a second
-    # input channel with zero activations (open_eye.channel_pad).
+    # A first convolution with an odd channel count above 1 gets one zero channel more (bug #7: the RTL moves
+    # channel pairs). The former bug #17 workaround, off by default since the RTL fix (OPENEYE_PAD_CHANNELS=1 turns
+    # it on), gives a one-channel first layer wider than one x pass a second one (open_eye.channel_pad).
     model, padded = channel_pad.pad_first_layer(model, layer_parameters)
     if padded:
         layer_parameters = build_layer_parameters(model)
         layer_parameters[0].pad_channels = model[0].pad_channels
-        logger.info("%s: layer 0 input padded from %d to %d channels (former bug #17 workaround, %s=1)",
-                    channel_pad.PAD_CHANNELS_ENV, model[0].original_channels, layer_parameters[0].channels,
-                    channel_pad.PAD_CHANNELS_ENV)
+        logger.info("layer 0 input padded from %d to %d channels with zero activations (%s)",
+                    model[0].original_channels, layer_parameters[0].channels,
+                    "bug #7, odd channel count" if model[0].original_channels > 1
+                    else f"former bug #17 workaround, {channel_pad.PAD_CHANNELS_ENV}=1")
     if os.environ.get("DUMP_LAYER_PARAMS"):
         for n, lpar in enumerate(layer_parameters):
             fields = sorted(k for k in vars(lpar) if k.startswith(("iact_read_", "iact_write_", "psum_pagu_"))
@@ -571,8 +572,15 @@ async def execute_model(dut, only_files, sparse_iacts, sparse_wghts, layer_es, s
                                             max(range(len(outputs)), key=outputs.__getitem__), outputs)
                             file_ok = True
                             if(logging.DEBUG >= log_level):
+                                # A convolution compares only the psum slots that hold an output (bug #9: the slot
+                                # after a 7-wide row carries an idle PE's psum); output_order has their positions.
+                                slots = None
+                                name = str(layer_parameters[layer_number].layer_name)
+                                if "Conv" in name and "Depthwise" not in name and openeye_parameter.SERIAL:
+                                    slots = output_order[layer_repetition]
                                 file_ok = gtu.check_results(openeye_parameter, 'demo/layer_' + str(layer_number) + '_' + str(layer_repetition) + '/dma_stream_ref.txt',\
-                                                            'demo/layer_' + str(layer_number) + '_' + str(layer_repetition) + '/output.txt')
+                                                            'demo/layer_' + str(layer_number) + '_' + str(layer_repetition) + '/output.txt',
+                                                            slot_positions=slots)
                             assert dram_ok and file_ok, "result check failed: values %s, reference file %s" % (
                                 "ok" if dram_ok else "differ", "ok" if file_ok else "differs")
                         else :

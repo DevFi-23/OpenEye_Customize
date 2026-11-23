@@ -85,8 +85,10 @@ def _run_conv_const(layer_mode, const_value, cluster_rows, num_glb_iact,
                     input_channels, request, ramp_iacts=False,
                     psum_width=20, trans_words=8, bias_step=0,
                     input_height=INPUT_SIZE_Y, asymmetric_kernel=False,
-                    quant_amount=1024, dma_bitwidth=None, random_data=False, expect_layers=None):
-    """Build and simulate one constant-operand conv configuration."""
+                    quant_amount=1024, dma_bitwidth=None, random_data=False, expect_layers=None,
+                    cluster_columns=2):
+    """Build and simulate one constant-operand conv configuration. cluster_columns: CLUSTER_COLUMNS of the platform
+    (2 everywhere except test_cluster_columns1.py, bug #51)."""
     # OpenEyeParameters and parameters.vh read these from the environment at
     # generation time, so they have to be set before create_vh_file_from_envvars.
     os.environ["CLUSTER_ROWS"] = str(cluster_rows)
@@ -104,7 +106,7 @@ def _run_conv_const(layer_mode, const_value, cluster_rows, num_glb_iact,
     if dma_bitwidth is not None:
         os.environ["DMA_BITWIDTH"] = str(dma_bitwidth)
     os.environ["RAM_CELLS"]       = "32"
-    os.environ["CLUSTER_COLUMNS"] = "2"
+    os.environ["CLUSTER_COLUMNS"] = str(cluster_columns)
 
     toplevel = "OpenEye_FPGA"
     module   = "OpenEye_FPGA_tb"

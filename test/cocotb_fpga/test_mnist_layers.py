@@ -3,27 +3,27 @@
 """Activation-mapping regressions and the real MNIST convolution layers.
 
 1. test_iact_channel_mapping: one small Conv layer (8x4, ramp activations,
-   asymmetric kernel) for 1/2/4/8 input channels and NUM_GLB_IACT 1 and 3.
+   asymmetric kernel) for 1/2/3/4/5/8 input channels and NUM_GLB_IACT 1 and 3.
    Guards the iact_stream_constructor fixes:
      - one input channel (bug #6, output was the bias only; fixed 2026-10-14
        with a row-pair address, since the bug #17 fix of 2026-11-04 every
        pixel is a word of its own on the multi-channel address loops);
      - NUM_GLB_IACT=3: a convolution broadcasts every word to all iact banks
        instead of the Dense-style bank rotation (bug #7).
-   Three input channels still fail: the Python stream packs three bytes per
-   pixel while the RTL moves activations in pairs (xfail, see README_FI 8b).
-   Since 2026-11-07 the toolchain refuses such a layer (check_conv_geometry);
-   the test sets OPENEYE_ALLOW_UNSUPPORTED=1 so that it still runs the RTL.
+   An odd channel count above 1 (3, 5) failed until 2026-11-22: the Python
+   stream packs three bytes per pixel while the RTL moves activations in pairs
+   (bug #7, README_FI 8b). Since then the testbench pads such a first layer to
+   the next even count with a zero channel (open_eye.channel_pad).
 
 2. test_mnist_conv: the three convolution layers of models/mnist_conv_net.py
    with their real shapes. The 64-filter layers need QUANT_AMOUNT >= 64 (one
-   quantisation entry per filter). Known failures are marked
-   xfail(strict) so that a fix shows up as XPASS and the mark has to be
-   removed. Conv2 passes since the bug #18 fix (2026-10-15); Conv1 passes
+   quantisation entry per filter). Known failures were marked
+   xfail(strict) so that a fix showed up as XPASS; none is left since
+   2026-11-22. Conv2 passes since the bug #18 fix (2026-10-15); Conv1 passes
    with its one channel since the RTL fix of bug #17 (2026-11-04; from
    2026-10-22 on with its input padded to two channels, open_eye.channel_pad,
-   which test_mnist_conv1_with_padding still runs); Conv3 computes every value correctly but fails the stream
-   check of bug #9. The FC layer (3136 -> 10) is not included: Dense layers with 10
+   which test_mnist_conv1_with_padding still runs); Conv3 passes since the testbench fix of bug #9 (2026-11-22: the
+   file check skips the padding slot of its 7-wide rows; every value was always right). The FC layer (3136 -> 10) is not included: Dense layers with 10
    outputs fail with the open bug #5 (test_gemm_layer.py::test_dense_ten_outputs).
 
 3. test_random_data: random activations and weights (the constant-weight
@@ -54,15 +54,10 @@ import pytest
 import test_conv_const as conv
 from open_eye import test_dir, open_eye_dir
 
-THREE_CHANNELS = pytest.mark.xfail(
-    strict=True, reason="bug #7: Python packs 3 bytes per pixel, the RTL moves activations in pairs")
-
-
-@pytest.mark.parametrize("channels", [1, 2, pytest.param(3, marks=THREE_CHANNELS), 4, 8])
+@pytest.mark.parametrize("channels", [1, 2, 3, 4, 5, 8])
 @pytest.mark.parametrize("num_glb_iact", [1, 3])
 def test_iact_channel_mapping(num_glb_iact, channels, request, monkeypatch):
-    if channels == 3:   # refused by check_conv_geometry (bug #7): run the RTL anyway, so a fix shows up as XPASS
-        monkeypatch.setenv("OPENEYE_ALLOW_UNSUPPORTED", "1")
+    # 3 and 5 channels: the testbench pads the input to 4 / 8 with zero channels (bug #7, open_eye.channel_pad)
     monkeypatch.setattr(conv, "INPUT_SIZE_X", 8)
     conv._run_conv_const("Convolution_Single", 8, 2, num_glb_iact=num_glb_iact,
                          input_channels=channels, request=request, input_height=4,
@@ -74,10 +69,8 @@ def test_iact_channel_mapping(num_glb_iact, channels, request, monkeypatch):
 MNIST_LAYERS = {
     "conv1_28x28_c1_f32": (28, 28, 1, 32, 32),          # one channel, 2 x passes (bug #17, fixed)
     "conv2_14x14_c32_f64": (14, 14, 32, 64, 64),
-    "conv3_7x7_c64_f64": pytest.param(
-        (7, 7, 64, 64, 64), marks=pytest.mark.xfail(
-            strict=True, reason="bug #9: padding slots of 7-wide rows are non-zero; every result value is correct "
-                                "(tools/verify_conv_output.py)")),
+    # 7-wide rows: the padding slot after x = 6 is not compared (bug #9, fixed in the testbench 2026-11-22)
+    "conv3_7x7_c64_f64": (7, 7, 64, 64, 64),
 }
 
 
@@ -151,10 +144,7 @@ TRAINED_MODEL = os.path.join(open_eye_dir, os.pardir, os.pardir, "doc", "demo_no
 TRAINED_LAYERS = {
     "conv1_28x28_c1_f32": (28, 28, 1, 32, 32, "sequential_1/conv2d_1/convolution"),        # 1 zero weight
     "conv2_14x14_c32_f64": (14, 14, 32, 64, 64, "sequential_1/conv2d_1_2/convolution"),    # 189 zero weights
-    "conv3_7x7_c64_f64": pytest.param(
-        (7, 7, 64, 64, 64, "sequential_1/conv2d_2_1/convolution"), marks=pytest.mark.xfail(   # 418 zero weights
-            strict=True, reason="bug #9: padding slots of 7-wide rows are non-zero; every result value is correct "
-                                "(tools/verify_conv_output.py)")),
+    "conv3_7x7_c64_f64": (7, 7, 64, 64, 64, "sequential_1/conv2d_2_1/convolution"),          # 418 zero weights
 }
 
 

@@ -1,0 +1,37 @@
+diff --git a/hdl/iact_stream_constructor.v b/hdl/iact_stream_constructor.v
+index a4afd1d..a61d4c6 100644
+--- a/hdl/iact_stream_constructor.v
++++ b/hdl/iact_stream_constructor.v
+@@ -706,4 +706,32 @@ reg enable_write_to_storage;
+       end
+     end
+   endgenerate
++
++// ---- MON50: scratch-only monitor for bug #50 (never committed) ----
++reg [11:0] mon_max_x, mon_max_next;
++reg [31:0] mon_fire_next, mon_fire_reset, mon_exits;
++integer mon_fd;
++initial begin mon_fd = $fopen("mon50.log", "a"); mon_max_x = 0; mon_max_next = 0; mon_fire_next = 0; mon_fire_reset = 0; mon_exits = 0; end
++always @(posedge clk_i) begin
++  if (fully_connected_i && fsm_current_state == WRITE_TO_MEMORY &&
++      (((CLUSTER_ROWS != 1) & ((CLUSTER_ROWS/2) * PE_Y >= wght_size_x_i)) | (CLUSTER_COLUMNS != 1)) &&
++      channel_trans_cycle == 0) begin
++    if (x_pos_in_w_cycle > mon_max_x) mon_max_x = x_pos_in_w_cycle;
++    if (x_pos_in_w_cycle >= x_range_lower_bound && !(x_pos_in_w_cycle < x_range_lower_bound + iact_values_per_cluster_transmit)) begin
++      if (next_x_value_add > mon_max_next) mon_max_next = next_x_value_add;
++      if (next_x_value_add >= iact_x_add_up) begin
++        mon_fire_next = mon_fire_next + 1;
++        if (mon_fire_next <= 3) $fdisplay(mon_fd, "MON50 FIRE_NEXT %m t=%0t x=%0d lo=%0d nxt=%0d add=%0d xs=%0d fc=%0d", $time, x_pos_in_w_cycle, x_range_lower_bound, next_x_value_add, iact_x_add_up, x_start, fsm_cycle);
++      end
++    end
++    if (x_pos_in_w_cycle == iact_x_add_up + wght_size_x - stride_x_i - 1) begin
++      mon_fire_reset = mon_fire_reset + 1;
++      if (mon_fire_reset <= 3) $fdisplay(mon_fd, "MON50 FIRE_RESET %m t=%0t x=%0d lo=%0d add=%0d wx=%0d sx=%0d", $time, x_pos_in_w_cycle, x_range_lower_bound, iact_x_add_up, wght_size_x, stride_x_i);
++    end
++  end
++  if (fully_connected_i && fsm_current_state == WRITE_TO_MEMORY && fsm_cycle == needed_iact_buffer_words_i && fsm_cycle != 0) begin
++    mon_exits = mon_exits + 1;
++    $fdisplay(mon_fd, "MON50 EXIT %m t=%0t x=%0d lo=%0d xs=%0d maxx=%0d maxnext=%0d fires=%0d/%0d", $time, x_pos_in_w_cycle, x_range_lower_bound, x_start, mon_max_x, mon_max_next, mon_fire_next, mon_fire_reset);
++  end
++end
+ endmodule

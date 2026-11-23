@@ -95,7 +95,33 @@ def open_or_create_file(filepath):
     open_file = open(filename, 'w')
     return open_file
 
-def check_results(params, file_1,file_2):
+def padding_slot_spans(params, slot_positions, lines):
+    """Per reference line, the (start, end) character spans of its psum slots that hold no output.
+
+    slot_positions is the output position of every psum slot of a convolution stream in stream order ([filter, x, y],
+    None for a slot without output), as calculate_conv_serial returns it: DMA_BITWIDTH // 32 slots per line, slot k in
+    bits [k * DATA_PSUM_BITWIDTH, (k + 1) * DATA_PSUM_BITWIDTH) of the word, counted from the right end of the line.
+    Returns None when the list does not fit the file (one span list per line otherwise)."""
+    per_line = params.DMA_BITWIDTH // 32
+    width = params.DATA_PSUM_BITWIDTH
+    if len(slot_positions) != per_line * len(lines):
+        return None
+    spans = []
+    for i, line in enumerate(lines):
+        n = len(line.strip())
+        spans.append([(n - width * (k + 1), n - width * k) for k in range(per_line)
+                      if slot_positions[i * per_line + k] is None and n >= width * (k + 1)])
+    return spans
+
+
+def check_results(params, file_1, file_2, slot_positions=None):
+    """Compare the reference DMA stream file_1 with the DUT stream file_2, one DMA word per line.
+
+    An all-zero reference line is padding and is not compared. With slot_positions (the position list of
+    calculate_conv_serial, see padding_slot_spans) the psum slots without an output are not compared either: the RTL
+    fills the slot after the last pixel of a row that does not fill its last word (7-wide rows: 8 slots for 7 pixels)
+    with the psum of an idle PE, the reference has 0 there, and no output is lost (bug #9). Every other bit, the
+    unused upper bits of the word included, is still compared. Returns True when no compared bit differs."""
     # Open the two files in read-only mode
     with open(file_1, 'r') as f1, open(file_2, 'r') as f2:
         # Read the contents of the two files into two lists
@@ -127,11 +153,30 @@ def check_results(params, file_1,file_2):
         return values
 
     expected_len = words * params.DATA_PSUM_BITWIDTH
+    spans = None
+    if slot_positions is not None:
+        spans = padding_slot_spans(params, slot_positions, lines1)
+        if spans is None:
+            logger.error("Slot positions do not fit the reference: %d slots for %d lines of %d slots",
+                         len(slot_positions), len(lines1), params.DMA_BITWIDTH // 32)
+            return False
+
+    def masked(line, line_spans):
+        chars = list(line)
+        for start, end in line_spans:
+            chars[start:end] = "-" * (end - start)
+        return "".join(chars)
+
+    padding_only = 0
     for i, (line1, line2) in enumerate(zip(lines1, lines2)) :
         if line1 != line2:
             ref, out = line1.strip(), line2.strip()
             # An all-zero reference line is padding and not a real difference.
             if set(ref) <= {"0"} and ref:
+                continue
+            # A difference only in slots without an output (bug #9)
+            if spans is not None and spans[i] and len(ref) == len(out) and masked(ref, spans[i]) == masked(out, spans[i]):
+                padding_only += 1
                 continue
             logger.error(f'Difference found at line {i + 1}:')
             if len(ref) != expected_len or len(out) != expected_len:
@@ -153,6 +198,9 @@ def check_results(params, file_1,file_2):
                      len(lines2), len(lines1), len(missing), missing[0] + 1)
         return False
 
+    if padding_only:
+        logger.info("%d reference lines differ only in psum slots without an output (not compared, bug #9)",
+                    padding_only)
     logger.debug('No differences found between files')
     return True
 

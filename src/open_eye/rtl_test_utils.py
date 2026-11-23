@@ -2948,9 +2948,11 @@ async def trace_convert_window(ptp, dut, oep, max_lines=40):
         vals = []
         for n in names:
             try:
-                v = int(getattr(dut, n).value)
-                if n in ("current_x", "current_y") and v > (1 << 11):
-                    v -= (1 << 12)  # signed window position
+                value = getattr(dut, n).value
+                v = int(value)
+                width = len(value)          # current_x 12 bits, current_y 8 bits (it read current_y as 12 bits)
+                if n in ("current_x", "current_y") and v >= (1 << (width - 1)):
+                    v -= (1 << width)  # signed window position
                 vals.append(v)
             except Exception:
                 vals.append(-1)
