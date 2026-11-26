@@ -181,6 +181,119 @@ def data():
     return d
 
 
+# ---------------------------------------------------------------- write-back checks of 26/11
+LANES = os.path.join(PERF, "writeback_lanes_2026-11-26")
+RT_DIR = os.path.join(EXP, "2026-11-26_requant_timing")
+
+
+def lanes_identify(prefix, nlanes, seeds=("1", "2", "3", "4")):
+    """(filter, x, y) of every (capture, lane) slot of layer 0: the positions whose reference value equals the lane
+    value, intersected over the seeds (the write-back schedule does not depend on the data)."""
+    runs = [load(os.path.join(LANES, f"{prefix}_s{s}.json")) for s in seeds]
+    if not all(runs):
+        return None
+    caps = [[c for c in r["captures"] if c["layer"] == 0] for r in runs]
+    refs = [r["refs"]["0"] for r in runs]
+    F, X, Y = len(refs[0]), len(refs[0][0]), len(refs[0][0][0])
+    slots = []
+    for k in range(len(caps[0])):
+        row = []
+        for lane in range(nlanes):
+            cand = None
+            for ref, cs in zip(refs, caps):
+                v = cs[k]["lanes"][lane]
+                here = {(f, x, y) for f in range(F) for x in range(X) for y in range(Y) if ref[f][x][y] == v}
+                cand = here if cand is None else cand & here
+            row.append(cand)
+        slots.append(row)
+    written = {}
+    for row in slots:
+        for c in row:
+            if len(c) == 1:
+                p = next(iter(c))
+                written[p] = written.get(p, 0) + 1
+    unused_zero = all(all(v == 0 for v in c["lanes"][nlanes:]) for c in caps[0])
+    return {"caps": len(caps[0]), "slots": slots, "outputs": F * X * Y,
+            "unique": sum(1 for row in slots for c in row if len(c) == 1),
+            "covered": len(written), "twice": sum(1 for v in written.values() if v > 1),
+            "unused_zero": unused_zero, "clusters": sorted({(c["x_cl"], c["y_cl"]) for c in caps[0]})}
+
+
+def levels_vi(levels):
+    """'13  (CARRY8=5 DSP_A_B_DATA=1 ... LUT2=1 LUT5=1)' -> '13 tầng logic: DSP48E2, 5 CARRY8, 2 LUT'."""
+    import re
+    n = levels.split()[0] if levels else "?"
+    parts = dict(re.findall(r"(\w+)=(\d+)", levels))
+    out = []
+    if any(k.startswith("DSP") for k in parts):
+        out.append("DSP48E2")
+    if "CARRY8" in parts:
+        out.append(f"{parts['CARRY8']} CARRY8")
+    luts = sum(int(v) for k, v in parts.items() if k.startswith("LUT"))
+    if luts:
+        out.append(f"{luts} LUT")
+    return f"{n} tầng logic: " + ", ".join(out)
+
+
+def sta_stages():
+    """Worst setup path into each register stage (timing_stages.rpt) and the detail of the worst R4 -> table -> R5
+    path (timing_requant.rpt), as Vivado reports them."""
+    import re
+    out = {"stages": [], "path": []}
+    path = os.path.join(RT_DIR, "timing_stages.rpt")
+    if os.path.exists(path):
+        text = open(path).read()
+        for sec in text.split("######## ")[1:]:
+            title = sec.split(":")[0]
+            slack = re.search(r"Slack \(MET\) :\s+([-\d.]+)ns", sec)
+            delay = re.search(r"Data Path Delay:\s+([\d.]+)ns", sec)
+            levels = re.search(r"Logic Levels:\s+(\d+)\s*(\([^)]*\))?", sec)
+            src = re.search(r"Source:\s+(\S+)", sec)
+            dst = re.search(r"Destination:\s+(\S+)", sec)
+            if slack:
+                out["stages"].append({"title": title, "slack": float(slack.group(1)), "delay": float(delay.group(1)),
+                                      "levels": levels.group(0).split(":", 1)[1].strip() if levels else "",
+                                      "src": src.group(1), "dst": dst.group(1)})
+    path = os.path.join(RT_DIR, "timing_requant.rpt")
+    if os.path.exists(path):
+        text = open(path).read()
+        sec = text.split("######## R4 -> table")[1].split("########")[0]
+        first = sec.split("Slack (MET)")[1].split("slack")[0]
+        out["r5_slack"] = float(re.search(r":\s+([-\d.]+)ns", first).group(1))
+        lines = first.splitlines()
+        for i, line in enumerate(lines):
+            m = re.match(r"\s+\S+\s+(FDCE|RAMD32|LUT6|LUT5|LUT4)\s+\(Prop", line)
+            if m and i + 1 < len(lines):
+                out["path"].append((m.group(1), float(lines[i + 1].split()[0])))
+            m = re.search(r"net \(fo=(\d+), routed\)\s+([\d.]+)", line)
+            if m:
+                out["path"].append((f"dây (fo={m.group(1)})", float(m.group(2))))
+        m = re.search(r"required time\s+([\d.]+)", first)
+        out["required"] = float(m.group(1)) if m else None
+        m = re.search(r"arrival time\s+-([\d.]+)", first)
+        out["arrival"] = float(m.group(1)) if m else None
+    return out
+
+
+def tb_requant_log():
+    path = os.path.join(RT_DIR, "tb_requant.log")
+    if not os.path.exists(path):
+        return None
+    import re
+    rows, reads, result = [], [], None
+    for line in open(path):
+        m = re.match(r"input (\d+) psum\s+(-?\d+): q\s+(-?\d+) after the 3rd edge \(want\s+(-?\d+)\)\s+(\w+); after the 2nd "
+                     r"edge q was\s+(-?\d+)", line)
+        if m:
+            rows.append(m.groups())
+        m = re.match(r"t=([\d.]+) ns: value_i =\s+(-?\d+) -> value_o =\s+(\d+)", line)
+        if m:
+            reads.append(m.groups())
+        if line.startswith("RESULT"):
+            result = line.split()[1]
+    return {"rows": rows, "reads": reads, "result": result}
+
+
 # ---------------------------------------------------------------- figures
 PHASE_GROUPS = [("nạp weight", ("load_wght",), SLOTS[0]),
                 ("nạp khác", ("load_config", "load_iact", "load_bias", "load_quant", "load_act"), LIGHT),
@@ -354,7 +467,7 @@ def figure_wz(d, path):
     plt.close(fig)
 
 
-def figure_writeback(path):
+def figure_writeback(path, slacks=None):
     """The write-back path of one lane: quantizer stages between registers, the activation table (LUTRAM, read without a
     clock) squeezed into the existing clock between the stage-3 register and the write-back register; below, the same
     tail with a block RAM (synchronous read), which needs one more register."""
@@ -395,8 +508,10 @@ def figure_writeback(path):
                    (82, 83.2), (86.6, 87.9), (89.1, 91)):
         arrow(xa, xb, ym)
     # clock brackets
-    for (xa, xb), lab in zip(((12, 30), (30, 48), (48, 66), (66, 88.5)),
-                             ("1 chu kỳ", "1 chu kỳ", "1 chu kỳ", "1 chu kỳ (có sẵn): đọc bảng + mux ≈ 1 ns, < 4 ns")):
+    labels = ["1 chu kỳ", "1 chu kỳ", "1 chu kỳ", "1 chu kỳ (có sẵn): đọc bảng + mux"]
+    if slacks:
+        labels = [f"{lab}\nslack +{num(v, 3)} ns" for lab, v in zip(labels, slacks)]
+    for (xa, xb), lab in zip(((12, 30), (30, 48), (48, 66), (66, 88.5)), labels):
         ax.plot([xa, xa, xb, xb], [y0 - 2.2, y0 - 3.2, y0 - 3.2, y0 - 2.2], color=INK_2, lw=0.8)
         ax.text((xa + xb) / 2, y0 - 4.2, lab, ha="center", va="top", fontsize=6.8,
                 color=INK if xa == 66 else INK_2, fontweight="bold" if xa == 66 else "normal")
@@ -634,7 +749,8 @@ def sections(doc, d, figs):
     ])
     doc.add_picture(figs["ghi_nguoc"], width=Cm(16.5))
     caption(doc, "Hình 2. Đường ghi ngược của một làn. Bảng của SiLU / hard-swish chen vào chu kỳ vốn có giữa thanh ghi tầng "
-                 "3 (R4) và thanh ghi ghi ngược (R5). Phần dưới: nếu bảng ở block RAM thì phải thêm một thanh ghi.")
+                 "3 (R4) và thanh ghi ghi ngược (R5). Slack: đường xấu nhất vào từng thanh ghi theo Vivado (kiểm chứng 3). Phần "
+                 "dưới: nếu bảng ở block RAM thì phải thêm một thanh ghi.")
     para(doc, "Bảng của SiLU / hard-swish nằm giữa R4 và R5, trong chu kỳ đã có sẵn giữa hai thanh ghi đó:")
     bullets(doc, [
         "Vì sao đọc được mà không cần clock: bảng được khai báo là mảng reg với ram_style = \"distributed\" "
@@ -663,6 +779,104 @@ def sections(doc, d, figs):
     para(doc, "Kết luận: tính hàm không thêm thanh ghi, nên độ trễ và tốc độ của pipeline ghi ngược giữ nguyên: 0 chu kỳ "
               "mỗi giá trị. Chỉ việc nạp bảng (32 word DMA) tốn chu kỳ, một lần cho mỗi layer có bảng.")
 
+    # ---- write-back checks of 26/11
+    doc.add_heading("Kiểm chứng 1: mỗi làn mang output nào (đo 26/11)", level=3)
+    lx4, lx2, lw = lanes_identify("x4", 4), lanes_identify("x2", 2), lanes_identify("w16f16", 4)
+    if lx4:
+        para(doc, "Một coroutine cocotb ghi lại giá trị của mọi làn ở mỗi chu kỳ khối kích hoạt nhận giá trị (act_capture), "
+                  "rồi so với output tham chiếu của layer (int8 sau lượng tử). Giá trị int8 hay trùng nhau, nên mỗi layer chạy "
+                  "4 seed và lấy giao các vị trí có cùng giá trị: lịch ghi ngược không phụ thuộc dữ liệu, nên mỗi ô (lần nhận, "
+                  "làn) được xác định duy nhất (doc/experiments/2026-11-26_writeback_lanes.md). Layer 0 của Conv_Stack, CR 2, "
+                  "sparse, không hàm.")
+        rows = []
+        for k in (0, 1, 2, 3, 4, 8, 32):
+            rows.append([str(k)] + [str(next(iter(c))) if len(c) == 1 else "?" for c in lx4["slots"][k]])
+        table(doc, ["Lần nhận", "làn 0 (f, x, y)", "làn 1", "làn 2", "làn 3"], rows, widths=[2.0, 3.5, 3.5, 3.5, 3.5])
+        caption(doc, "Bảng 7. X = 4, Conv 8 × 4 × 4 → 8: output (filter, x, y) của từng làn ở một số lần nhận.")
+        rows = []
+        for name, r, n in (("X 4, Conv 8×4×4 → 8", lx4, 4), ("X 2, Conv 8×4×4 → 8", lx2, 2),
+                           ("X 4, Conv 16×4×4 → 16", lw, 4)):
+            if r:
+                rows.append([name, f"{r['caps']} × {n}", f"{r['unique']}/{r['caps'] * n}", f"{r['covered']}/{r['outputs']}",
+                             str(r["twice"])])
+        table(doc, ["Ca", "Lần nhận × làn", "Ô xác định duy nhất", "Output có mặt", "Output ghi 2 lần"], rows,
+              widths=[4.4, 2.8, 3.2, 2.8, 2.8], align_right=(1, 2, 3, 4))
+        caption(doc, "Bảng 8. Mọi ô xác định được; mọi output có mặt. Các output ghi 2 lần là 6 lần nhận cuối mỗi layer, lặp lại "
+                     "output đầu với cùng giá trị (vô hại; activation_cycles của profiler vì thế dư 6 mỗi layer).")
+        bullets(doc, [
+            "Mỗi giá trị trên một làn là một output hoàn chỉnh: khớp int8 cuối của tham chiếu (bias + mọi channel + mọi hàng "
+            "kernel, đã lượng tử). Việc cộng xong trước ghi ngược: dọc theo từng cột PE (psum đi qua các hàng PE, mỗi hàng giữ "
+            "một hàng kernel; PE_cluster.v) và qua các lượt trong bộ đệm psum (bắt đầu bằng bias); FSM psum chỉ sang "
+            "SEND_PSUM_TO_IACT ở lượt cuối (store_in_psum = 0).",
+            "X làn là X vị trí x liền nhau của cùng một filter, cùng hàng y (X 4: x 0–3, rồi 4–7; X 2: 2 vị trí, các làn "
+            "khác luôn 0). Các lần nhận liên tiếp đi qua 4 filter cho cùng các pixel: mỗi làn gom 4 filter thành nhóm 4 channel "
+            "của một pixel cho layer sau. Thứ tự: nhóm 4 filter → khối X vị trí x → hàng y → nhóm 4 filter kế.",
+            "Số làn theo X (số cột PE, NUM_GLB_PSUM), không theo số cluster: đo 18/11 trên mạng Bảng 2, tốc độ ghi ngược "
+            "khoảng 1,75 giá trị mỗi chu kỳ ở X 2 và 3,5 ở X 4, như nhau ở CR 1 / 2 / 8 và Y 3 / 4. Chỉ số cluster của FSM psum "
+            "giữ 0 suốt pha ghi ngược, nên chưa xác nhận được ghi ngược đọc từng cluster một như chú thích trong RTL.",
+        ])
+
+    doc.add_heading("Kiểm chứng 2: mỗi tầng tốn đúng 1 chu kỳ (mô phỏng RTL)", level=3)
+    tbl = tb_requant_log()
+    if tbl:
+        para(doc, "Testbench Verilog nhỏ (doc/experiments/2026-11-26_requant_timing/tb_requant.v, Icarus) cho quantization_unit "
+                  "một psum mới mỗi chu kỳ, với hệ số Leaky ReLU của Conv1 MNIST (mant 8.817.157 / 2^31, neg 215 / 2^19, làm "
+                  "tròn). Cạnh lấy mẫu nạp tầng 1, cạnh sau nạp tầng 2, cạnh thứ ba nạp tầng 3 (R4):")
+        rows = [[v.replace("-", "−") for v in (p, q, w)] + [ok, e.replace("-", "−")] for _, p, q, w, ok, e in tbl["rows"]]
+        table(doc, ["psum", "Kết quả sau cạnh thứ 3", "Mong đợi", "", "Sau cạnh thứ 2 (kết quả trước)"], rows,
+              widths=[2.4, 3.6, 2.4, 1.6, 4.8], align_right=(0, 1, 2, 4))
+        caption(doc, "Bảng 9. Kết quả có đúng sau cạnh thứ 3, chưa có sau cạnh thứ 2; mỗi chu kỳ ra một kết quả mới (pipeline). "
+                     "−2000 → −1 là Leaky ReLU (không có Leaky: −8).")
+        if tbl["reads"]:
+            para(doc, "Bảng hàm kích hoạt: nạp 32 word ở cạnh clock, rồi đổi chỉ số 3 lần trong 0,2 ns giữa hai cạnh clock; "
+                      "output đổi theo ngay (" + "; ".join(f"t = {num(float(t), 1)} ns: T[{v.replace('-', '−')}] = {o}"
+                                                         for t, v, o in tbl["reads"]) +
+                      f"). Kết quả testbench: {tbl['result']}. Mô phỏng RTL không có trễ cổng, nên nó chỉ chứng minh hành vi "
+                      "theo chu kỳ; chạy kịp hay không là việc của phân tích timing.")
+
+    doc.add_heading("Kiểm chứng 3: logic giữa hai thanh ghi có kịp trong 4 ns không (STA Vivado)", level=3)
+    st = sta_stages()
+    if st["stages"]:
+        para(doc, "Phân tích timing tĩnh (STA) của Vivado tính mọi đường thanh ghi → thanh ghi trên bản đã place and route, ở "
+                  "góc chậm nhất của chip (speed grade −2), không phụ thuộc dữ liệu thử. Chạy chỉ đọc trên checkpoint của mốc "
+                  "22/11 (doc/experiments/2026-11-26_requant_timing: timing_stages.tcl, timing_requant.tcl):")
+        names = {"S1": "Tầng 1 (sum_s1, mant_s1, shift_s1)", "S2": "Tầng 2 (prod_s2): nhân mant × sum",
+                 "S3 = R4": "Tầng 3 = R4 (quantized_value): dịch, kẹp", "R5": "R5 (iact_to_psum_mux_reg)"}
+        rows = []
+        seen = set()
+        for x in st["stages"]:
+            key = x["title"].split(" (")[0].strip()
+            if key not in names or key in seen:
+                continue
+            seen.add(key)
+            what = ("đường reset; đường dữ liệu còn rộng hơn" if "CLR" in x["dst"] else
+                    ("đường điều khiển (clock enable)" if x["dst"].endswith("/CE") else levels_vi(x["levels"])))
+            rows.append([names[key], what, f"{num(x['delay'], 3)} ns", f"+{num(x['slack'], 3)} ns"])
+        if "r5_slack" in st:
+            rows.append(["R4 → bảng → mux → R5 (đường dữ liệu)", "LUTRAM (RAMD32) + 2 LUT6",
+                         f"{num(sum(v for _, v in st['path']), 3)} ns",
+                         f"+{num(st['r5_slack'], 3)} ns"])
+        table(doc, ["Thanh ghi đích", "Đường xấu nhất", "Trễ đường dữ liệu", "Slack"], rows, widths=[5.2, 5.8, 2.6, 2.4],
+              align_right=(2, 3))
+        caption(doc, "Bảng 10. Đường xấu nhất vào từng tầng, clock 4 ns. Slack dương = kịp; WNS của cả thiết kế +0,114 ns.")
+        if st["path"]:
+            steps = " + ".join(f"{name} {num(v, 3)}" for name, v in st["path"])
+            para(doc, f"Đường R4 → R5 xấu nhất, từng bước (ns): {steps}; đến R5 ở {num(st['arrival'], 3)} ns, hạn chót "
+                      f"{num(st['required'], 3)} ns (chu kỳ 4 ns, đã tính lệch clock, độ bất định và setup của R5): dư {num(st['r5_slack'], 3)} "
+                      "ns. Đọc LUTRAM chỉ 0,100 ns và không qua thanh ghi; phần lớn là dây (R4 nối tới 113 chân của các bank và "
+                      "mux).")
+        bullets(doc, [
+            "Đường có bảng là đường dư nhiều nhất trong chuỗi lượng tử (1,49 ns, 37 % chu kỳ). Đường chặt nhất là phép nhân ở "
+            "tầng 2 (+0,116 ns): mant 25 bit × sum 21 bit lớn hơn một DSP48E2 (27 × 18), nên cần thêm 5 bộ cộng CARRY8 ngoài "
+            "DSP. Chèn bảng vào trước phép nhân thì không kịp; đặt sau R4 như hiện nay thì kịp với dư rộng.",
+            "Hai bộ chọn giữa R4 và R5: (1) chọn bank 8:1 trong bảng: bảng chia 8 bank để một word DMA 64 bit (8 ô) ghi vào 8 "
+            "bank trong một chu kỳ khi nạp; khi đọc, 5 bit cao của chỉ số là địa chỉ trong bank, 3 bit thấp chọn bank. (2) "
+            "chọn theo chế độ (act_mode == 2 ? bảng : output bộ lượng tử): SiLU / hard-swish lấy bảng; không hàm, ReLU, Leaky "
+            "ReLU đi thẳng nên không phải nạp bảng. Vivado gộp hai bộ chọn thành 2 tầng LUT6 (đường trên). R5 "
+            "(iact_to_psum_mux_reg) là thanh ghi ghi ngược, không phải bộ chọn, dù tên có \"mux\".",
+        ])
+
+
     doc.add_heading("3.3. Đo theo từng layer", level=2)
     para(doc, "Mạng Bảng 2 (weight và input ngẫu nhiên, seed 1), CR 2 X 4 Y 3, chạy 5 lần: không hàm, ReLU, Leaky ReLU, "
               "SiLU, hard-swish (hàm đặt sau mọi Conv / Dense trừ layer cuối), cả sparse và dense. Chi phí trực tiếp của "
@@ -683,7 +897,7 @@ def sections(doc, d, figs):
         rows.append(cells)
     table(doc, ["Layer", "Chu kỳ khối kích hoạt / ghi ngược", "ReLU", "Leaky ReLU", "SiLU", "hard-swish"], rows,
           widths=[3.6, 3.6, 2.0, 2.2, 2.0, 2.4], align_right=(1, 2, 3, 4, 5))
-    caption(doc, "Bảng 7. Chi phí trực tiếp của hàm ở từng layer (chu kỳ, so với không hàm), giống nhau ở sparse và dense. "
+    caption(doc, "Bảng 11. Chi phí trực tiếp của hàm ở từng layer (chu kỳ, so với không hàm), giống nhau ở sparse và dense. "
                  "Khối kích hoạt bận cùng số chu kỳ ở cả 5 lần chạy, kể cả không hàm, và nằm trong ghi ngược.")
     doc.add_picture(figs["ham_kich_hoat"], width=Cm(16.5))
     caption(doc, "Hình 3. Cả mạng Bảng 2: hiệu số chu kỳ so với không hàm, chia trực tiếp (nạp bảng, ghi ngược) và gián tiếp "
@@ -716,7 +930,7 @@ def sections(doc, d, figs):
                  f" ({sgn(mn_dense[a] - mn_dense['relu'])})") for a, _ in MN_ACTS])
     table(doc, ["Mạng, chế độ", "không hàm", "ReLU", "Leaky ReLU", "SiLU", "hard-swish"], rows,
           widths=[3.6, 2.2, 2.6, 2.6, 2.4, 2.6], align_right=(1, 2, 3, 4, 5))
-    caption(doc, "Bảng 8. Tổng chu kỳ cả mạng. Bảng 2 và MNIST cùng weight (weight của model ReLU, ảnh 0): so với không hàm. "
+    caption(doc, "Bảng 12. Tổng chu kỳ cả mạng. Bảng 2 và MNIST cùng weight (weight của model ReLU, ảnh 0): so với không hàm. "
                  "MNIST model riêng (mỗi hàm một model đã huấn luyện, không có bản không hàm): so với ReLU.")
     notes = [
         "Trên dense, hàm kích hoạt chỉ tốn đúng phần nạp bảng: ReLU = Leaky ReLU = không hàm; SiLU = hard-swish = +32 chu kỳ "
@@ -782,7 +996,7 @@ def sections(doc, d, figs):
         table(doc, ["Conv1 MNIST, sparse", "Ghi ngược ReLU / SiLU", "Ghi ngược ngoài khối kích hoạt (ReLU)",
                     "Tổng layer ReLU / SiLU", "SiLU so với ReLU"], rows, widths=[3.8, 3.2, 3.2, 3.6, 2.2],
               align_right=(1, 2, 3, 4))
-        caption(doc, "Bảng 9. Conv1 của MNIST với bảng bias bật và tắt (ảnh 0). Các layer khác của MNIST và mọi layer của "
+        caption(doc, "Bảng 13. Conv1 của MNIST với bảng bias bật và tắt (ảnh 0). Các layer khác của MNIST và mọi layer của "
                      "mạng Bảng 2 không có thời gian chờ này, nên ở đó nạp bảng hiện ra đủ +32.")
         para(doc, f"Tắt bảng bias làm Conv1 dài hơn nhiều ({fmt(off_r['total_cycles'])} so với {fmt(on_r['total_cycles'])} "
                   f"chu kỳ, vì bias được gửi lại cho mỗi vị trí: {fmt(ph(off_r, 'load_bias'))} word nạp bias thay cho "
@@ -802,7 +1016,7 @@ def sections(doc, d, figs):
         rows.append(["Cả mạng", "", "", f"{fmt(ta)} / {fmt(tb)}", f"{sgn(ta - tb)} ({pct(100.0 * (ta - tb) / tb, 1)})"])
         table(doc, ["MNIST ReLU, sparse", "Nạp bias bật / tắt", "Ghi ngược bật / tắt", "Tổng bật / tắt", "Chênh lệch"],
               rows, widths=[3.0, 3.0, 3.2, 3.8, 3.0], align_right=(1, 2, 3, 4))
-        caption(doc, "Bảng 10. Bảng bias theo filter làm mọi layer Conv nhanh hơn; ở Conv1 có 890 chu kỳ chờ (tính vào ghi "
+        caption(doc, "Bảng 14. Bảng bias theo filter làm mọi layer Conv nhanh hơn; ở Conv1 có 890 chu kỳ chờ (tính vào ghi "
                      "ngược) nhưng nạp bias bớt 14.320 chu kỳ. Pool và Dense không đổi.")
         para(doc, "Khoảng chờ chỉ có ở Conv1: thời gian che được trước lượt tính đầu (nạp bảng lượng tử và chuyển activation, "
                   "khoảng 1.130 chu kỳ) ngắn hơn việc trải bias của Conv1 (28 × 28 output, 2 lượt x). Ở Conv2 / Conv3, chuyển "
@@ -824,7 +1038,7 @@ def sections(doc, d, figs):
         ["Hàm kích hoạt (19–20/11)", "MNIST 4 hàm; mạng Bảng 2 5 cấu hình", "số 0 tự nhiên sau hàm: 6 – 87 %", "26"],
         ["Quét input bằng 0 (18/11)", "4 layer của mạng Bảng 2, 3 cấu hình cluster", "input bằng 0: 0 – 90 %", "120"],
     ], widths=[3.6, 4.4, 6.0, 1.6], align_right=(3,))
-    caption(doc, "Bảng 11. Dữ liệu dùng trong mục này (CR 2 X 4 Y 3 trừ phép quét 18/11). Đặt số 0 bằng móc của testbench: "
+    caption(doc, "Bảng 15. Dữ liệu dùng trong mục này (CR 2 X 4 Y 3 trừ phép quét 18/11). Đặt số 0 bằng móc của testbench: "
                  "cùng giá trị ở mọi mức, mức cao chỉ thêm số 0.")
 
     doc.add_heading("4.2. Phần giống nhau ở mọi mức số 0", level=2)
@@ -841,7 +1055,7 @@ def sections(doc, d, figs):
     table(doc, ["Layer (25 mức số 0)", "Nạp weight S / D", "Nạp activation", "Chuyển activation", "Đọc kết quả",
                 "Tính toán dense", "Tính toán sparse"], rows, widths=[3.4, 2.4, 1.8, 2.0, 1.8, 2.0, 2.6],
           align_right=(1, 2, 3, 4, 5, 6))
-    caption(doc, "Bảng 12. Chu kỳ từng pha trên 25 mức số 0 của mỗi layer: một số duy nhất nghĩa là giống hệt ở cả 25 mức. "
+    caption(doc, "Bảng 16. Chu kỳ từng pha trên 25 mức số 0 của mỗi layer: một số duy nhất nghĩa là giống hệt ở cả 25 mức. "
                  "Nạp activation, chuyển activation, đọc kết quả giống nhau ở cả hai chế độ.")
     bullets(doc, [
         "Nạp weight không đổi theo số 0: mỗi PE nhận một khối weight có độ dài cố định, mỗi weight một ô (12 bit ở sparse, "
@@ -859,7 +1073,7 @@ def sections(doc, d, figs):
     rows = [[pct(float(w) * 100, 0, sign=False)] + [fmt(c2[(w, a)]) for a in ZEROS] for w in ZEROS]
     table(doc, ["weight = 0 \\ input = 0"] + [pct(float(a) * 100, 0, sign=False) for a in ZEROS], rows,
           widths=[3.6, 2.4, 2.4, 2.4, 2.4, 2.4], align_right=(1, 2, 3, 4, 5))
-    caption(doc, f"Bảng 13. Chu kỳ tính toán sparse của Conv 14×14×16→32 (dense: {fmt(ph(g('conv2', '0', '0', 'dense'), 'compute'))} "
+    caption(doc, f"Bảng 17. Chu kỳ tính toán sparse của Conv 14×14×16→32 (dense: {fmt(ph(g('conv2', '0', '0', 'dense'), 'compute'))} "
                  "ở mọi mức).")
     s0 = c2[("0", "0")]
     fc = {(w, a): ph(g("fc", w, a), "compute") for w in ZEROS for a in ZEROS}
@@ -926,7 +1140,7 @@ def sections(doc, d, figs):
         ["Test RTL test_dense_readout (15 ca: nhiều lượt, CR 1 / 4, NUM_GLB_IACT 3, NUM_GLB_PSUM 2, dense, GEMM)",
          f"{dc.get('dense_readout_rtl', {}).get('passed', '?')}/15 PASS (chạy lại 23/11)", "không có"],
     ], widths=[5.6, 4.6, 5.8])
-    caption(doc, "Bảng 14. Kết quả kiểm tra. P = số output mỗi cột trong một lượt, CX = số cột cluster.")
+    caption(doc, "Bảng 18. Kết quả kiểm tra. P = số output mỗi cột trong một lượt, CX = số cột cluster.")
     bullets(doc, [
         "11 test hỏng không do RTL: fixture (SimpleNamespace) thiếu hai trường output_cycles và needed_psum_transmissions mà "
         "upstream 23be043 (01/10, trước khi fork) bắt đầu đọc. Thêm hai trường là đủ; test mới (31) còn phủ 2–3 lượt, "
@@ -985,7 +1199,7 @@ def sections_6_8(doc, d, figs):
             rows.append([f"{names[kind]}, {mode}", f"{min(v)}–{max(v)}",
                          "; ".join(f"{label[k]}: {compact(ns)}" for k, ns in by.items())])
     table(doc, ["Vị trí, chế độ", "Số channel", "Kết quả"], rows, widths=[3.4, 2.0, 10.6])
-    caption(doc, "Bảng 15. Tóm tắt phép quét số channel.")
+    caption(doc, "Bảng 19. Tóm tắt phép quét số channel.")
     # 6.2
     doc.add_heading("6.2. Tại sao các số channel này sai", level=2)
     first_s, first_d = verdicts("first", "sparse"), verdicts("first", "dense")
@@ -1018,7 +1232,7 @@ def sections_6_8(doc, d, figs):
         rows.append([str(c), str(used), str(slots), str(last), pred, f"{meas[0]} / {meas[1]}"])
     table(doc, ["C", "used_channels", "Ô RTL đọc mỗi pixel", "Giá trị mỗi pixel ở nhóm cuối", "Dự đoán",
                 "Đo: sparse / dense"], rows, widths=[1.0, 2.4, 2.8, 3.4, 3.2, 3.2], align_right=(0, 1, 2, 3))
-    caption(doc, "Bảng 16. Layer đầu, C = 1 … 12: quy tắc gói / đọc và kết quả đo. Mẫu lặp lại với chu kỳ 4 đến C = 34.")
+    caption(doc, "Bảng 20. Layer đầu, C = 1 … 12: quy tắc gói / đọc và kết quả đo. Mẫu lặp lại với chu kỳ 4 đến C = 34.")
     mid_s = verdicts("mid", "sparse")
     bullets(doc, [
         "Layer giữa đọc kết quả ghi ngược của layer trước. Bộ ghi ngược của RTL ghi theo nhóm 4 channel mỗi pixel (#25). Với "
@@ -1073,7 +1287,7 @@ def sections_7_8(doc, d):
     doc.add_heading("7. Việc đã làm trong tuần", level=1)
     table(doc, ["Commit", "Ngày", "Nội dung"], [[c, day, text] for c, day, text in COMMITS],
           widths=[2.0, 1.6, 12.4])
-    caption(doc, "Bảng 17. Các commit trong tuần (nhánh dev, đã đẩy lên origin).")
+    caption(doc, "Bảng 21. Các commit trong tuần (nhánh dev, đã đẩy lên origin).")
     bullets(doc, [
         "19/11: đo chi phí hàm kích hoạt trên MNIST đã huấn luyện, 4 hàm × 3 ảnh × sparse / dense "
         "(doc/experiments/2026-11-19_activation_cost.md).",
@@ -1087,7 +1301,9 @@ def sections_7_8(doc, d):
         "bias ở Conv1 MNIST (bảng bias tắt); báo cáo này.",
         "26/11: đo MNIST không hàm và 4 hàm trên cùng weight của model ReLU, sparse / dense (10 lần chạy, "
         "doc/experiments/2026-11-26_mnist_same_weights.md; thêm lựa chọn none vào models/mnist_conv_net.py); thêm mục 2.3 "
-        "(pha chạy song song) và 3.2 (pha ghi ngược, bảng LUTRAM) vào báo cáo; đổi ngày báo cáo sang 27/11.",
+        "(pha chạy song song) và 3.2 (pha ghi ngược, bảng LUTRAM) vào báo cáo; đổi ngày báo cáo sang 27/11; kiểm chứng pha "
+        "ghi ngược: làn mang output nào (15 lần chạy, doc/experiments/2026-11-26_writeback_lanes.md), mỗi tầng 1 chu kỳ "
+        "(mô phỏng) và timing từng tầng (Vivado, doc/experiments/2026-11-26_requant_timing.md).",
     ])
     doc.add_heading("8. Bước tiếp theo", level=1)
     bullets(doc, [
@@ -1111,7 +1327,10 @@ def build():
              "weight_0_ca_mang", "so_channel")}
     mn0 = d["mn"][("relu", 0, "sparse")]
     figure_layers(mn0, figs["pha_tung_layer"])
-    figure_writeback(figs["ghi_nguoc"])
+    st = sta_stages()
+    sl = {x["title"].split(" (")[0].strip(): x["slack"] for x in reversed(st["stages"])}
+    slacks = [sl.get("S1"), sl.get("S2"), sl.get("S3 = R4"), st.get("r5_slack")] if st["stages"] else None
+    figure_writeback(figs["ghi_nguoc"], slacks if slacks and all(v is not None for v in slacks) else None)
     figure_act(d, figs["ham_kich_hoat"])
     figure_compute_lines(d, figs["tinh_toan_theo_so_0"])
     figure_grid(d, figs["luoi_sparse_dense"])
@@ -1170,6 +1389,9 @@ def build():
         "(logic tổ hợp, 0 flip-flop), chen vào chu kỳ có sẵn giữa thanh ghi cuối của bộ lượng tử và thanh ghi ghi ngược, nên "
         "pipeline ghi ngược không dài thêm (mục 3.2). Ở Conv1 của MNIST, 32 chu kỳ nạp bảng còn bị che vì khối psum đang chờ "
         "ghi lại bảng bias chạy nền (mục 3.5).",
+        "Pha ghi ngược (kiểm 26/11): mỗi làn mang một output hoàn chỉnh (X làn = X vị trí x liền nhau, 4 filter liên tiếp "
+        "gom thành nhóm 4 channel); mỗi tầng của bộ lượng tử tốn đúng 1 chu kỳ (mô phỏng); mọi tầng kịp trong 4 ns (Vivado: "
+        "đường có bảng R4 → R5 dư 1,49 ns, chặt nhất là phép nhân ở tầng 2, dư 0,116 ns).",
         "MNIST không hàm (đo thêm 26/11, weight của model ReLU): sparse "
         + (f"{fmt(d['same'][('none', 'sparse')]['total_cycles'])}, ReLU "
            f"{fmt(d['same'][('relu', 'sparse')]['total_cycles'])} (−10,0 %), Leaky ReLU / SiLU / hard-swish trong khoảng ±1 % "

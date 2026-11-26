@@ -1,0 +1,415 @@
+
+######## S1: sum_s1 / mant_s1 / shift_s1 / round_s1 (psum + offset, choice of [mant, shift]): 225 cells
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version      : Vivado v.2024.2 (win64) Build 5239630 Fri Nov 08 22:35:27 MST 2024
+| Date              : Thu Nov 26 21:54:42 2026
+| Host              : TruongPhi running 64-bit major release  (build 9200)
+| Command           : report_timing -to [get_cells -hier -quiet -filter {NAME =~ *u_quant_unit/*_s1_reg*}] -max_paths 1 -nworst 1 -delay_type max -return_string
+| Design            : OpenEye_FPGA
+| Device            : xczu7ev-ffvc1156
+| Speed File        : -2  PRODUCTION 1.30 05-15-2022
+| Design State      : Routed
+| Temperature Grade : E
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             0.739ns  (required time - arrival time)
+  Source:                 rst_sync_wrapper/sync_stages_reg[1]_replica/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.000ns period=4.000ns})
+  Destination:            psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/sum_s1_reg[16]/CLR
+                            (recovery check against rising-edge clock clk  {rise@0.000ns fall@2.000ns period=4.000ns})
+  Path Group:             **async_default**
+  Path Type:              Recovery (Max at Slow Process Corner)
+  Requirement:            4.000ns  (clk rise@4.000ns - clk rise@0.000ns)
+  Data Path Delay:        3.151ns  (logic 0.079ns (2.507%)  route 3.072ns (97.493%))
+  Logic Levels:           0  
+  Clock Path Skew:        -0.008ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.020ns = ( 4.020 - 4.000 ) 
+    Source Clock Delay      (SCD):    0.028ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk_i (IN)
+                         net (fo=44257, unset)        0.028     0.028    rst_sync_wrapper/clk_i
+    SLICE_X100Y227       FDCE                                         r  rst_sync_wrapper/sync_stages_reg[1]_replica/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X100Y227       FDCE (Prop_AFF_SLICEL_C_Q)
+                                                      0.079     0.107 r  rst_sync_wrapper/sync_stages_reg[1]_replica/Q
+                         net (fo=95, routed)          3.072     3.179    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/Q[0]_repN_alias
+    SLICE_X68Y177        FDCE                                         f  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/sum_s1_reg[16]/CLR  (IS_INVERTED)
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        4.000     4.000 r  
+                                                      0.000     4.000 r  clk_i (IN)
+                         net (fo=44257, unset)        0.020     4.020    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/clk_i
+    SLICE_X68Y177        FDCE                                         r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/sum_s1_reg[16]/C
+                         clock pessimism              0.000     4.020    
+                         clock uncertainty           -0.035     3.985    
+    SLICE_X68Y177        FDCE (Recov_AFF_SLICEL_C_CLR)
+                                                     -0.066     3.919    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/sum_s1_reg[16]
+  -------------------------------------------------------------------
+                         required time                          3.919    
+                         arrival time                          -3.179    
+  -------------------------------------------------------------------
+                         slack                                  0.739    
+
+
+
+
+
+
+######## S2: prod_s2 (mant x sum + rounding constant): 256 cells
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version      : Vivado v.2024.2 (win64) Build 5239630 Fri Nov 08 22:35:27 MST 2024
+| Date              : Thu Nov 26 21:54:43 2026
+| Host              : TruongPhi running 64-bit major release  (build 9200)
+| Command           : report_timing -to [get_cells -hier -quiet -filter {NAME =~ *u_quant_unit/prod_s2_reg*}] -max_paths 1 -nworst 1 -delay_type max -return_string
+| Design            : OpenEye_FPGA
+| Device            : xczu7ev-ffvc1156
+| Speed File        : -2  PRODUCTION 1.30 05-15-2022
+| Design State      : Routed
+| Temperature Grade : E
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             0.116ns  (required time - arrival time)
+  Source:                 psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/mant_s1_reg[20]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.000ns period=4.000ns})
+  Destination:            psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[45]/D
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.000ns period=4.000ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            4.000ns  (clk rise@4.000ns - clk rise@0.000ns)
+  Data Path Delay:        3.865ns  (logic 2.254ns (58.314%)  route 1.611ns (41.686%))
+  Logic Levels:           13  (CARRY8=5 DSP_A_B_DATA=1 DSP_ALU=1 DSP_M_DATA=1 DSP_MULTIPLIER=1 DSP_OUTPUT=1 DSP_PREADD_DATA=1 LUT2=1 LUT5=1)
+  Clock Path Skew:        -0.008ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.020ns = ( 4.020 - 4.000 ) 
+    Source Clock Delay      (SCD):    0.028ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk_i (IN)
+                         net (fo=44257, unset)        0.028     0.028    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/clk_i
+    SLICE_X68Y180        FDCE                                         r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/mant_s1_reg[20]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X68Y180        FDCE (Prop_DFF2_SLICEL_C_Q)
+                                                      0.081     0.109 f  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/mant_s1_reg[20]/Q
+                         net (fo=9, routed)           0.874     0.983    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s21/A[20]
+    DSP48E2_X6Y70        DSP_A_B_DATA (Prop_DSP_A_B_DATA_DSP48E2_A[20]_A2_DATA[20])
+                                                      0.192     1.175 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s21/DSP_A_B_DATA_INST/A2_DATA[20]
+                         net (fo=1, routed)           0.000     1.175    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s21/DSP_A_B_DATA.A2_DATA<20>
+    DSP48E2_X6Y70        DSP_PREADD_DATA (Prop_DSP_PREADD_DATA_DSP48E2_A2_DATA[20]_A2A1[20])
+                                                      0.076     1.251 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s21/DSP_PREADD_DATA_INST/A2A1[20]
+                         net (fo=1, routed)           0.000     1.251    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s21/DSP_PREADD_DATA.A2A1<20>
+    DSP48E2_X6Y70        DSP_MULTIPLIER (Prop_DSP_MULTIPLIER_DSP48E2_A2A1[20]_U[24])
+                                                      0.505     1.756 f  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s21/DSP_MULTIPLIER_INST/U[24]
+                         net (fo=1, routed)           0.000     1.756    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s21/DSP_MULTIPLIER.U<24>
+    DSP48E2_X6Y70        DSP_M_DATA (Prop_DSP_M_DATA_DSP48E2_U[24]_U_DATA[24])
+                                                      0.047     1.803 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s21/DSP_M_DATA_INST/U_DATA[24]
+                         net (fo=1, routed)           0.000     1.803    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s21/DSP_M_DATA.U_DATA<24>
+    DSP48E2_X6Y70        DSP_ALU (Prop_DSP_ALU_DSP48E2_U_DATA[24]_ALU_OUT[24])
+                                                      0.585     2.388 f  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s21/DSP_ALU_INST/ALU_OUT[24]
+                         net (fo=1, routed)           0.000     2.388    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s21/DSP_ALU.ALU_OUT<24>
+    DSP48E2_X6Y70        DSP_OUTPUT (Prop_DSP_OUTPUT_DSP48E2_ALU_OUT[24]_P[24])
+                                                      0.109     2.497 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s21/DSP_OUTPUT_INST/P[24]
+                         net (fo=2, routed)           0.275     2.771    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s21_n_81
+    SLICE_X64Y176        LUT2 (Prop_H6LUT_SLICEM_I0_O)
+                                                      0.125     2.896 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2[31]_i_11__2/O
+                         net (fo=1, routed)           0.015     2.911    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2[31]_i_11__2_n_0
+    SLICE_X64Y176        CARRY8 (Prop_CARRY8_SLICEM_S[7]_CO[7])
+                                                      0.117     3.028 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[31]_i_2__2/CO[7]
+                         net (fo=1, routed)           0.026     3.054    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[31]_i_2__2_n_0
+    SLICE_X64Y177        CARRY8 (Prop_CARRY8_SLICEM_CI_CO[7])
+                                                      0.015     3.069 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[39]_i_2__2/CO[7]
+                         net (fo=1, routed)           0.026     3.095    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[39]_i_2__2_n_0
+    SLICE_X64Y178        CARRY8 (Prop_CARRY8_SLICEM_CI_O[3])
+                                                      0.082     3.177 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[45]_i_3__2/O[3]
+                         net (fo=2, routed)           0.338     3.515    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s210_out[19]
+    SLICE_X65Y178        LUT5 (Prop_E6LUT_SLICEL_I0_O)
+                                                      0.051     3.566 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2[39]_i_6__2/O
+                         net (fo=1, routed)           0.007     3.573    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2[39]_i_6__2_n_0
+    SLICE_X65Y178        CARRY8 (Prop_CARRY8_SLICEL_S[4]_CO[7])
+                                                      0.153     3.726 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[39]_i_1__2/CO[7]
+                         net (fo=1, routed)           0.026     3.752    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[39]_i_1__2_n_0
+    SLICE_X65Y179        CARRY8 (Prop_CARRY8_SLICEL_CI_O[5])
+                                                      0.116     3.868 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[45]_i_1__2/O[5]
+                         net (fo=1, routed)           0.025     3.893    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[45]_i_1__2_n_10
+    SLICE_X65Y179        FDCE                                         r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[45]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        4.000     4.000 r  
+                                                      0.000     4.000 r  clk_i (IN)
+                         net (fo=44257, unset)        0.020     4.020    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/clk_i
+    SLICE_X65Y179        FDCE                                         r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[45]/C
+                         clock pessimism              0.000     4.020    
+                         clock uncertainty           -0.035     3.985    
+    SLICE_X65Y179        FDCE (Setup_FFF_SLICEL_C_D)
+                                                      0.025     4.010    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[45]
+  -------------------------------------------------------------------
+                         required time                          4.010    
+                         arrival time                          -3.893    
+  -------------------------------------------------------------------
+                         slack                                  0.116    
+
+
+
+
+
+
+######## S2: shift_s2: 28 cells
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version      : Vivado v.2024.2 (win64) Build 5239630 Fri Nov 08 22:35:27 MST 2024
+| Date              : Thu Nov 26 21:54:43 2026
+| Host              : TruongPhi running 64-bit major release  (build 9200)
+| Command           : report_timing -to [get_cells -hier -quiet -filter {NAME =~ *u_quant_unit/shift_s2_reg*}] -max_paths 1 -nworst 1 -delay_type max -return_string
+| Design            : OpenEye_FPGA
+| Device            : xczu7ev-ffvc1156
+| Speed File        : -2  PRODUCTION 1.30 05-15-2022
+| Design State      : Routed
+| Temperature Grade : E
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             2.239ns  (required time - arrival time)
+  Source:                 rst_sync_wrapper/sync_stages_reg[1]_replica_15/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.000ns period=4.000ns})
+  Destination:            psum_pipeline_inst/gen_quant_unit[1].u_quant_unit/shift_s2_reg[4]/CLR
+                            (recovery check against rising-edge clock clk  {rise@0.000ns fall@2.000ns period=4.000ns})
+  Path Group:             **async_default**
+  Path Type:              Recovery (Max at Slow Process Corner)
+  Requirement:            4.000ns  (clk rise@4.000ns - clk rise@0.000ns)
+  Data Path Delay:        1.650ns  (logic 0.077ns (4.666%)  route 1.573ns (95.334%))
+  Logic Levels:           0  
+  Clock Path Skew:        -0.009ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.021ns = ( 4.021 - 4.000 ) 
+    Source Clock Delay      (SCD):    0.030ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk_i (IN)
+                         net (fo=44257, unset)        0.030     0.030    rst_sync_wrapper/clk_i
+    SLICE_X78Y198        FDCE                                         r  rst_sync_wrapper/sync_stages_reg[1]_replica_15/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X78Y198        FDCE (Prop_AFF_SLICEM_C_Q)
+                                                      0.077     0.107 r  rst_sync_wrapper/sync_stages_reg[1]_replica_15/Q
+                         net (fo=149, routed)         1.573     1.680    psum_pipeline_inst/gen_quant_unit[1].u_quant_unit/Q[0]_repN_15_alias
+    SLICE_X79Y187        FDCE                                         f  psum_pipeline_inst/gen_quant_unit[1].u_quant_unit/shift_s2_reg[4]/CLR  (IS_INVERTED)
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        4.000     4.000 r  
+                                                      0.000     4.000 r  clk_i (IN)
+                         net (fo=44257, unset)        0.021     4.021    psum_pipeline_inst/gen_quant_unit[1].u_quant_unit/clk_i
+    SLICE_X79Y187        FDCE                                         r  psum_pipeline_inst/gen_quant_unit[1].u_quant_unit/shift_s2_reg[4]/C
+                         clock pessimism              0.000     4.021    
+                         clock uncertainty           -0.035     3.986    
+    SLICE_X79Y187        FDCE (Recov_EFF_SLICEM_C_CLR)
+                                                     -0.066     3.920    psum_pipeline_inst/gen_quant_unit[1].u_quant_unit/shift_s2_reg[4]
+  -------------------------------------------------------------------
+                         required time                          3.920    
+                         arrival time                          -1.680    
+  -------------------------------------------------------------------
+                         slack                                  2.239    
+
+
+
+
+
+
+######## S3 = R4: quantized_value (shift, clamp): 56 cells
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version      : Vivado v.2024.2 (win64) Build 5239630 Fri Nov 08 22:35:27 MST 2024
+| Date              : Thu Nov 26 21:54:43 2026
+| Host              : TruongPhi running 64-bit major release  (build 9200)
+| Command           : report_timing -to [get_cells -hier -quiet -filter {NAME =~ *u_quant_unit/quantized_value_reg*}] -max_paths 1 -nworst 1 -delay_type max -return_string
+| Design            : OpenEye_FPGA
+| Device            : xczu7ev-ffvc1156
+| Speed File        : -2  PRODUCTION 1.30 05-15-2022
+| Design State      : Routed
+| Temperature Grade : E
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             0.853ns  (required time - arrival time)
+  Source:                 psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[45]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.000ns period=4.000ns})
+  Destination:            psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value_reg[2]/D
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.000ns period=4.000ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            4.000ns  (clk rise@4.000ns - clk rise@0.000ns)
+  Data Path Delay:        3.128ns  (logic 0.775ns (24.776%)  route 2.353ns (75.224%))
+  Logic Levels:           7  (CARRY8=2 LUT3=1 LUT5=1 LUT6=3)
+  Clock Path Skew:        -0.009ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.020ns = ( 4.020 - 4.000 ) 
+    Source Clock Delay      (SCD):    0.029ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk_i (IN)
+                         net (fo=44257, unset)        0.029     0.029    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/clk_i
+    SLICE_X65Y179        FDCE                                         r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[45]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X65Y179        FDCE (Prop_FFF_SLICEL_C_Q)
+                                                      0.079     0.108 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2_reg[45]/Q
+                         net (fo=137, routed)         0.928     1.036    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/prod_s2[45]
+    SLICE_X69Y173        LUT5 (Prop_A6LUT_SLICEL_I2_O)
+                                                      0.035     1.071 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value[7]_i_229__2/O
+                         net (fo=4, routed)           0.224     1.295    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value[7]_i_229__2_n_0
+    SLICE_X71Y172        LUT6 (Prop_F6LUT_SLICEM_I1_O)
+                                                      0.148     1.443 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value[7]_i_180__2/O
+                         net (fo=6, routed)           0.328     1.771    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value[7]_i_180__2_n_0
+    SLICE_X68Y172        LUT3 (Prop_D6LUT_SLICEL_I2_O)
+                                                      0.099     1.870 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value[7]_i_160__2/O
+                         net (fo=4, routed)           0.342     2.212    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value[7]_i_160__2_n_0
+    SLICE_X69Y176        LUT6 (Prop_F6LUT_SLICEL_I0_O)
+                                                      0.148     2.360 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value[7]_i_86__2/O
+                         net (fo=1, routed)           0.176     2.536    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value[7]_i_86__2_n_0
+    SLICE_X69Y175        CARRY8 (Prop_CARRY8_SLICEL_DI[1]_CO[7])
+                                                      0.117     2.653 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value_reg[7]_i_24__2/CO[7]
+                         net (fo=1, routed)           0.026     2.679    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value_reg[7]_i_24__2_n_0
+    SLICE_X69Y176        CARRY8 (Prop_CARRY8_SLICEL_CI_CO[3])
+                                                      0.060     2.739 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value_reg[7]_i_4__2/CO[3]
+                         net (fo=8, routed)           0.278     3.017    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value10_in
+    SLICE_X72Y174        LUT6 (Prop_F6LUT_SLICEL_I0_O)
+                                                      0.089     3.106 r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value[2]_i_1__2/O
+                         net (fo=1, routed)           0.051     3.157    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value[2]_i_1__2_n_0
+    SLICE_X72Y174        FDCE                                         r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value_reg[2]/D
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        4.000     4.000 r  
+                                                      0.000     4.000 r  clk_i (IN)
+                         net (fo=44257, unset)        0.020     4.020    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/clk_i
+    SLICE_X72Y174        FDCE                                         r  psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value_reg[2]/C
+                         clock pessimism              0.000     4.020    
+                         clock uncertainty           -0.035     3.985    
+    SLICE_X72Y174        FDCE (Setup_FFF_SLICEL_C_D)
+                                                      0.025     4.010    psum_pipeline_inst/gen_quant_unit[3].u_quant_unit/quantized_value_reg[2]
+  -------------------------------------------------------------------
+                         required time                          4.010    
+                         arrival time                          -3.157    
+  -------------------------------------------------------------------
+                         slack                                  0.853    
+
+
+
+
+
+
+######## R5: iact_to_psum_mux_reg (table, mux): 225 cells
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version      : Vivado v.2024.2 (win64) Build 5239630 Fri Nov 08 22:35:27 MST 2024
+| Date              : Thu Nov 26 21:54:43 2026
+| Host              : TruongPhi running 64-bit major release  (build 9200)
+| Command           : report_timing -to [get_cells -hier -quiet -filter {NAME =~ *iact_to_psum_mux_reg*}] -max_paths 1 -nworst 1 -delay_type max -return_string
+| Design            : OpenEye_FPGA
+| Device            : xczu7ev-ffvc1156
+| Speed File        : -2  PRODUCTION 1.30 05-15-2022
+| Design State      : Routed
+| Temperature Grade : E
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Timing Report
+
+Slack (MET) :             1.228ns  (required time - arrival time)
+  Source:                 fsm_cycle_reg[0]/C
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.000ns period=4.000ns})
+  Destination:            iact_to_psum_mux_reg_reg[65]/CE
+                            (rising edge-triggered cell FDCE clocked by clk  {rise@0.000ns fall@2.000ns period=4.000ns})
+  Path Group:             clk
+  Path Type:              Setup (Max at Slow Process Corner)
+  Requirement:            4.000ns  (clk rise@4.000ns - clk rise@0.000ns)
+  Data Path Delay:        2.666ns  (logic 0.579ns (21.714%)  route 2.087ns (78.286%))
+  Logic Levels:           5  (LUT5=2 LUT6=3)
+  Clock Path Skew:        -0.010ns (DCD - SCD + CPR)
+    Destination Clock Delay (DCD):    0.020ns = ( 4.020 - 4.000 ) 
+    Source Clock Delay      (SCD):    0.030ns
+    Clock Pessimism Removal (CPR):    0.000ns
+  Clock Uncertainty:      0.035ns  ((TSJ^2 + TIJ^2)^1/2 + DJ) / 2 + PE
+    Total System Jitter     (TSJ):    0.071ns
+    Total Input Jitter      (TIJ):    0.000ns
+    Discrete Jitter          (DJ):    0.000ns
+    Phase Error              (PE):    0.000ns
+
+    Location             Delay type                Incr(ns)  Path(ns)    Netlist Resource(s)
+  -------------------------------------------------------------------    -------------------
+                         (clock clk rise edge)        0.000     0.000 r  
+                                                      0.000     0.000 r  clk_i (IN)
+                         net (fo=44257, unset)        0.030     0.030    clk_i
+    SLICE_X93Y203        FDCE                                         r  fsm_cycle_reg[0]/C
+  -------------------------------------------------------------------    -------------------
+    SLICE_X93Y203        FDCE (Prop_CFF_SLICEM_C_Q)
+                                                      0.078     0.108 r  fsm_cycle_reg[0]/Q
+                         net (fo=563, routed)         0.405     0.513    dma_storage/fsm_cycle_reg[31]_0[0]
+    SLICE_X95Y207        LUT6 (Prop_C6LUT_SLICEL_I5_O)
+                                                      0.088     0.601 r  dma_storage/iact_channels_counter[4]_i_12/O
+                         net (fo=3, routed)           0.181     0.782    dma_storage/fsm_cycle_reg[26]
+    SLICE_X97Y208        LUT6 (Prop_G6LUT_SLICEL_I0_O)
+                                                      0.149     0.931 r  dma_storage/iact_to_psum_start_shifting_i_7/O
+                         net (fo=2, routed)           0.236     1.166    psum_pipeline_inst/buffer_addr_temp_reg[11]_i_3_0
+    SLICE_X98Y208        LUT6 (Prop_B6LUT_SLICEL_I5_O)
+                                                      0.051     1.217 r  psum_pipeline_inst/iact_to_psum_trans_counter[3]_i_4/O
+                         net (fo=5, routed)           0.057     1.274    psum_pipeline_inst/fsm_cycle_reg[5]
+    SLICE_X98Y208        LUT5 (Prop_F6LUT_SLICEL_I0_O)
+                                                      0.123     1.397 r  psum_pipeline_inst/iact_to_psum_trans_counter[3]_i_3/O
+                         net (fo=5, routed)           0.144     1.541    psum_pipeline_inst/p_0_in4_out
+    SLICE_X98Y204        LUT5 (Prop_E6LUT_SLICEL_I4_O)
+                                                      0.090     1.631 r  psum_pipeline_inst/iact_to_psum_mux_reg[127]_i_1/O
+                         net (fo=129, routed)         1.065     2.696    iact_to_psum_mux_reg[31]
+    SLICE_X102Y192       FDCE                                         r  iact_to_psum_mux_reg_reg[65]/CE
+  -------------------------------------------------------------------    -------------------
+
+                         (clock clk rise edge)        4.000     4.000 r  
+                                                      0.000     4.000 r  clk_i (IN)
+                         net (fo=44257, unset)        0.020     4.020    clk_i
+    SLICE_X102Y192       FDCE                                         r  iact_to_psum_mux_reg_reg[65]/C
+                         clock pessimism              0.000     4.020    
+                         clock uncertainty           -0.035     3.985    
+    SLICE_X102Y192       FDCE (Setup_EFF2_SLICEL_C_CE)
+                                                     -0.060     3.925    iact_to_psum_mux_reg_reg[65]
+  -------------------------------------------------------------------
+                         required time                          3.925    
+                         arrival time                          -2.696    
+  -------------------------------------------------------------------
+                         slack                                  1.228    
+
+
+
+
+

@@ -1,0 +1,13 @@
+input 0 psum   2000: q    8 after the 3rd edge (want    8)    OK; after the 2nd edge q was    0 (previous input)
+input 1 psum  -2000: q   -1 after the 3rd edge (want   -1)    OK; after the 2nd edge q was    8 (previous input)
+input 2 psum  10000: q   41 after the 3rd edge (want   41)    OK; after the 2nd edge q was   -1 (previous input)
+input 3 psum -10000: q   -4 after the 3rd edge (want   -4)    OK; after the 2nd edge q was   41 (previous input)
+input 4 psum      0: q    0 after the 3rd edge (want    0)    OK; after the 2nd edge q was   -4 (previous input)
+input 5 psum     -1: q    0 after the 3rd edge (want    0)    OK; after the 2nd edge q was    0 (previous input)
+input 6 psum  30000: q  123 after the 3rd edge (want  123)    OK; after the 2nd edge q was    0 (previous input)
+input 7 psum -30000: q  -12 after the 3rd edge (want  -12)    OK; after the 2nd edge q was  123 (previous input)
+t=174.6 ns: value_i =    5 -> value_o =  122 (entry 133 holds 122)
+t=174.7 ns: value_i =   -3 -> value_o =  130 (entry 125 holds 130)
+t=174.8 ns: value_i = -128 -> value_o =  255 (entry 0 holds 255)
+the three reads lie between the posedges at 174 and 178 ns: the table needs no clock to read
+RESULT PASS (0 errors)

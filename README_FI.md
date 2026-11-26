@@ -4774,3 +4774,17 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   +1 chu kỳ mỗi đợt), dòng MNIST cùng weight có cột không hàm (mục 3.4), bảng bias bật / tắt theo layer (mục 3.5: bảng bias theo filter của
   17/11 làm mọi Conv nhanh hơn, Conv1 −41 %, cả mạng −10,2 %; còn 890 chu kỳ chờ ở Conv1 có thể bỏ bằng RTL, lợi 0,45 %).
 
+- **Làn ghi ngược mang output nào** (`doc/experiments/2026-11-26_writeback_lanes.md`, thư mục `2026-11-26_writeback_lanes/`, số liệu `doc/perf/writeback_lanes_2026-11-26/`: `probe_lanes.py`,
+  `run_lanes.py`, `analyse_lanes.py`; 15 lần chạy, chỉ Python): ghi lại giá trị mọi làn ở mỗi chu kỳ `act_capture`, xác định (filter, x, y) bằng
+  giao 4 seed: 280/280, 268/268, 1.048/1.048 ô xác định duy nhất. Mỗi làn mang một output hoàn chỉnh (khớp int8 cuối của tham chiếu); X làn =
+  X vị trí x liền nhau của cùng filter, cùng hàng; các lần nhận liên tiếp đi qua 4 filter (= nhóm 4 channel của layer sau cho một pixel). 6 lần
+  nhận cuối mỗi layer lặp lại output đầu (cùng giá trị, vô hại; `activation_cycles` dư 6). Chỉ số cluster của FSM psum giữ 0 suốt pha ghi ngược,
+  nên chưa xác nhận được "đọc từng cluster một"; số làn chỉ theo X.
+- **Bộ lượng tử: mỗi tầng 1 chu kỳ và có kịp 4 ns không** (`doc/experiments/2026-11-26_requant_timing.md`, thư mục `2026-11-26_requant_timing/`):
+  mô phỏng Icarus `tb_requant.v` (PASS): kết quả sau đúng 3 cạnh clock, 1 kết quả mỗi chu kỳ, Leaky ReLU đúng (−2000 → −1), bảng đọc không cần
+  clock. STA Vivado trên checkpoint route 22/11 (chỉ đọc, `timing_requant.tcl`, `timing_stages.tcl`): slack vào S1 +0,739, S2 (nhân, DSP48E2 +
+  5 CARRY8) **+0,116**, S3 = R4 +0,853, R4 → LUTRAM (0,100 ns) → 2 LUT6 → R5 **+1,491 ns**; bảng ghi +1,603. Giữa R4 và R5 có chọn bank 8:1
+  của bảng và chọn theo chế độ (bảng hay đi thẳng), Vivado gộp thành 2 tầng LUT6.
+- **Báo cáo lần 7 (27/11) thêm ba phần kiểm chứng pha ghi ngược** vào mục 3.2: (1) làn mang output nào (bảng làn × lần nhận, 280/268/1.048 ô xác
+  định duy nhất), (2) mỗi tầng 1 chu kỳ (mô phỏng `tb_requant.v`), (3) timing từng tầng theo Vivado (bảng slack, đường R4 → R5 từng bước, hai bộ
+  chọn giữa R4 và R5); Hình 2 ghi slack của từng tầng; bộ sinh đọc thẳng `doc/perf/writeback_lanes_2026-11-26/`, `timing_*.rpt`, `tb_requant.log`.
