@@ -1,0 +1,172 @@
+11-23 09:40 start at abd2bb8 Fix #51 (RTL), #50 (Python clamp), #7 (odd channel padding), #9 (testbench slot mask): 144 case(s), 6 in parallel
+11-23 09:41 PASS     first_c1_sparse (42 s) 
+11-23 09:41 PASS     first_c2_sparse (43 s) 
+11-23 09:41 PASS     first_c3_sparse (45 s) padded 3 -> 4
+11-23 09:41 PASS     first_c4_sparse (45 s) 
+11-23 09:41 PASS     first_c5_sparse (49 s) padded 5 -> 8
+11-23 09:41 FAIL     first_c6_sparse (50 s) Difference found at f = 0, x = 0, y= 0: reference 647, DUT 80
+11-23 09:41 PASS     first_c7_sparse (32 s) padded 7 -> 8
+11-23 09:41 PASS     first_c8_sparse (32 s) 
+11-23 09:41 PASS     first_c9_sparse (34 s) padded 9 -> 12
+11-23 09:41 FAIL     first_c10_sparse (36 s) Difference found at f = 0, x = 0, y= 0: reference 742, DUT 1474
+11-23 09:41 PASS     first_c11_sparse (36 s) padded 11 -> 12
+11-23 09:41 PASS     first_c12_sparse (35 s) 
+11-23 09:42 PASS     first_c13_sparse (43 s) padded 13 -> 16
+11-23 09:42 FAIL     first_c14_sparse (44 s) Difference found at f = 0, x = 0, y= 0: reference 933, DUT 1238
+11-23 09:42 PASS     first_c15_sparse (43 s) padded 15 -> 16
+11-23 09:42 PASS     first_c16_sparse (45 s) 
+11-23 09:42 PASS     first_c17_sparse (48 s) padded 17 -> 20
+11-23 09:42 FAIL     first_c18_sparse (48 s) Difference found at f = 0, x = 0, y= 0: reference 2825, DUT 2918
+11-23 09:43 PASS     first_c19_sparse (90 s) padded 19 -> 20
+11-23 09:43 PASS     first_c20_sparse (92 s) 
+11-23 09:44 PASS     first_c21_sparse (96 s) padded 21 -> 24
+11-23 09:44 FAIL     first_c22_sparse (96 s) Difference found at f = 0, x = 0, y= 0: reference 621, DUT 1364
+11-23 09:44 PASS     first_c23_sparse (96 s) padded 23 -> 24
+11-23 09:44 PASS     first_c24_sparse (99 s) 
+11-23 09:45 PASS     first_c25_sparse (84 s) padded 25 -> 28
+11-23 09:45 FAIL     first_c26_sparse (86 s) Difference found at f = 0, x = 0, y= 0: reference 1130, DUT 433
+11-23 09:45 PASS     first_c27_sparse (85 s) padded 27 -> 28
+11-23 09:45 PASS     first_c28_sparse (89 s) 
+11-23 09:45 PASS     first_c29_sparse (95 s) padded 29 -> 32
+11-23 09:45 FAIL     first_c30_sparse (99 s) Difference found at f = 0, x = 0, y= 0: reference 1333, DUT 1348
+11-23 09:47 PASS     first_c31_sparse (113 s) padded 31 -> 32
+11-23 09:47 PASS     first_c32_sparse (118 s) 
+11-23 09:47 PASS     first_c33_sparse (120 s) padded 33 -> 36
+11-23 09:47 FAIL     first_c34_sparse (123 s) Difference found at f = 0, x = 0, y= 0: reference 309, DUT 380
+11-23 09:47 FAIL     mid_f1_sparse (27 s) Error: encoded columns need 12 words, the PE block has 6
+11-23 09:47 FAIL     mid_f2_sparse (38 s) Error found in Iact storage; word: 0 cell: 0 addr: 0
+11-23 09:47 FAIL     mid_f3_sparse (32 s) Error: column cannot be encoded without an all-zero word: [-33, -16, 0]
+11-23 09:47 PASS     mid_f4_sparse (52 s) 
+11-23 09:47 FAIL     mid_f5_sparse (26 s) Error: encoded columns need 35 words, the PE block has 30
+11-23 09:47 FAIL     mid_f6_sparse (43 s) Error found in Iact storage; word: 32 cell: 0 addr: 8
+11-23 09:47 FAIL     mid_f7_sparse (32 s) Error: encoded columns need 47 words, the PE block has 42
+11-23 09:48 PASS     mid_f8_sparse (71 s) 
+11-23 09:48 FAIL     mid_f9_sparse (31 s) Error: column cannot be encoded without an all-zero word: [-13, 8, -22, 6, -9, 1, -25, -12, 0]
+11-23 09:48 FAIL     mid_f10_sparse (46 s) Error found in Iact storage; word: 64 cell: 0 addr: 16
+11-23 09:48 FAIL     mid_f11_sparse (34 s) Error: column cannot be encoded without an all-zero word: [-2, -4, 19, -19, -7, -24, -22, 1, -1, 4, 0]
+11-23 09:49 PASS     mid_f12_sparse (88 s) 
+11-23 09:49 FAIL     mid_f13_sparse (34 s) Error: encoded columns need 79 words, the PE block has 78
+11-23 09:49 FAIL     mid_f14_sparse (49 s) Error found in Iact storage; word: 96 cell: 0 addr: 24
+11-23 09:49 FAIL     mid_f15_sparse (32 s) Error: encoded columns need 91 words, the PE block has 90
+11-23 09:50 PASS     mid_f16_sparse (146 s) 
+11-23 09:50 FAIL     mid_f17_sparse (35 s) Error: encoded columns need 58 words, the PE block has 54
+11-23 09:50 FAIL     mid_f18_sparse (34 s) Error: encoded columns need 59 words, the PE block has 54
+11-23 09:50 REFUSED  mid_f19_sparse (50 s) Convolution2D: the weight stream would hold 2 weight set(s), the RTL reads 3 pass(es) x 1 channel batch(es) = 3 (bug #39b: 19 filters, 9 psums per PE); split the filters
+11-23 09:52 PASS     mid_f20_sparse (196 s) 
+11-23 09:52 FAIL     dense_f1_sparse (49 s) Error: encoded columns need 12 words, the PE block has 6
+11-23 09:52 FAIL     dense_f2_sparse (64 s) Error: list assignment index out of range
+11-23 09:52 FAIL     dense_f3_sparse (56 s) Error: column cannot be encoded without an all-zero word: [-33, -16, 0]
+11-23 09:52 PASS     dense_f4_sparse (60 s) 
+11-23 09:52 FAIL     dense_f5_sparse (33 s) Error: 0
+11-23 09:52 FAIL     dense_f6_sparse (26 s) Error: encoded columns need 24 words, the PE block has 18
+11-23 09:52 FAIL     dense_f7_sparse (26 s) Error: 0
+11-23 09:52 PASS     dense_f8_sparse (50 s) 
+11-23 09:52 FAIL     dense_f9_sparse (27 s) Error: 0
+11-23 09:52 FAIL     dense_f10_sparse (27 s) Error: column cannot be encoded without an all-zero word: [-19, 12, 21, 1, 0]
+11-23 09:52 FAIL     dense_f11_sparse (26 s) Error: 0
+11-23 09:52 PASS     dense_f12_sparse (55 s) 
+11-23 09:52 FAIL     dense_f13_sparse (27 s) Error: 0
+11-23 09:52 FAIL     dense_f14_sparse (27 s) Error: column cannot be encoded without an all-zero word: [-2, 15, 1, -4, -24, -7, 0]
+11-23 09:52 FAIL     dense_f15_sparse (26 s) Error: 0
+11-23 09:52 PASS     dense_f16_sparse (63 s) 
+11-23 09:52 FAIL     dense_f17_sparse (32 s) Error: 0
+11-23 09:52 FAIL     dense_f18_sparse (32 s) Error: column cannot be encoded without an all-zero word: [14, 4, -12, -6, -16, 10, 16, 1, 0]
+11-23 09:52 PASS     first_c1_dense (38 s) 
+11-23 09:52 PASS     first_c2_dense (38 s) 
+11-23 09:52 PASS     first_c3_dense (42 s) padded 3 -> 4
+11-23 09:52 PASS     first_c4_dense (43 s) 
+11-23 09:52 PASS     first_c5_dense (46 s) padded 5 -> 8
+11-23 09:52 FAIL     first_c6_dense (46 s) Error writing output txt-file
+11-23 09:53 PASS     first_c7_dense (47 s) padded 7 -> 8
+11-23 09:53 PASS     first_c8_dense (46 s) 
+11-23 09:53 PASS     first_c9_dense (52 s) padded 9 -> 12
+11-23 09:53 FAIL     first_c10_dense (51 s) Error writing output txt-file
+11-23 09:53 PASS     first_c11_dense (50 s) padded 11 -> 12
+11-23 09:53 PASS     first_c12_dense (53 s) 
+11-23 09:54 PASS     first_c13_dense (60 s) padded 13 -> 16
+11-23 09:54 FAIL     first_c14_dense (61 s) Error writing output txt-file
+11-23 09:54 PASS     first_c15_dense (64 s) padded 15 -> 16
+11-23 09:54 PASS     first_c16_dense (68 s) 
+11-23 09:54 PASS     first_c17_dense (71 s) padded 17 -> 20
+11-23 09:54 FAIL     first_c18_dense (66 s) Error writing output txt-file
+11-23 09:55 PASS     first_c19_dense (65 s) padded 19 -> 20
+11-23 09:55 PASS     first_c20_dense (67 s) 
+11-23 09:55 PASS     first_c21_dense (74 s) padded 21 -> 24
+11-23 09:55 FAIL     first_c22_dense (71 s) Error writing output txt-file
+11-23 09:56 PASS     first_c23_dense (70 s) padded 23 -> 24
+11-23 09:56 PASS     first_c24_dense (71 s) 
+11-23 09:56 PASS     first_c25_dense (75 s) padded 25 -> 28
+11-23 09:56 FAIL     first_c26_dense (76 s) Error writing output txt-file
+11-23 09:57 PASS     first_c27_dense (80 s) padded 27 -> 28
+11-23 09:57 PASS     first_c28_dense (80 s) 
+11-23 09:57 PASS     first_c29_dense (84 s) padded 29 -> 32
+11-23 09:57 FAIL     first_c30_dense (85 s) Error writing output txt-file
+11-23 09:57 PASS     first_c31_dense (84 s) padded 31 -> 32
+11-23 09:57 PASS     first_c32_dense (85 s) 
+11-23 09:58 PASS     first_c33_dense (92 s) padded 33 -> 36
+11-23 09:58 FAIL     first_c34_dense (93 s) Error writing output txt-file
+11-23 09:58 REFUSED  mid_f1_dense (27 s) Convolution2D: 1 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 12 weight words per pass, the stream packs 6 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 09:58 FAIL     mid_f2_dense (32 s) Error found in Iact storage; word: 0 cell: 0 addr: 0
+11-23 09:58 REFUSED  mid_f3_dense (24 s) Convolution2D: 3 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 24 weight words per pass, the stream packs 18 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 09:58 PASS     mid_f4_dense (40 s) 
+11-23 09:58 REFUSED  mid_f5_dense (24 s) Convolution2D: 5 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 36 weight words per pass, the stream packs 30 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 09:58 FAIL     mid_f6_dense (33 s) Error found in Iact storage; word: 32 cell: 0 addr: 8
+11-23 09:58 REFUSED  mid_f7_dense (26 s) Convolution2D: 7 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 48 weight words per pass, the stream packs 42 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 09:59 PASS     mid_f8_dense (50 s) 
+11-23 09:59 REFUSED  mid_f9_dense (25 s) Convolution2D: 9 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 60 weight words per pass, the stream packs 54 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 09:59 FAIL     mid_f10_dense (32 s) Error found in Iact storage; word: 64 cell: 0 addr: 16
+11-23 09:59 REFUSED  mid_f11_dense (24 s) Convolution2D: 11 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 72 weight words per pass, the stream packs 66 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 09:59 PASS     mid_f12_dense (67 s) 
+11-23 09:59 REFUSED  mid_f13_dense (25 s) Convolution2D: 13 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 84 weight words per pass, the stream packs 78 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 09:59 FAIL     mid_f14_dense (38 s) Error found in Iact storage; word: 96 cell: 0 addr: 24
+11-23 09:59 REFUSED  mid_f15_dense (27 s) Convolution2D: 15 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 96 weight words per pass, the stream packs 90 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 10:00 PASS     mid_f16_dense (103 s) 
+11-23 10:00 REFUSED  mid_f17_dense (29 s) Convolution2D: the weight stream would hold 2 weight set(s), the RTL reads 3 pass(es) x 1 channel batch(es) = 3 (bug #39b: 17 filters, 8 psums per PE); split the filters
+11-23 10:00 REFUSED  mid_f18_dense (31 s) Convolution2D: 9 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 60 weight words per pass, the stream packs 54 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 10:00 REFUSED  mid_f19_dense (37 s) Convolution2D: the weight stream would hold 2 weight set(s), the RTL reads 3 pass(es) x 1 channel batch(es) = 3 (bug #39b: 19 filters, 9 psums per PE); split the filters
+11-23 10:02 PASS     mid_f20_dense (155 s) 
+11-23 10:02 REFUSED  dense_f1_dense (29 s) Convolution2D: 1 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 12 weight words per pass, the stream packs 6 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 10:02 FAIL     dense_f2_dense (36 s) Error: list assignment index out of range
+11-23 10:02 REFUSED  dense_f3_dense (30 s) Convolution2D: 3 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 24 weight words per pass, the stream packs 18 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 10:02 PASS     dense_f4_dense (46 s) 
+11-23 10:02 FAIL     dense_f5_dense (27 s) Error: 0
+11-23 10:02 REFUSED  dense_f6_dense (32 s) Convolution2D: 3 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 24 weight words per pass, the stream packs 18 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 10:02 FAIL     dense_f7_dense (32 s) Error: 0
+11-23 10:02 PASS     dense_f8_dense (55 s) 
+11-23 10:02 FAIL     dense_f9_dense (34 s) Error: 0
+11-23 10:02 REFUSED  dense_f10_dense (36 s) Convolution2D: 5 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 36 weight words per pass, the stream packs 30 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 10:02 FAIL     dense_f11_dense (35 s) Error: 0
+11-23 10:02 PASS     dense_f12_dense (55 s) 
+11-23 10:02 FAIL     dense_f13_dense (28 s) Error: 0
+11-23 10:02 REFUSED  dense_f14_dense (29 s) Convolution2D: 7 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 48 weight words per pass, the stream packs 42 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 10:02 FAIL     dense_f15_dense (28 s) Error: 0
+11-23 10:02 PASS     dense_f16_dense (50 s) 
+11-23 10:02 FAIL     dense_f17_dense (26 s) Error: 0
+11-23 10:02 REFUSED  dense_f18_dense (27 s) Convolution2D: 9 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 60 weight words per pass, the stream packs 54 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 10:02 done
+11-23 10:02 start at abd2bb8 Fix #51 (RTL), #50 (Python clamp), #7 (odd channel padding), #9 (testbench slot mask): 24 case(s), 6 in parallel
+11-23 10:03 STOPPED  last_f1_sparse (23 s) ValueError: encoded columns need 12 words, the PE block has 6 (src/open_eye/test_utils_main.py:205 write_stream)
+11-23 10:03 PASS     last_f2_sparse (32 s) 
+11-23 10:03 STOPPED  last_f3_sparse (23 s) ValueError: column cannot be encoded without an all-zero word: [-33, -16, 0] (src/open_eye/test_utils_main.py:205 write_stream)
+11-23 10:03 PASS     last_f4_sparse (35 s) 
+11-23 10:03 STOPPED  last_f5_sparse (24 s) ValueError: encoded columns need 35 words, the PE block has 30 (src/open_eye/test_utils_main.py:205 write_stream)
+11-23 10:03 PASS     last_f6_sparse (37 s) 
+11-23 10:03 STOPPED  last_f7_sparse (29 s) ValueError: encoded columns need 47 words, the PE block has 42 (src/open_eye/test_utils_main.py:205 write_stream)
+11-23 10:03 PASS     last_f8_sparse (41 s) 
+11-23 10:03 STOPPED  last_f9_sparse (28 s) ValueError: column cannot be encoded without an all-zero word: [-13, 8, -22, 6, -9, 1, -25, -12, 0] (src/open_eye/test_utils_main.py:205 write_stream)
+11-23 10:03 PASS     last_f10_sparse (37 s) 
+11-23 10:03 STOPPED  last_f11_sparse (24 s) ValueError: column cannot be encoded without an all-zero word: [-2, -4, 19, -19, -7, -24, -22, 1, -1, 4, 0] (src/open_eye/test_utils_main.py:205 write_stream)
+11-23 10:04 PASS     last_f12_sparse (37 s) 
+11-23 10:04 REFUSED  last_f1_dense (23 s) Convolution2D: 1 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 12 weight words per pass, the stream packs 6 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 10:04 PASS     last_f2_dense (28 s) 
+11-23 10:04 REFUSED  last_f3_dense (21 s) Convolution2D: 3 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 24 weight words per pass, the stream packs 18 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 10:04 PASS     last_f4_dense (29 s) 
+11-23 10:04 REFUSED  last_f5_dense (23 s) Convolution2D: 5 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 36 weight words per pass, the stream packs 30 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 10:04 PASS     last_f6_dense (33 s) 
+11-23 10:04 REFUSED  last_f7_dense (25 s) Convolution2D: 7 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 48 weight words per pass, the stream packs 42 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 10:04 PASS     last_f8_dense (33 s) 
+11-23 10:04 REFUSED  last_f9_dense (25 s) Convolution2D: 9 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 60 weight words per pass, the stream packs 54 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 10:04 PASS     last_f10_dense (32 s) 
+11-23 10:04 REFUSED  last_f11_dense (24 s) Convolution2D: 11 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 72 weight words per pass, the stream packs 66 (bug #48); use a filter count that gives a multiple of 2 filters per PE
+11-23 10:04 PASS     last_f12_dense (28 s) 
+11-23 10:04 done

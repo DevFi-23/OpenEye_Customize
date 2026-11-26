@@ -793,7 +793,8 @@ OpenEye_orig/
 │   │                             2026-10-10_TienDo/ (1 hình), 2026-10-15_TienDo/ (2 hình), 2026-10-31_TienDo/ (5 hình),
 │   │                             2026-11-05_HamKichHoat/ (4 hình), 2026-11-10_TienDo/ (lần 5, hàm kích hoạt chi tiết, 5 hình),
 │   │                             2026-11-18_TienDo/ (lần 6, hằng tuần: sparse / dense theo layer theo 4 giai đoạn, 5 hình +
-│   │                             dataset_theo_layer_2026-11-18.csv);
+│   │                             dataset_theo_layer_2026-11-18.csv), 2026-11-27_TienDo/ (lần 7: hàm kích hoạt theo layer, pha ghi
+│   │                             ngược, cách profiler đo, mức độ thưa, test Dense, số channel; 7 hình);
 │   │                             sinh bằng tools/report/make_*.py (~/tools/docenv), mỗi script ghi vào thư mục của nó
 │   ├── OpenEye_FPGA_documentation.md, test_status_handover.md   Tài liệu của upstream
 │   └── demo_notebooks/           Notebook demo của upstream
@@ -4733,3 +4734,43 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
   cluster (8172 / 8064 / 8064 ở CR 1 / 4 / 8), đo bằng 7 lần chạy có monitor tạm trong constructor và 11 lần chạy ở biên; layer đầu 3 / 5 / 7 channel được đệm lên
   4 / 8 (tránh #45); Conv3 MNIST hết xfail. RTL giống hệt mốc Vivado fix51. Kiểm chứng: lint 0 mới, unit test 647 / 0, hồi quy 254 = 254 PASS (0 xfail), 12 ca mốc
   và Bảng 3 giống hệt từng chu kỳ. Chưa commit.
+
+### 2026-11-23
+
+- **Báo cáo hằng tuần lần 7** (bản đầu; ngày 26/11 đổi thành `doc/reports/2026-11-27_TienDo/BaoCao_TienDo_OpenEye_2026-11-27.docx`,
+  sinh bằng `tools/report/make_progress_report_2026-11-27.py`, xem mục 2026-11-26): trả lời các câu hỏi của bạn. (1) Hàm kích hoạt theo layer: tính hàm 0 chu kỳ ở cả 4
+  hàm (khối kích hoạt chạy trong ghi ngược, ghi ngược dài như nhau kể cả không hàm), chỉ SiLU / hard-swish +32 chu kỳ mỗi layer (nạp bảng).
+  (2) Cách profiler đo: coroutine cocotb đếm từng cạnh clock, gán mỗi chu kỳ cho một pha theo FSM chính / FSM psum; 8 biện pháp làm số đo
+  chính xác (Bảng 3). (3) Mức độ thưa: chỉ pha tính toán sparse đổi theo số 0; nạp weight, nạp / chuyển activation, đọc kết quả và mọi pha
+  dense giống hệt ở 25 mức số 0 của mỗi layer. (4) Kiểm tra test_dense_output, đối chiếu upstream. (5) Số channel còn lỗi.
+- **Vì sao 32 chu kỳ nạp bảng bị che ở Conv1 MNIST (đã kiểm chứng)**: bảng bias theo filter ghi lại bảng bias chạy nền; ở Conv1 việc này
+  dài hơn các pha nạp nên FSM psum phải chờ trong trạng thái 11, profiler tính vào ghi ngược (ghi ngược ngoài khối kích hoạt 928 chu kỳ so
+  với 110 ở các layer khác). Chạy lại MNIST ReLU / SiLU với `BIAS_PER_FILTER_EN=0` (`doc/perf/act_nobias_2026-11-23/`, 2 lần PASS): ghi
+  ngược 7.212 / 7.212, Conv1 SiLU = ReLU + 32 (32.619 → 32.651).
+- **Kiểm tra bản sửa test_dense_output (6a7a323) và upstream** (`doc/experiments/2026-11-23_dense_output_check.{py,json,md}`): dev 31/31 test
+  qua, bộ giải mã Dense khứ hồi đúng 600/600 (N 1–200 × CX 1 / 2 / 4), `test_dense_readout` 15/15 PASS (chạy lại); upstream `12340ab` hỏng
+  11/11 test của chính nó (8 × thiếu tham số `rel_layers`, 3 × không có file tham chiếu) và công thức giải mã cũ sai 304/600 kích thước
+  (mọi Dense có hơn 16 × CX output khi CX ≥ 2). Bản sửa đúng; không có gì để lấy từ upstream.
+- **Quét số channel / số filter** (`doc/experiments/2026-11-23_channel_sweep.md`, thư mục `2026-11-23_channel_sweep/`: `test_channels.py`,
+  `run_channels.py`, `out/status.json`; 168 lần chạy trên `abd2bb8`, sparse và dense, chỉ đo): (1) layer đầu C = 6, 10, …, 34 (chia 4 dư 2,
+  #45, không có kiểm tra): sparse sai lặng lẽ, dense ra X; C lẻ được đệm và đúng; (2) layer giữa chỉ F chia hết cho 4 đúng, F chia 4 dư 2 (kể
+  cả 2) làm bộ đệm sau ghi ngược sai; (3) trước Dense chỉ F chia hết cho 4 chạy được; (4) số filter mỗi PE lẻ: sparse dừng ở bộ mã hoá weight,
+  dense bị #48 chặn (layer cuối với F chẵn đều đúng). Nguyên nhân #45: Python gói activation theo nhóm `used_channels` = 4 và nhóm cuối chỉ
+  ghi channel có thật (`iact_stream_mapper.py` 186–197), RTL đọc 4 ô mỗi pixel ở mọi nhóm (`channel_div_trans = 2`), nên nhóm cuối thiếu
+  làm các pixel trượt. Đề xuất (Python, cần đồng ý): đệm C chia 4 dư 2 ở layer đầu lên bội của 4; chặn layer giữa / Dense có số channel không
+  chia hết cho 4; báo lỗi rõ cho số filter mỗi PE lẻ. Chưa commit.
+
+### 2026-11-26
+
+- **MNIST không hàm kích hoạt** (`doc/experiments/2026-11-26_mnist_same_weights.md`, profile `doc/perf/act_same_weights_2026-11-26/`):
+  `models/mnist_conv_net.py` thêm `none` (`nn.Identity`); weight của model ReLU chạy với không hàm và 4 hàm, sparse / dense, 10/10 PASS. Sparse:
+  không hàm 217.947, ReLU 196.238 (−9,96 %), Leaky ReLU −0,85 %, SiLU +0,03 %, hard-swish −0,05 %; dense: không hàm = ReLU = Leaky ReLU =
+  202.895, SiLU = hard-swish +64. Không hàm thì sparse chậm hơn dense 7,4 %.
+- **Báo cáo lần 7 đổi ngày sang 27/11/2026** (`doc/reports/2026-11-27_TienDo/BaoCao_TienDo_OpenEye_2026-11-27.docx` + 7 hình, bộ sinh đổi tên
+  thành `tools/report/make_progress_report_2026-11-27.py`; thư mục 2026-11-23_TienDo cũ đã xoá): thêm mục 2.3 (khi một việc chạy song song: tổng
+  chính xác, mỗi pha là thời gian trên đường găng; phần lẫn đã biết 890 chu kỳ chờ trải bias ở Conv1 MNIST; kết luận dựa trên chạy A/B), mục
+  3.2 (pha ghi ngược: bộ lượng tử 3 tầng, 4 làn; bảng SiLU / hard-swish là LUTRAM `ram_style = "distributed"`, đọc tổ hợp không qua thanh
+  ghi, chen vào chu kỳ có sẵn giữa thanh ghi tầng 3 và thanh ghi ghi ngược; Vivado: mỗi bản 88 LUT, 64 LUTRAM, 0 flip-flop; BRAM sẽ cần
+  +1 chu kỳ mỗi đợt), dòng MNIST cùng weight có cột không hàm (mục 3.4), bảng bias bật / tắt theo layer (mục 3.5: bảng bias theo filter của
+  17/11 làm mọi Conv nhanh hơn, Conv1 −41 %, cả mạng −10,2 %; còn 890 chu kỳ chờ ở Conv1 có thể bỏ bằng RTL, lợi 0,45 %).
+

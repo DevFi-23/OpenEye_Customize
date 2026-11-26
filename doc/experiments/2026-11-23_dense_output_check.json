@@ -1,0 +1,43 @@
+{
+ "dev_commit": "abd2bb8",
+ "dev_test": {
+  "passed": 31,
+  "failed": 0,
+  "summary": "============================== 31 passed in 9.75s ==============================",
+  "errors": {}
+ },
+ "upstream_commit": "12340ab",
+ "upstream_test": {
+  "passed": 0,
+  "failed": 11,
+  "summary": "============================== 11 failed in 1.07s ==============================",
+  "errors": {
+   "TypeError: compare_stream_Dense() missing 1 required positional argument: 'rel_layers'": 8,
+   "FileNotFoundError: [Errno 2] No such file or directory: '<tmp>/.../dma_stream_ref.txt'": 3
+  }
+ },
+ "upstream_decoder_line": "f = offset + (beat % columns) * per_column + beat // columns",
+ "dev_roundtrip": {
+  "cases": 600,
+  "wrong": 0,
+  "examples": []
+ },
+ "upstream_formula": {
+  "cases": 600,
+  "wrong": 304,
+  "examples": [
+   "N=33 CX=2 passes=2: 13 of 33 outputs misplaced",
+   "N=34 CX=2 passes=2: 14 of 34 outputs misplaced",
+   "N=35 CX=2 passes=2: 15 of 35 outputs misplaced",
+   "N=36 CX=2 passes=2: 16 of 36 outputs misplaced",
+   "N=37 CX=2 passes=2: 17 of 37 outputs misplaced",
+   "N=38 CX=2 passes=2: 18 of 38 outputs misplaced"
+  ],
+  "rule": "wrong exactly when passes > 1 and CX > 1, i.e. N > 16 * CX with CX >= 2"
+ },
+ "dense_readout_rtl": {
+  "passed": 15,
+  "failed": 0,
+  "note": "test/cocotb_fpga/test_dense_readout.py re-run 2026-11-23, 6 in parallel, 29-284 s each"
+ }
+}

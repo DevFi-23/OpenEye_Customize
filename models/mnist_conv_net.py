@@ -5,8 +5,9 @@ import torch.nn.functional as F
 # Activation functions of the conv blocks: the default "relu" is the original model (F.relu, the trained checkpoint
 # doc/demo_notebooks/mnist_unquantized_model.pth); the others are variants for the activation work of the fork
 # (models/train_mnist.py, doc/experiments/2026-11-02_activation_plan.md). None of them has parameters, so the state
-# dict is the same for every activation.
-ACTIVATIONS = ("relu", "leaky_relu", "silu", "hardswish")
+# dict is the same for every activation. "none" (identity, added 2026-11-26) runs a model's weights without an activation,
+# to measure the network without one (doc/experiments/2026-11-26_mnist_same_weights).
+ACTIVATIONS = ("relu", "leaky_relu", "silu", "hardswish", "none")
 
 
 class SimpleMNISTConvNet(nn.Module):
@@ -17,7 +18,7 @@ class SimpleMNISTConvNet(nn.Module):
         self.activation = activation
         self.negative_slope = negative_slope
         self.act = {"relu": nn.ReLU(), "leaky_relu": nn.LeakyReLU(negative_slope), "silu": nn.SiLU(),
-                    "hardswish": nn.Hardswish()}[activation]
+                    "hardswish": nn.Hardswish(), "none": nn.Identity()}[activation]
 
         # 1. Conv-Block (Output: 32 Kanäle)
         self.Conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)

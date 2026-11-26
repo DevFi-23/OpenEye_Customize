@@ -1,0 +1,842 @@
+{
+ "first_c1_sparse": [
+  "PASS",
+  "",
+  42
+ ],
+ "first_c2_sparse": [
+  "PASS",
+  "",
+  43
+ ],
+ "first_c3_sparse": [
+  "PASS",
+  "padded 3 -> 4",
+  45
+ ],
+ "first_c4_sparse": [
+  "PASS",
+  "",
+  45
+ ],
+ "first_c5_sparse": [
+  "PASS",
+  "padded 5 -> 8",
+  49
+ ],
+ "first_c6_sparse": [
+  "FAIL",
+  "Difference found at f = 0, x = 0, y= 0: reference 647, DUT 80",
+  50
+ ],
+ "first_c7_sparse": [
+  "PASS",
+  "padded 7 -> 8",
+  32
+ ],
+ "first_c8_sparse": [
+  "PASS",
+  "",
+  32
+ ],
+ "first_c9_sparse": [
+  "PASS",
+  "padded 9 -> 12",
+  34
+ ],
+ "first_c10_sparse": [
+  "FAIL",
+  "Difference found at f = 0, x = 0, y= 0: reference 742, DUT 1474",
+  36
+ ],
+ "first_c11_sparse": [
+  "PASS",
+  "padded 11 -> 12",
+  36
+ ],
+ "first_c12_sparse": [
+  "PASS",
+  "",
+  35
+ ],
+ "first_c13_sparse": [
+  "PASS",
+  "padded 13 -> 16",
+  43
+ ],
+ "first_c14_sparse": [
+  "FAIL",
+  "Difference found at f = 0, x = 0, y= 0: reference 933, DUT 1238",
+  44
+ ],
+ "first_c15_sparse": [
+  "PASS",
+  "padded 15 -> 16",
+  43
+ ],
+ "first_c16_sparse": [
+  "PASS",
+  "",
+  45
+ ],
+ "first_c17_sparse": [
+  "PASS",
+  "padded 17 -> 20",
+  48
+ ],
+ "first_c18_sparse": [
+  "FAIL",
+  "Difference found at f = 0, x = 0, y= 0: reference 2825, DUT 2918",
+  48
+ ],
+ "first_c19_sparse": [
+  "PASS",
+  "padded 19 -> 20",
+  90
+ ],
+ "first_c20_sparse": [
+  "PASS",
+  "",
+  92
+ ],
+ "first_c21_sparse": [
+  "PASS",
+  "padded 21 -> 24",
+  96
+ ],
+ "first_c22_sparse": [
+  "FAIL",
+  "Difference found at f = 0, x = 0, y= 0: reference 621, DUT 1364",
+  96
+ ],
+ "first_c23_sparse": [
+  "PASS",
+  "padded 23 -> 24",
+  96
+ ],
+ "first_c24_sparse": [
+  "PASS",
+  "",
+  99
+ ],
+ "first_c25_sparse": [
+  "PASS",
+  "padded 25 -> 28",
+  84
+ ],
+ "first_c26_sparse": [
+  "FAIL",
+  "Difference found at f = 0, x = 0, y= 0: reference 1130, DUT 433",
+  86
+ ],
+ "first_c27_sparse": [
+  "PASS",
+  "padded 27 -> 28",
+  85
+ ],
+ "first_c28_sparse": [
+  "PASS",
+  "",
+  89
+ ],
+ "first_c29_sparse": [
+  "PASS",
+  "padded 29 -> 32",
+  95
+ ],
+ "first_c30_sparse": [
+  "FAIL",
+  "Difference found at f = 0, x = 0, y= 0: reference 1333, DUT 1348",
+  99
+ ],
+ "first_c31_sparse": [
+  "PASS",
+  "padded 31 -> 32",
+  113
+ ],
+ "first_c32_sparse": [
+  "PASS",
+  "",
+  118
+ ],
+ "first_c33_sparse": [
+  "PASS",
+  "padded 33 -> 36",
+  120
+ ],
+ "first_c34_sparse": [
+  "FAIL",
+  "Difference found at f = 0, x = 0, y= 0: reference 309, DUT 380",
+  123
+ ],
+ "mid_f1_sparse": [
+  "STOPPED",
+  "ValueError: encoded columns need 12 words, the PE block has 6 (src/open_eye/test_utils_main.py:205 write_stream)",
+  27
+ ],
+ "mid_f2_sparse": [
+  "FAIL",
+  "Error found in Iact storage; word: 0 cell: 0 addr: 0",
+  38
+ ],
+ "mid_f3_sparse": [
+  "STOPPED",
+  "ValueError: column cannot be encoded without an all-zero word: [-33, -16, 0] (src/open_eye/test_utils_main.py:205 write_stream)",
+  32
+ ],
+ "mid_f4_sparse": [
+  "PASS",
+  "",
+  52
+ ],
+ "mid_f5_sparse": [
+  "STOPPED",
+  "ValueError: encoded columns need 35 words, the PE block has 30 (src/open_eye/test_utils_main.py:205 write_stream)",
+  26
+ ],
+ "mid_f6_sparse": [
+  "FAIL",
+  "Error found in Iact storage; word: 32 cell: 0 addr: 8",
+  43
+ ],
+ "mid_f7_sparse": [
+  "STOPPED",
+  "ValueError: encoded columns need 47 words, the PE block has 42 (src/open_eye/test_utils_main.py:205 write_stream)",
+  32
+ ],
+ "mid_f8_sparse": [
+  "PASS",
+  "",
+  71
+ ],
+ "mid_f9_sparse": [
+  "STOPPED",
+  "ValueError: column cannot be encoded without an all-zero word: [-13, 8, -22, 6, -9, 1, -25, -12, 0] (src/open_eye/test_utils_main.py:205 write_stream)",
+  31
+ ],
+ "mid_f10_sparse": [
+  "FAIL",
+  "Error found in Iact storage; word: 64 cell: 0 addr: 16",
+  46
+ ],
+ "mid_f11_sparse": [
+  "STOPPED",
+  "ValueError: column cannot be encoded without an all-zero word: [-2, -4, 19, -19, -7, -24, -22, 1, -1, 4, 0] (src/open_eye/test_utils_main.py:205 write_stream)",
+  34
+ ],
+ "mid_f12_sparse": [
+  "PASS",
+  "",
+  88
+ ],
+ "mid_f13_sparse": [
+  "STOPPED",
+  "ValueError: encoded columns need 79 words, the PE block has 78 (src/open_eye/test_utils_main.py:205 write_stream)",
+  34
+ ],
+ "mid_f14_sparse": [
+  "FAIL",
+  "Error found in Iact storage; word: 96 cell: 0 addr: 24",
+  49
+ ],
+ "mid_f15_sparse": [
+  "STOPPED",
+  "ValueError: encoded columns need 91 words, the PE block has 90 (src/open_eye/test_utils_main.py:205 write_stream)",
+  32
+ ],
+ "mid_f16_sparse": [
+  "PASS",
+  "",
+  146
+ ],
+ "mid_f17_sparse": [
+  "STOPPED",
+  "ValueError: encoded columns need 58 words, the PE block has 54 (src/open_eye/test_utils_main.py:205 write_stream)",
+  35
+ ],
+ "mid_f18_sparse": [
+  "STOPPED",
+  "ValueError: encoded columns need 59 words, the PE block has 54 (src/open_eye/test_utils_main.py:205 write_stream)",
+  34
+ ],
+ "mid_f19_sparse": [
+  "REFUSED",
+  "Convolution2D: the weight stream would hold 2 weight set(s), the RTL reads 3 pass(es) x 1 channel batch(es) = 3 (bug #39b: 19 filters, 9 psums per PE); split the filters",
+  50
+ ],
+ "mid_f20_sparse": [
+  "PASS",
+  "",
+  196
+ ],
+ "dense_f1_sparse": [
+  "STOPPED",
+  "ValueError: encoded columns need 12 words, the PE block has 6 (src/open_eye/test_utils_main.py:205 write_stream)",
+  49
+ ],
+ "dense_f2_sparse": [
+  "STOPPED",
+  "IndexError: list assignment index out of range (src/open_eye/test_utils_main.py:919 fill_dram_with_ref)",
+  64
+ ],
+ "dense_f3_sparse": [
+  "STOPPED",
+  "ValueError: column cannot be encoded without an all-zero word: [-33, -16, 0] (src/open_eye/test_utils_main.py:205 write_stream)",
+  56
+ ],
+ "dense_f4_sparse": [
+  "PASS",
+  "",
+  60
+ ],
+ "dense_f5_sparse": [
+  "STOPPED",
+  "KeyError: 0 (src/open_eye/test_utils_main.py:303 make_ref)",
+  33
+ ],
+ "dense_f6_sparse": [
+  "STOPPED",
+  "ValueError: encoded columns need 24 words, the PE block has 18 (src/open_eye/test_utils_main.py:205 write_stream)",
+  26
+ ],
+ "dense_f7_sparse": [
+  "STOPPED",
+  "KeyError: 0 (src/open_eye/test_utils_main.py:303 make_ref)",
+  26
+ ],
+ "dense_f8_sparse": [
+  "PASS",
+  "",
+  50
+ ],
+ "dense_f9_sparse": [
+  "STOPPED",
+  "KeyError: 0 (src/open_eye/test_utils_main.py:303 make_ref)",
+  27
+ ],
+ "dense_f10_sparse": [
+  "STOPPED",
+  "ValueError: column cannot be encoded without an all-zero word: [-19, 12, 21, 1, 0] (src/open_eye/test_utils_main.py:205 write_stream)",
+  27
+ ],
+ "dense_f11_sparse": [
+  "STOPPED",
+  "KeyError: 0 (src/open_eye/test_utils_main.py:303 make_ref)",
+  26
+ ],
+ "dense_f12_sparse": [
+  "PASS",
+  "",
+  55
+ ],
+ "dense_f13_sparse": [
+  "STOPPED",
+  "KeyError: 0 (src/open_eye/test_utils_main.py:303 make_ref)",
+  27
+ ],
+ "dense_f14_sparse": [
+  "STOPPED",
+  "ValueError: column cannot be encoded without an all-zero word: [-2, 15, 1, -4, -24, -7, 0] (src/open_eye/test_utils_main.py:205 write_stream)",
+  27
+ ],
+ "dense_f15_sparse": [
+  "STOPPED",
+  "KeyError: 0 (src/open_eye/test_utils_main.py:303 make_ref)",
+  26
+ ],
+ "dense_f16_sparse": [
+  "PASS",
+  "",
+  63
+ ],
+ "dense_f17_sparse": [
+  "STOPPED",
+  "KeyError: 0 (src/open_eye/test_utils_main.py:303 make_ref)",
+  32
+ ],
+ "dense_f18_sparse": [
+  "STOPPED",
+  "ValueError: column cannot be encoded without an all-zero word: [14, 4, -12, -6, -16, 10, 16, 1, 0] (src/open_eye/test_utils_main.py:205 write_stream)",
+  32
+ ],
+ "first_c1_dense": [
+  "PASS",
+  "",
+  38
+ ],
+ "first_c2_dense": [
+  "PASS",
+  "",
+  38
+ ],
+ "first_c3_dense": [
+  "PASS",
+  "padded 3 -> 4",
+  42
+ ],
+ "first_c4_dense": [
+  "PASS",
+  "",
+  43
+ ],
+ "first_c5_dense": [
+  "PASS",
+  "padded 5 -> 8",
+  46
+ ],
+ "first_c6_dense": [
+  "FAIL",
+  "the DUT output holds X (undefined) values",
+  46
+ ],
+ "first_c7_dense": [
+  "PASS",
+  "padded 7 -> 8",
+  47
+ ],
+ "first_c8_dense": [
+  "PASS",
+  "",
+  46
+ ],
+ "first_c9_dense": [
+  "PASS",
+  "padded 9 -> 12",
+  52
+ ],
+ "first_c10_dense": [
+  "FAIL",
+  "the DUT output holds X (undefined) values",
+  51
+ ],
+ "first_c11_dense": [
+  "PASS",
+  "padded 11 -> 12",
+  50
+ ],
+ "first_c12_dense": [
+  "PASS",
+  "",
+  53
+ ],
+ "first_c13_dense": [
+  "PASS",
+  "padded 13 -> 16",
+  60
+ ],
+ "first_c14_dense": [
+  "FAIL",
+  "the DUT output holds X (undefined) values",
+  61
+ ],
+ "first_c15_dense": [
+  "PASS",
+  "padded 15 -> 16",
+  64
+ ],
+ "first_c16_dense": [
+  "PASS",
+  "",
+  68
+ ],
+ "first_c17_dense": [
+  "PASS",
+  "padded 17 -> 20",
+  71
+ ],
+ "first_c18_dense": [
+  "FAIL",
+  "the DUT output holds X (undefined) values",
+  66
+ ],
+ "first_c19_dense": [
+  "PASS",
+  "padded 19 -> 20",
+  65
+ ],
+ "first_c20_dense": [
+  "PASS",
+  "",
+  67
+ ],
+ "first_c21_dense": [
+  "PASS",
+  "padded 21 -> 24",
+  74
+ ],
+ "first_c22_dense": [
+  "FAIL",
+  "the DUT output holds X (undefined) values",
+  71
+ ],
+ "first_c23_dense": [
+  "PASS",
+  "padded 23 -> 24",
+  70
+ ],
+ "first_c24_dense": [
+  "PASS",
+  "",
+  71
+ ],
+ "first_c25_dense": [
+  "PASS",
+  "padded 25 -> 28",
+  75
+ ],
+ "first_c26_dense": [
+  "FAIL",
+  "the DUT output holds X (undefined) values",
+  76
+ ],
+ "first_c27_dense": [
+  "PASS",
+  "padded 27 -> 28",
+  80
+ ],
+ "first_c28_dense": [
+  "PASS",
+  "",
+  80
+ ],
+ "first_c29_dense": [
+  "PASS",
+  "padded 29 -> 32",
+  84
+ ],
+ "first_c30_dense": [
+  "FAIL",
+  "the DUT output holds X (undefined) values",
+  85
+ ],
+ "first_c31_dense": [
+  "PASS",
+  "padded 31 -> 32",
+  84
+ ],
+ "first_c32_dense": [
+  "PASS",
+  "",
+  85
+ ],
+ "first_c33_dense": [
+  "PASS",
+  "padded 33 -> 36",
+  92
+ ],
+ "first_c34_dense": [
+  "FAIL",
+  "the DUT output holds X (undefined) values",
+  93
+ ],
+ "mid_f1_dense": [
+  "REFUSED",
+  "Convolution2D: 1 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 12 weight words per pass, the stream packs 6 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  27
+ ],
+ "mid_f2_dense": [
+  "FAIL",
+  "Error found in Iact storage; word: 0 cell: 0 addr: 0",
+  32
+ ],
+ "mid_f3_dense": [
+  "REFUSED",
+  "Convolution2D: 3 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 24 weight words per pass, the stream packs 18 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  24
+ ],
+ "mid_f4_dense": [
+  "PASS",
+  "",
+  40
+ ],
+ "mid_f5_dense": [
+  "REFUSED",
+  "Convolution2D: 5 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 36 weight words per pass, the stream packs 30 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  24
+ ],
+ "mid_f6_dense": [
+  "FAIL",
+  "Error found in Iact storage; word: 32 cell: 0 addr: 8",
+  33
+ ],
+ "mid_f7_dense": [
+  "REFUSED",
+  "Convolution2D: 7 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 48 weight words per pass, the stream packs 42 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  26
+ ],
+ "mid_f8_dense": [
+  "PASS",
+  "",
+  50
+ ],
+ "mid_f9_dense": [
+  "REFUSED",
+  "Convolution2D: 9 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 60 weight words per pass, the stream packs 54 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  25
+ ],
+ "mid_f10_dense": [
+  "FAIL",
+  "Error found in Iact storage; word: 64 cell: 0 addr: 16",
+  32
+ ],
+ "mid_f11_dense": [
+  "REFUSED",
+  "Convolution2D: 11 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 72 weight words per pass, the stream packs 66 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  24
+ ],
+ "mid_f12_dense": [
+  "PASS",
+  "",
+  67
+ ],
+ "mid_f13_dense": [
+  "REFUSED",
+  "Convolution2D: 13 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 84 weight words per pass, the stream packs 78 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  25
+ ],
+ "mid_f14_dense": [
+  "FAIL",
+  "Error found in Iact storage; word: 96 cell: 0 addr: 24",
+  38
+ ],
+ "mid_f15_dense": [
+  "REFUSED",
+  "Convolution2D: 15 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 96 weight words per pass, the stream packs 90 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  27
+ ],
+ "mid_f16_dense": [
+  "PASS",
+  "",
+  103
+ ],
+ "mid_f17_dense": [
+  "REFUSED",
+  "Convolution2D: the weight stream would hold 2 weight set(s), the RTL reads 3 pass(es) x 1 channel batch(es) = 3 (bug #39b: 17 filters, 8 psums per PE); split the filters",
+  29
+ ],
+ "mid_f18_dense": [
+  "REFUSED",
+  "Convolution2D: 9 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 60 weight words per pass, the stream packs 54 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  31
+ ],
+ "mid_f19_dense": [
+  "REFUSED",
+  "Convolution2D: the weight stream would hold 2 weight set(s), the RTL reads 3 pass(es) x 1 channel batch(es) = 3 (bug #39b: 19 filters, 9 psums per PE); split the filters",
+  37
+ ],
+ "mid_f20_dense": [
+  "PASS",
+  "",
+  155
+ ],
+ "dense_f1_dense": [
+  "REFUSED",
+  "Convolution2D: 1 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 12 weight words per pass, the stream packs 6 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  29
+ ],
+ "dense_f2_dense": [
+  "STOPPED",
+  "IndexError: list assignment index out of range (src/open_eye/test_utils_main.py:919 fill_dram_with_ref)",
+  36
+ ],
+ "dense_f3_dense": [
+  "REFUSED",
+  "Convolution2D: 3 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 24 weight words per pass, the stream packs 18 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  30
+ ],
+ "dense_f4_dense": [
+  "PASS",
+  "",
+  46
+ ],
+ "dense_f5_dense": [
+  "STOPPED",
+  "KeyError: 0 (src/open_eye/test_utils_main.py:303 make_ref)",
+  27
+ ],
+ "dense_f6_dense": [
+  "REFUSED",
+  "Convolution2D: 3 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 24 weight words per pass, the stream packs 18 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  32
+ ],
+ "dense_f7_dense": [
+  "STOPPED",
+  "KeyError: 0 (src/open_eye/test_utils_main.py:303 make_ref)",
+  32
+ ],
+ "dense_f8_dense": [
+  "PASS",
+  "",
+  55
+ ],
+ "dense_f9_dense": [
+  "STOPPED",
+  "KeyError: 0 (src/open_eye/test_utils_main.py:303 make_ref)",
+  34
+ ],
+ "dense_f10_dense": [
+  "REFUSED",
+  "Convolution2D: 5 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 36 weight words per pass, the stream packs 30 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  36
+ ],
+ "dense_f11_dense": [
+  "STOPPED",
+  "KeyError: 0 (src/open_eye/test_utils_main.py:303 make_ref)",
+  35
+ ],
+ "dense_f12_dense": [
+  "PASS",
+  "",
+  55
+ ],
+ "dense_f13_dense": [
+  "STOPPED",
+  "KeyError: 0 (src/open_eye/test_utils_main.py:303 make_ref)",
+  28
+ ],
+ "dense_f14_dense": [
+  "REFUSED",
+  "Convolution2D: 7 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 48 weight words per pass, the stream packs 42 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  29
+ ],
+ "dense_f15_dense": [
+  "STOPPED",
+  "KeyError: 0 (src/open_eye/test_utils_main.py:303 make_ref)",
+  28
+ ],
+ "dense_f16_dense": [
+  "PASS",
+  "",
+  50
+ ],
+ "dense_f17_dense": [
+  "STOPPED",
+  "KeyError: 0 (src/open_eye/test_utils_main.py:303 make_ref)",
+  26
+ ],
+ "dense_f18_dense": [
+  "REFUSED",
+  "Convolution2D: 9 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 60 weight words per pass, the stream packs 54 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  27
+ ],
+ "last_f1_sparse": [
+  "STOPPED",
+  "ValueError: encoded columns need 12 words, the PE block has 6 (src/open_eye/test_utils_main.py:205 write_stream)",
+  23
+ ],
+ "last_f2_sparse": [
+  "PASS",
+  "",
+  32
+ ],
+ "last_f3_sparse": [
+  "STOPPED",
+  "ValueError: column cannot be encoded without an all-zero word: [-33, -16, 0] (src/open_eye/test_utils_main.py:205 write_stream)",
+  23
+ ],
+ "last_f4_sparse": [
+  "PASS",
+  "",
+  35
+ ],
+ "last_f5_sparse": [
+  "STOPPED",
+  "ValueError: encoded columns need 35 words, the PE block has 30 (src/open_eye/test_utils_main.py:205 write_stream)",
+  24
+ ],
+ "last_f6_sparse": [
+  "PASS",
+  "",
+  37
+ ],
+ "last_f7_sparse": [
+  "STOPPED",
+  "ValueError: encoded columns need 47 words, the PE block has 42 (src/open_eye/test_utils_main.py:205 write_stream)",
+  29
+ ],
+ "last_f8_sparse": [
+  "PASS",
+  "",
+  41
+ ],
+ "last_f9_sparse": [
+  "STOPPED",
+  "ValueError: column cannot be encoded without an all-zero word: [-13, 8, -22, 6, -9, 1, -25, -12, 0] (src/open_eye/test_utils_main.py:205 write_stream)",
+  28
+ ],
+ "last_f10_sparse": [
+  "PASS",
+  "",
+  37
+ ],
+ "last_f11_sparse": [
+  "STOPPED",
+  "ValueError: column cannot be encoded without an all-zero word: [-2, -4, 19, -19, -7, -24, -22, 1, -1, 4, 0] (src/open_eye/test_utils_main.py:205 write_stream)",
+  24
+ ],
+ "last_f12_sparse": [
+  "PASS",
+  "",
+  37
+ ],
+ "last_f1_dense": [
+  "REFUSED",
+  "Convolution2D: 1 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 12 weight words per pass, the stream packs 6 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  23
+ ],
+ "last_f2_dense": [
+  "PASS",
+  "",
+  28
+ ],
+ "last_f3_dense": [
+  "REFUSED",
+  "Convolution2D: 3 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 24 weight words per pass, the stream packs 18 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  21
+ ],
+ "last_f4_dense": [
+  "PASS",
+  "",
+  29
+ ],
+ "last_f5_dense": [
+  "REFUSED",
+  "Convolution2D: 5 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 36 weight words per pass, the stream packs 30 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  23
+ ],
+ "last_f6_dense": [
+  "PASS",
+  "",
+  33
+ ],
+ "last_f7_dense": [
+  "REFUSED",
+  "Convolution2D: 7 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 48 weight words per pass, the stream packs 42 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  25
+ ],
+ "last_f8_dense": [
+  "PASS",
+  "",
+  33
+ ],
+ "last_f9_dense": [
+  "REFUSED",
+  "Convolution2D: 9 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 60 weight words per pass, the stream packs 54 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  25
+ ],
+ "last_f10_dense": [
+  "PASS",
+  "",
+  32
+ ],
+ "last_f11_dense": [
+  "REFUSED",
+  "Convolution2D: 11 filters per PE with PARALLEL_MACS=2 on dense hardware (SPARSITY_EN=0): the PE reads 72 weight words per pass, the stream packs 66 (bug #48); use a filter count that gives a multiple of 2 filters per PE",
+  24
+ ],
+ "last_f12_dense": [
+  "PASS",
+  "",
+  28
+ ]
+}
