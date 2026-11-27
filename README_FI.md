@@ -4788,3 +4788,33 @@ python3 tools/lint_check.py --verilator ~/tools/verilator-5.020/bin/verilator --
 - **Báo cáo lần 7 (27/11) thêm ba phần kiểm chứng pha ghi ngược** vào mục 3.2: (1) làn mang output nào (bảng làn × lần nhận, 280/268/1.048 ô xác
   định duy nhất), (2) mỗi tầng 1 chu kỳ (mô phỏng `tb_requant.v`), (3) timing từng tầng theo Vivado (bảng slack, đường R4 → R5 từng bước, hai bộ
   chọn giữa R4 và R5); Hình 2 ghi slack của từng tầng; bộ sinh đọc thẳng `doc/perf/writeback_lanes_2026-11-26/`, `timing_*.rpt`, `tb_requant.log`.
+- **Báo cáo lần 7: mục 3.3 dùng số chu kỳ thật thay cho hiệu số, Bảng 17 ghi rõ là một layer, thêm mục 4.5 đánh giá hướng sparse / dense theo
+  layer** (yêu cầu của bạn): Bảng 11 = chu kỳ từng layer × 5 hàm × sparse / dense, số in đậm là ít nhất; Hình 3 = tổng chu kỳ mạng Bảng 2 theo
+  hàm (sparse: ReLU ít nhất 74.177, không hàm nhiều nhất 77.655; dense: không hàm = ReLU = Leaky 70.369). Bảng 17 = tổng chu kỳ của layer Conv
+  14×14×16→32 chạy riêng (không phải cả mạng), dense 31.170, in đậm ô sparse thắng. Mục 4.5 (Bảng 21 sau khi đánh số lại, 7 mạng): đổi cả chế độ theo layer chỉ lợi
+  0 đến −1,4 % (MNIST ReLU) với chi phí ước tính +4.800–9.600 LUT, chưa đáng; P1 (weight 8 bit, activation sparse) 0 đến −7,9 %, khoảng +281 LUT;
+  thêm chọn S / D / P1 theo layer chỉ thêm 0,1–0,4 điểm. Đề xuất: làm trước bước tách Weight / Activation (3a), để sau việc đổi cả chế độ.
+- **Một phép nhân mỗi PE (`PARALLEL_MACS = 1`)** (`doc/experiments/2026-11-27_parallel_macs.md`, chỉ đo và phân tích): dense chạy đúng (tính toán
+  ×1,95, nạp weight +33 %); sparse bị Python chặn vì `data_pipeline_wght.v` viết cứng word 24 bit (dòng 414), upstream `12340ab` y hệt (và sparse
+  Conv của upstream đã sai ở 2 phép nhân). Mô hình với bộ mã hoá thật: 1 phép nhân không bao giờ ít chu kỳ hơn (tỉ số 2,0 ở 0 % weight 0, về 1,0
+  chỉ khi cả cột bằng 0; cùng số bộ nhân thì bằng nhau ở 0 % và 100 %, ở giữa chậm hơn 3–39 %). Đề xuất (chưa làm, RTL cần đồng ý): tham số hoá giải mã theo số làn, nới
+  `overhead_w`, bỏ quy ước "word toàn 0 = không có dữ liệu" bằng đếm word (làm chung với P1).
+- **Báo cáo lần 7, sửa chú thích Hình 4** (bạn phát hiện): panel đầu ghi "(ảnh)" nhưng phép đo từng layer dùng input ngẫu nhiên có đặt số 0 → đổi
+  thành "(1 channel)" ở mọi hình / bảng của mục 4; chú thích Hình 4 ghi rõ là từng layer chạy riêng, chỉ pha tính toán, ý nghĩa ba đường sparse và
+  đường dense, và vì sao ba đường của Dense 1568→32 trùng nhau; câu "mục 4.2–4.4 đo từng layer chạy riêng" chuyển lên đầu mục 4.2 (trước đó nằm sau
+  Hình 4).
+- **Hình 4, nhãn rõ hơn**: chú thích đường ghi "sparse, 0 / 40 / 80 % weight bằng 0" kèm tiêu đề "Mỗi đường giữ cố định tỉ lệ weight bằng 0; trục
+  ngang đổi tỉ lệ input bằng 0", trục ngang "tỉ lệ input bằng 0 (%)", dense "như nhau ở mọi tỉ lệ số 0" (nhãn cũ "weight 0 %" dễ hiểu nhầm là
+  giá trị phải đổi theo trục ngang).
+- **Báo cáo lần 7, bổ sung mục 4.4 và 3.3** (yêu cầu của bạn):
+  - **Số channel và hiệu quả bỏ qua số 0** (Bảng 18, `doc/experiments/2026-11-27_channels_zero_skip/`, dữ liệu
+    `doc/perf/channels_zero_skip_2026-11-27/`, 28 lần chạy): một layer Conv 14×14×C→32 chạy riêng, C = 1…64, weight không có số 0, input
+    bằng 0 ở 0 / 40 / 80 %. Tính toán giảm −8,5 % (C = 1) → −25,4 % (C = 4) ở 80 %, rồi đứng yên khoảng −26 % từ 8 đến 64 channel, vì với
+    kernel 3×3 mỗi lượt PE chỉ xử lý min(C, 4) channel (`used_channels`). Ở 1 channel, input bằng 0 tới 40 % không bớt chu kỳ nào (giải thích
+    đường phẳng của Conv1 ở Hình 4). Tổng layer sparse / dense tốt dần 98,8 % → 84,6 % chỉ vì các pha cố định chiếm tỉ trọng nhỏ dần.
+  - **Word 2 weight / 1 phép nhân mỗi PE** (Bảng 19 đo dense, Bảng 20 mô hình sparse, dữ liệu `doc/perf/parallel_macs_2026-11-27/`).
+  - **Giải thích**: nạp weight độ dài cố định (`trans_cycles_wght`, FILLER, các khối dài bằng nhau theo hàng DMA); Dense không bỏ weight 0 vì
+    chạy dạng raw (`raw_wght_i = fully_connected | gemm_mode`, cách sửa #19 / #26 / #47), hướng lợi là P1; pooling như nhau ở hai chế độ
+    (FSM chính trên bộ đệm int8, công thức ⌈C/4⌉ × H/2 × (1,5 W + 4) khớp cả 4 layer đo).
+  - Bảng 12 đổi nhãn "MNIST cùng weight" thành "MNIST, weight ReLU, đổi hàm" và chú thích ghi rõ mọi cột dùng chung weight của model ReLU.
+  - Bảng đánh số lại (thêm 3 bảng: 4.5 thành Bảng 21, commit trong tuần thành Bảng 25); mục 7 thêm 293c655, cf4bffd và việc 27/11.

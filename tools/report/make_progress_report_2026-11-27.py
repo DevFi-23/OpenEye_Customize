@@ -63,7 +63,7 @@ GRAY, LIGHT = "#9b9a95", "#cfcec8"
 ZEROS = ["0", "0.2", "0.4", "0.6", "0.8"]
 T2_ACTS = [("none", "không hàm"), ("relu", "ReLU"), ("leaky", "Leaky ReLU"), ("silu", "SiLU"), ("hardswish", "hard-swish")]
 MN_ACTS = [("relu", "ReLU"), ("leaky_relu", "Leaky ReLU"), ("silu", "SiLU"), ("hardswish", "hard-swish")]
-SHAPES = [("conv1", "Conv 28×28×1→16 (ảnh)"), ("conv2", "Conv 14×14×16→32"), ("conv3", "Conv 7×7×32→32"),
+SHAPES = [("conv1", "Conv 28×28×1→16 (1 channel)"), ("conv2", "Conv 14×14×16→32"), ("conv3", "Conv 7×7×32→32"),
           ("fc", "Dense 1568→32")]
 PHASE_VI = [("load_config", "nạp cấu hình"), ("load_iact", "nạp activation"), ("load_wght", "nạp weight"),
             ("load_bias", "nạp bias"), ("load_quant", "nạp bảng lượng tử"), ("load_act", "nạp bảng hàm kích hoạt"),
@@ -74,6 +74,8 @@ COMMITS = [
     ("6a7a323", "21/11", "Sửa #21 trong bộ giải mã Dense của testbench, sửa 11 test hỏng của test_dense_output"),
     ("f6df9af", "21/11", "Rà upstream 12340ab (không lấy); tìm ra lỗi mới #50, #51 của dev"),
     ("abd2bb8", "22/11", "Sửa #51 (RTL, 3 dòng), #50 (kẹp trong Python), #7 (đệm channel lẻ), #9 (mặt nạ ô đệm)"),
+    ("293c655", "26/11", "Báo cáo 7: chi phí hàm theo layer, pha ghi ngược, profiler, độ thưa, quét số channel"),
+    ("cf4bffd", "26/11", "Báo cáo 7: kiểm chứng pha ghi ngược (làn, 1 chu kỳ mỗi tầng, timing Vivado từng tầng)"),
 ]
 
 
@@ -330,36 +332,28 @@ def figure_layers(run, path):
     plt.close(fig)
 
 
-def figure_act(d, path):
-    """Table 2 network: change of total cycles against no activation, direct (table load + write-back) and indirect
-    (compute of the next layers), sparse and dense."""
-    acts = T2_ACTS[1:]
-    fig, axes = new_figure(10.5, 3.5, 1, 2)
-    lo = hi = 0
-    for ax, (mode, title) in zip(axes, [("sparse", "Phần cứng sparse"), ("dense", "Phần cứng dense")]):
-        style_axes(ax, "y")
-        base = d["t2"][("none", mode)]
-        for i, (a, lab) in enumerate(acts):
-            r = d["t2"][(a, mode)]
-            direct = sum(ph(r, p) - ph(base, p) for p in ("load_act", "writeback"))
-            comp = ph(r, "compute") - ph(base, "compute")
-            for x, v, color, label in ((i - 0.2, direct, SLOTS[0], "trực tiếp: nạp bảng + ghi ngược"),
-                                       (i + 0.2, comp, SLOTS[1], "gián tiếp: tính toán của layer sau (số 0)")):
-                ax.bar(x, v, width=0.38, color=color, edgecolor=SURFACE, linewidth=1.0, label=label if i == 0 else None)
-                ax.text(x, v + (40 if v >= 0 else -40), sgn(v), ha="center", va="bottom" if v >= 0 else "top",
-                        fontsize=7, color=INK)
-                lo, hi = min(lo, v), max(hi, v)
-        ax.axhline(0, color=AXIS, linewidth=1)
-        ax.set_xticks(range(len(acts)))
-        ax.set_xticklabels([lab for _, lab in acts], fontsize=8.5, color=INK)
-        ax.set_title(title, fontsize=9, color=INK, loc="left")
-    for ax in axes:
-        ax.set_ylim(lo - 600, hi + 600)
-        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: sgn(v)))
-    axes[0].set_ylabel("Δ chu kỳ so với không hàm", fontsize=8, color=INK_2)
-    h, lab = axes[0].get_legend_handles_labels()
-    fig.legend(h, lab, loc="upper center", ncol=2, frameon=False, fontsize=8.5, bbox_to_anchor=(0.5, 1.0))
-    fig.tight_layout(rect=(0, 0, 1, 0.9))
+def figure_act_totals(d, path):
+    """Table 2 network: total cycles per activation function, sparse and dense side by side (horizontal bars)."""
+    fig, ax = new_figure(10.0, 3.6)
+    style_axes(ax, "x")
+    h = 0.38
+    vals = []
+    for i, (a, lab) in enumerate(T2_ACTS):
+        for j, (mode, color, mlab) in enumerate((("sparse", SLOTS[0], "sparse"), ("dense", SLOTS[1], "dense"))):
+            v = d["t2"][(a, mode)]["total_cycles"]
+            vals.append(v)
+            y = i + (j - 0.5) * h
+            ax.barh(y, v, height=h * 0.9, color=color, edgecolor=SURFACE, linewidth=0.8, label=mlab if i == 0 else None)
+            ax.text(v + 120, y, fmt(v), va="center", fontsize=7.4, color=INK)
+    ax.set_yticks(range(len(T2_ACTS)))
+    ax.set_yticklabels([lab for _, lab in T2_ACTS], fontsize=8.5, color=INK)
+    ax.invert_yaxis()
+    lo = 65000
+    ax.set_xlim(lo, max(vals) * 1.03)
+    ax.xaxis.set_major_formatter(plt.FuncFormatter(kfmt))
+    ax.set_xlabel(f"chu kỳ cả mạng (trục bắt đầu ở {fmt(lo)} để thấy rõ chênh lệch)", fontsize=8, color=INK_2)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 1.12), ncol=2, frameon=False, fontsize=8.5)
+    fig.tight_layout()
     fig.savefig(path, facecolor=fig.get_facecolor())
     plt.close(fig)
 
@@ -367,26 +361,28 @@ def figure_act(d, path):
 def figure_compute_lines(d, path):
     """One layer: compute cycles against the input zero share, for three weight zero shares (sparse) and dense."""
     fig, axes = new_figure(11.5, 3.3, 1, 4)
-    styles = [("0", "weight 0 %", SLOTS[0], "-", "o"), ("0.4", "weight 40 %", SLOTS[1], "--", "s"),
-              ("0.8", "weight 80 %", SLOTS[2], ":", "^")]
+    styles = [("0", "0 %", SLOTS[0], "-", "o"), ("0.4", "40 %", SLOTS[1], "--", "s"),
+              ("0.8", "80 %", SLOTS[2], ":", "^")]
     for ax, (s, title) in zip(axes, SHAPES):
         style_axes(ax, "y")
         ax.spines["left"].set_visible(True)
         ax.spines["left"].set_color(AXIS)
         xs = [float(a) * 100 for a in ZEROS]
         dense = [ph(d["grid"][(s, "0", a, "dense")], "compute") for a in ZEROS]
-        ax.plot(xs, dense, color=GRAY, linewidth=2, linestyle=(0, (4, 3)), label="dense (mọi mức số 0)")
+        ax.plot(xs, dense, color=GRAY, linewidth=2, linestyle=(0, (4, 3)), label="dense (như nhau ở mọi tỉ lệ số 0)")
         for w, lab, color, ls, mk in styles:
             ys = [ph(d["grid"][(s, w, a, "sparse")], "compute") for a in ZEROS]
-            ax.plot(xs, ys, color=color, linestyle=ls, marker=mk, markersize=5, linewidth=2, label=f"sparse, {lab}")
+            ax.plot(xs, ys, color=color, linestyle=ls, marker=mk, markersize=5, linewidth=2, label=f"sparse, {lab} weight bằng 0")
         ax.set_ylim(0, max(dense + [ph(d["grid"][(s, "0", "0", "sparse")], "compute")]) * 1.12)
         ax.set_title(title, fontsize=8.5, color=INK, loc="left")
-        ax.set_xlabel("input bằng 0 (%)", fontsize=7.5, color=INK_2)
+        ax.set_xlabel("tỉ lệ input bằng 0 (%)", fontsize=7.5, color=INK_2)
         ax.yaxis.set_major_formatter(plt.FuncFormatter(kfmt))
     axes[0].set_ylabel("chu kỳ tính toán", fontsize=8, color=INK_2)
     h, lab = axes[0].get_legend_handles_labels()
-    fig.legend(h, lab, loc="upper center", ncol=4, frameon=False, fontsize=8, bbox_to_anchor=(0.5, 1.0))
-    fig.tight_layout(rect=(0, 0, 1, 0.88))
+    fig.legend(h, lab, loc="upper center", ncol=4, frameon=False, fontsize=8, bbox_to_anchor=(0.5, 1.0),
+               title="Mỗi đường giữ cố định tỉ lệ weight bằng 0; trục ngang đổi tỉ lệ input bằng 0",
+               title_fontsize=8)
+    fig.tight_layout(rect=(0, 0, 1, 0.82))
     fig.savefig(path, facecolor=fig.get_facecolor())
     plt.close(fig)
 
@@ -879,29 +875,58 @@ def sections(doc, d, figs):
 
     doc.add_heading("3.3. Đo theo từng layer", level=2)
     para(doc, "Mạng Bảng 2 (weight và input ngẫu nhiên, seed 1), CR 2 X 4 Y 3, chạy 5 lần: không hàm, ReLU, Leaky ReLU, "
-              "SiLU, hard-swish (hàm đặt sau mọi Conv / Dense trừ layer cuối), cả sparse và dense. Chi phí trực tiếp của "
-              "hàm ở một layer = hiệu số chu kỳ của layer đó so với không hàm, trừ phần tính toán (phần tính toán thay đổi do "
-              "số 0 mà hàm của layer trước để lại).")
-    base = t2[("none", "dense")]
-    rows = []
-    for k, layer in enumerate(base["layers"]):
-        if layer["info"]["name"] == "Pooling" or k == len(base["layers"]) - 1:
-            continue
-        cells = [lname(layer), f"{fmt(layer.get('activation_cycles', 0))} / {fmt(ph(layer, 'writeback'))}"]
-        for a, _ in T2_ACTS[1:]:
-            vals = []
-            for mode in ("dense", "sparse"):
-                L, B = t2[(a, mode)]["layers"][k], t2[("none", mode)]["layers"][k]
-                vals.append(L["total_cycles"] - B["total_cycles"] - (ph(L, "compute") - ph(B, "compute")))
-            cells.append(sgn(vals[0]) + ("" if vals[0] == vals[1] else f" (sparse {sgn(vals[1])})"))
-        rows.append(cells)
-    table(doc, ["Layer", "Chu kỳ khối kích hoạt / ghi ngược", "ReLU", "Leaky ReLU", "SiLU", "hard-swish"], rows,
-          widths=[3.6, 3.6, 2.0, 2.2, 2.0, 2.4], align_right=(1, 2, 3, 4, 5))
-    caption(doc, "Bảng 11. Chi phí trực tiếp của hàm ở từng layer (chu kỳ, so với không hàm), giống nhau ở sparse và dense. "
-                 "Khối kích hoạt bận cùng số chu kỳ ở cả 5 lần chạy, kể cả không hàm, và nằm trong ghi ngược.")
-    doc.add_picture(figs["ham_kich_hoat"], width=Cm(16.5))
-    caption(doc, "Hình 3. Cả mạng Bảng 2: hiệu số chu kỳ so với không hàm, chia trực tiếp (nạp bảng, ghi ngược) và gián tiếp "
-                 "(tính toán của layer sau, do số 0).")
+              "SiLU, hard-swish (hàm đặt sau mọi Conv / Dense trừ layer cuối), cả sparse và dense. Bảng dưới là số chu kỳ "
+              "của từng layer ở từng trường hợp; số in đậm là ít chu kỳ nhất của hàng.")
+    layers = t2[("none", "dense")]["layers"]
+    rows, bold = [], []
+    for k in list(range(len(layers))) + [None]:
+        for mode in ("sparse", "dense"):
+            if k is None:
+                vals = [t2[(a, mode)]["total_cycles"] for a, _ in T2_ACTS]
+                name = "Cả mạng" if mode == "sparse" else ""
+            else:
+                vals = [t2[(a, mode)]["layers"][k]["total_cycles"] for a, _ in T2_ACTS]
+                name = lname(layers[k]) if mode == "sparse" else ""
+            lo = min(vals)
+            best = [lab for (_, lab), v in zip(T2_ACTS, vals) if v == lo]
+            same_all = len(set(vals)) == 1
+            rows.append([name, mode] + [fmt(v) for v in vals] +
+                        ["như nhau" if same_all else ", ".join(best)])
+            if not same_all:
+                bold.extend((len(rows), 2 + j) for j, v in enumerate(vals) if v == lo)
+    t = table(doc, ["Layer", "Chế độ", "không hàm", "ReLU", "Leaky ReLU", "SiLU", "hard-swish", "Ít chu kỳ nhất"], rows,
+              widths=[2.8, 1.5, 1.7, 1.7, 1.8, 1.7, 1.8, 3.0], align_right=(2, 3, 4, 5, 6))
+    for r, c in bold:
+        for run in t.rows[r].cells[c].paragraphs[0].runs:
+            run.bold = True
+    caption(doc, "Bảng 11. Chu kỳ từng layer của mạng Bảng 2 ở từng hàm kích hoạt, sparse và dense.")
+    doc.add_picture(figs["ham_kich_hoat"], width=Cm(16.0))
+    caption(doc, "Hình 3. Tổng chu kỳ của mạng Bảng 2 ở từng hàm kích hoạt, sparse và dense.")
+    sp = {a: t2[(a, "sparse")]["total_cycles"] for a, _ in T2_ACTS}
+    dn = {a: t2[(a, "dense")]["total_cycles"] for a, _ in T2_ACTS}
+    order = sorted(T2_ACTS, key=lambda x: sp[x[0]])
+    l0 = layers[0]
+    bullets(doc, [
+        f"Phần cứng dense: không hàm, ReLU và Leaky ReLU ít chu kỳ nhất và bằng nhau ({fmt(dn['none'])}); SiLU và hard-swish "
+        f"nhiều hơn một chút ({fmt(dn['silu'])}) vì phải nạp bảng ở 4 layer. Ở mỗi layer, ba hàm đầu cũng bằng nhau.",
+        f"Phần cứng sparse: ít chu kỳ nhất là {order[0][1]} ({fmt(sp[order[0][0]])}), rồi "
+        + ", ".join(f"{lab} ({fmt(sp[a])})" for a, lab in order[1:]) +
+        ". Hàm nào để lại nhiều số 0 thì layer sau tính nhanh hơn; không hàm để lại ít số 0 nhất nên chậm nhất. Layer đầu "
+        "(Conv 28×28×1→16) như nhau ở mọi hàm, trừ SiLU / hard-swish (nạp bảng).",
+        "Pooling như nhau ở mọi trường hợp và cả hai chế độ: pooling chạy trong FSM chính (MAXPOOLING_READ / SEND) trên bộ "
+        "đệm activation, nơi giá trị là int8 trần theo nhóm 4 channel mỗi pixel ở cả sparse lẫn dense; nó không dùng PE, "
+        "weight hay định dạng nén, và so sánh số 0 như mọi giá trị. Mỗi nhóm 4 channel và mỗi hàng output: đọc 2 hàng input "
+        "(W chu kỳ, mỗi chu kỳ một ô 64 bit = 2 pixel × 4 channel), ghi W / 2 pixel output, cộng khoảng 4 chu kỳ điều khiển: "
+        "⌈C / 4⌉ × H / 2 × (1,5 W + 4), khớp đúng cả 4 layer pooling đã đo (Pool 28 × 28 × 16: 4 × 14 × 46 = 2.576). Layer "
+        "pooling còn 21 chu kỳ cấu hình và 20–40 chu kỳ word lượng tử (vẫn có trong luồng DMA nhưng pooling không dùng).",
+        f"So hai chế độ: trên mạng này (dữ liệu ngẫu nhiên) dense ít chu kỳ hơn sparse ở cả 5 trường hợp; gần nhất là ReLU "
+        f"({fmt(sp['relu'])} so với {fmt(dn['relu'])}).",
+        f"Khối kích hoạt bận {fmt(l0.get('activation_cycles', 0))} / "
+        f"{fmt(layers[2].get('activation_cycles', 0))} / {fmt(layers[4].get('activation_cycles', 0))} / "
+        f"{fmt(layers[5].get('activation_cycles', 0))} chu kỳ trong {fmt(ph(l0, 'writeback'))} / "
+        f"{fmt(ph(layers[2], 'writeback'))} / {fmt(ph(layers[4], 'writeback'))} / {fmt(ph(layers[5], 'writeback'))} chu kỳ "
+        "ghi ngược của 4 layer có hàm, như nhau ở cả 5 trường hợp: tính hàm không thêm chu kỳ nào.",
+    ])
 
     doc.add_heading("3.4. Đo end to end (cả mạng)", level=2)
     same = d["same"]
@@ -919,7 +944,7 @@ def sections(doc, d, figs):
     if have_same:
         for mode in ("sparse", "dense"):
             b = same[("none", mode)]["total_cycles"]
-            rows.append([f"MNIST cùng weight, {mode}"] + [
+            rows.append([f"MNIST, weight ReLU, đổi hàm, {mode}"] + [
                 f"{fmt(same[(a, mode)]['total_cycles'])}" + ("" if a == "none" else
                 f" ({pct(100.0 * (same[(a, mode)]['total_cycles'] - b) / b, 2)})") for a, _ in SAME_ACTS])
     mn_avg = {a: sum(d["mn"][(a, i, "sparse")]["total_cycles"] for i in (0, 1, 6)) / 3 for a, _ in MN_ACTS}
@@ -930,7 +955,8 @@ def sections(doc, d, figs):
                  f" ({sgn(mn_dense[a] - mn_dense['relu'])})") for a, _ in MN_ACTS])
     table(doc, ["Mạng, chế độ", "không hàm", "ReLU", "Leaky ReLU", "SiLU", "hard-swish"], rows,
           widths=[3.6, 2.2, 2.6, 2.6, 2.4, 2.6], align_right=(1, 2, 3, 4, 5))
-    caption(doc, "Bảng 12. Tổng chu kỳ cả mạng. Bảng 2 và MNIST cùng weight (weight của model ReLU, ảnh 0): so với không hàm. "
+    caption(doc, "Bảng 12. Tổng chu kỳ cả mạng. Bảng 2 và MNIST \"weight ReLU, đổi hàm\" (mọi cột dùng chung weight của model "
+                 "ReLU, chỉ thay hàm kích hoạt, ảnh 0): so với không hàm. "
                  "MNIST model riêng (mỗi hàm một model đã huấn luyện, không có bản không hàm): so với ReLU.")
     notes = [
         "Trên dense, hàm kích hoạt chỉ tốn đúng phần nạp bảng: ReLU = Leaky ReLU = không hàm; SiLU = hard-swish = +32 chu kỳ "
@@ -1042,6 +1068,8 @@ def sections(doc, d, figs):
                  "cùng giá trị ở mọi mức, mức cao chỉ thêm số 0.")
 
     doc.add_heading("4.2. Phần giống nhau ở mọi mức số 0", level=2)
+    para(doc, "Mục 4.2–4.4 dùng phép đo từng layer chạy riêng: 4 layer của mạng Bảng 2, mỗi layer là một lần chạy, weight "
+              "và input ngẫu nhiên (seed 1), CR 2 X 4 Y 3; không phải cả mạng. Kết quả cả mạng ở Hình 6 và mục 4.5.")
     rows = []
     for s, title in SHAPES:
         vals = {p: {(w, a, m): ph(g(s, w, a, m), p) for w in ZEROS for a in ZEROS for m in ("sparse", "dense")}
@@ -1068,27 +1096,38 @@ def sections(doc, d, figs):
 
     doc.add_heading("4.3. Phần khác nhau: tính toán trên phần cứng sparse", level=2)
     doc.add_picture(figs["tinh_toan_theo_so_0"], width=Cm(16.5))
-    caption(doc, "Hình 4. Chu kỳ tính toán của từng layer theo tỉ lệ input bằng 0, ở 3 mức weight bằng 0 (sparse) và dense.")
+    caption(doc, "Hình 4. Từng layer chạy riêng (4 layer của mạng Bảng 2, weight và input ngẫu nhiên, seed 1): số chu kỳ của "
+                 "pha tính toán. Trục ngang: tỉ lệ input bằng 0, đổi từ 0 đến 80 %. Mỗi đường màu là phần cứng sparse với tỉ "
+                 "lệ weight bằng 0 giữ cố định (0, 40 hoặc 80 %); đường xám là dense, như nhau ở mọi tỉ lệ số 0 của cả weight "
+                 "lẫn input. Ở Dense 1568→32 ba đường sparse trùng nhau vì layer Dense không bỏ qua weight bằng 0.")
     c2 = {(w, a): ph(g("conv2", w, a), "compute") for w in ZEROS for a in ZEROS}
-    rows = [[pct(float(w) * 100, 0, sign=False)] + [fmt(c2[(w, a)]) for a in ZEROS] for w in ZEROS]
-    table(doc, ["weight = 0 \\ input = 0"] + [pct(float(a) * 100, 0, sign=False) for a in ZEROS], rows,
-          widths=[3.6, 2.4, 2.4, 2.4, 2.4, 2.4], align_right=(1, 2, 3, 4, 5))
-    caption(doc, f"Bảng 17. Chu kỳ tính toán sparse của Conv 14×14×16→32 (dense: {fmt(ph(g('conv2', '0', '0', 'dense'), 'compute'))} "
-                 "ở mọi mức).")
+    tot2 = {(w, a): g("conv2", w, a)["total_cycles"] for w in ZEROS for a in ZEROS}
+    dtot2 = g("conv2", "0", "0", "dense")["total_cycles"]
+    para(doc, "Ví dụ layer Conv 14×14×16→32, tính cả mọi pha (tổng chu kỳ của layer):")
+    rows = [[pct(float(w) * 100, 0, sign=False)] + [fmt(tot2[(w, a)]) for a in ZEROS] for w in ZEROS]
+    t = table(doc, ["weight = 0 \\ input = 0"] + [pct(float(a) * 100, 0, sign=False) for a in ZEROS], rows,
+              widths=[3.6, 2.4, 2.4, 2.4, 2.4, 2.4], align_right=(1, 2, 3, 4, 5))
+    for i, w in enumerate(ZEROS):
+        for j, a in enumerate(ZEROS):
+            if tot2[(w, a)] < dtot2:
+                for run in t.rows[i + 1].cells[j + 1].paragraphs[0].runs:
+                    run.bold = True
+    caption(doc, f"Bảng 17. Một layer chạy riêng (Conv 14×14×16→32 của mạng Bảng 2), tổng chu kỳ của layer trên phần cứng "
+                 f"sparse theo tỉ lệ số 0. Dense: {fmt(dtot2)} ở mọi mức. Số in đậm: sparse ít chu kỳ hơn dense.")
     s0 = c2[("0", "0")]
     fc = {(w, a): ph(g("fc", w, a), "compute") for w in ZEROS for a in ZEROS}
     c1 = {(w, a): ph(g("conv1", w, a), "compute") for w in ZEROS for a in ZEROS}
     bullets(doc, [
-        f"Weight bằng 0 và input bằng 0 đều làm tính toán sparse giảm, và cộng dồn: Conv 14×14 chỉ weight 80 % → "
+        f"Pha tính toán của layer này giảm theo cả weight bằng 0 và input bằng 0, và cộng dồn: chỉ weight 80 % → "
         f"{pct(100.0 * (c2[('0.8', '0')] - s0) / s0)}, chỉ input 80 % → {pct(100.0 * (c2[('0', '0.8')] - s0) / s0)}, "
         f"cả hai → {pct(100.0 * (c2[('0.8', '0.8')] - s0) / s0)}.",
         f"Giảm ít hơn tỉ lệ số 0: 80 % input bằng 0 chỉ bớt {pct(-100.0 * (c2[('0', '0.8')] - s0) / s0, 0, sign=False)} chu "
         "kỳ. Theo phép quét 18/11, khoảng 60–64 % chu kỳ tính toán sparse là phần cố định không phụ thuộc số 0.",
         f"Layer Dense không bỏ qua weight bằng 0: tính toán giống hệt ở mọi mức weight bằng 0 ({fmt(fc[('0', '0')])} chu kỳ "
         f"ở input 0 %), chỉ input bằng 0 làm giảm ({fmt(fc[('0', '0.8')])} ở 80 %).",
-        f"Conv1 (ảnh, 1 channel): input bằng 0 đến 40 % gần như không bớt chu kỳ ({fmt(c1[('0', '0')])} → "
+        f"Conv 28×28×1→16 (1 channel): input bằng 0 đến 40 % gần như không bớt chu kỳ ({fmt(c1[('0', '0')])} → "
         f"{fmt(c1[('0', '0.4')])}), weight bằng 0 thì có ({fmt(c1[('0.8', '0')])} ở weight 80 %).",
-        "Khi không có số 0, sparse chậm hơn dense một chút ở pha tính toán (giải mã overhead): Conv1 +3,0 %, Dense 1568 "
+        "Khi không có số 0, sparse chậm hơn dense một chút ở pha tính toán (giải mã overhead): Conv 28×28×1→16 +3,0 %, Dense 1568 "
         "+2,4 %.",
     ])
 
@@ -1097,15 +1136,102 @@ def sections(doc, d, figs):
         "PE sparse lưu activation và weight ở dạng nén (giá trị khác 0 kèm 4 bit overhead đếm số 0 bị bỏ) và chỉ nhân các "
         "cặp khác 0, nên số 0 làm bớt phép nhân. Nhưng mỗi lượt tính còn có việc không phụ thuộc số 0 (đọc địa chỉ, giải mã, "
         "cộng psum, đồng bộ các PE), nên chu kỳ giảm chậm hơn số phép nhân.",
-        "PE đọc weight theo word 2 weight: một weight bằng 0 chỉ bớt được chu kỳ khi cả word biến mất (thí nghiệm 18/11: ở 5 % "
-        "weight bằng 0, tiết kiệm thật chỉ 0–10 % mức tỉ lệ).",
-        "Weight của layer Dense được gửi không nén (raw_wght_i = 1, rtl_test_utils.py): PE nhận mọi weight, kể cả 0, nên "
-        "không có gì để bỏ qua ở phía weight.",
-        "Conv1 chỉ có 1 channel: mỗi PE nhận rất ít activation mỗi lượt, nên phần cố định chiếm gần hết thời gian. Đường "
-        "cong lồi (gần phẳng đến 40 % rồi mới giảm) gợi ý chu kỳ chỉ bớt khi cả một nhóm activation, hoặc cả lượt của PE "
-        "chậm nhất, bằng 0. Đây là giả thuyết, chưa kiểm bằng trace.",
-        "Pha nạp không đổi vì khối dữ liệu gửi cho mỗi PE có độ dài cố định; phần cứng dense không đổi vì nó không có cơ chế "
-        "bỏ qua.",
+        "Pha nạp weight không đổi theo số 0, vì ba lẽ: (1) FSM chính nhận đúng trans_cycles_wght word, một thanh ghi cấu hình "
+        "Python tính từ kích thước layer: needed_wght_transmissions × ⌈used_wght_per_PE / 2⌉ × ⌈số cluster × Y × 24 / 64⌉ "
+        "(Conv2 MNIST: 3.072 hàng × 5 word = 15.360), không có số 0 trong công thức; (2) bộ mã hoá CSC bỏ weight 0 nhưng đổ "
+        "word đệm (FILLER) cho đủ độ dài khối của PE; (3) mỗi hàng DMA chở cùng lúc một word cho mọi nhóm PE, nên mọi khối "
+        "phải dài như nhau, bằng khối dài nhất. Vì vậy CSC ở đây chỉ bớt tính toán, không bớt băng thông. Muốn nạp ngắn lại "
+        "theo số 0 phải sửa RTL (độ dài khối theo layer) và chỉ lợi khi mọi PE đều thưa (weight đã prune).",
+        "Layer Dense không bỏ qua weight bằng 0 vì được thiết kế chạy dạng raw: RTL bật raw_wght_i = fully_connected | "
+        "gemm_mode (OpenEye_FPGA.v dòng 3398), bộ giải mã lưu mọi word kể cả word toàn 0; Python (DenseWghtStreamMapper) "
+        "đặt mọi weight, kể cả 0, vào đúng vị trí cố định. Đây là cách sửa của chuỗi lỗi #19, #26, #47 (bỏ word toàn 0 làm "
+        "lệch bộ đếm word, sai địa chỉ hoặc treo). Hệ quả: ở layer Dense, sparse chỉ bỏ qua được activation bằng 0 mà vẫn "
+        "chịu định dạng 12 bit (nạp nhiều hơn 40 %, chiếm 65 % layer). Cách lợi chắc chắn là gửi weight Dense 8 bit trên phần "
+        "cứng sparse (P1, mục 4.5); làm CSC cho Dense chỉ bớt phần tính toán (khoảng 35 % layer) và chỉ khi weight thật sự "
+        "thưa.",
+        "Phần cứng dense không đổi ở mọi pha vì nó không có cơ chế bỏ qua.",
+    ])
+
+    doc.add_heading("Số channel và hiệu quả bỏ qua số 0 (đo 27/11)", level=3)
+    chz = {}
+    for c in (1, 2, 4, 8, 16, 32, 64):
+        for case in ("a0_dense", "a0_sparse", "a0.4_sparse", "a0.8_sparse"):
+            r = load(os.path.join(PERF, "channels_zero_skip_2026-11-27", f"c{c}_{case}.json"))
+            if r:
+                chz[(c, case)] = r
+    if len(chz) == 28:
+        para(doc, "Ở Hình 4, ba layer Conv khác nhau cả kích thước, số filter lẫn số channel. Để tách riêng số channel: một "
+                  "layer Conv 14 × 14 × C → 32 chạy riêng, chỉ đổi C, weight không có số 0, input bằng 0 ở 0 / 40 / 80 %:")
+        rows = []
+        for c in (1, 2, 4, 8, 16, 32, 64):
+            s0, s4, s8 = (ph(chz[(c, k)], "compute") for k in ("a0_sparse", "a0.4_sparse", "a0.8_sparse"))
+            dn = chz[(c, "a0_dense")]
+            rows.append([str(c), fmt(ph(dn, "compute")), fmt(s0), fmt(s8), pct(100.0 * (s4 - s0) / s0, 1),
+                         pct(100.0 * (s8 - s0) / s0, 1),
+                         num(100.0 * chz[(c, "a0.8_sparse")]["total_cycles"] / dn["total_cycles"], 1) + " %"])
+        table(doc, ["C", "Tính toán dense", "Sparse, input 0 %", "Sparse, input 80 %", "Giảm ở 40 %", "Giảm ở 80 %",
+                    "Tổng layer sparse / dense ở 80 %"], rows, widths=[1.2, 2.3, 2.3, 2.3, 2.2, 2.2, 3.5],
+              align_right=(0, 1, 2, 3, 4, 5, 6))
+        caption(doc, "Bảng 18. Một layer Conv 14 × 14 × C → 32 chạy riêng (28 lần chạy, CR 2 X 4 Y 3), chu kỳ pha tính toán.")
+        bullets(doc, [
+            "Hiệu quả bỏ qua số 0 tăng mạnh từ 1 đến 4 channel (−8,5 % → −25,4 % ở 80 % input bằng 0), rồi đứng yên khoảng "
+            "−26 % từ 8 đến 64 channel. Không phải càng nhiều channel càng hiệu quả.",
+            "Lý do: với kernel 3 × 3, mỗi lượt PE xử lý một nhóm min(C, 4) channel (used_channels). Từ 4 channel trở lên mỗi "
+            "lượt giống hệt nhau, thêm channel chỉ thêm lượt (tính toán tăng tuyến tính, khoảng 1.400 chu kỳ mỗi channel). Với "
+            "1–2 channel mỗi lượt có quá ít activation cho mỗi PE, phần cố định lấn át: ở 1 channel, input bằng 0 tới 40 % "
+            "không bớt chu kỳ nào. Điều này giải thích đường gần phẳng của Conv 28 × 28 × 1 ở Hình 4.",
+            "Tổng cả layer có tốt dần theo C (98,8 % → 84,6 % của dense) nhưng không phải vì bỏ qua tốt hơn: tính toán lớn lên "
+            "nên các pha cố định (cấu hình, chuyển activation, đọc kết quả, phần nạp weight thêm của sparse) chiếm tỉ trọng "
+            "nhỏ dần.",
+            "Chênh lệch giữa Conv 14 × 14 × 16 (−26 %) và Conv 7 × 7 × 32 (−28 %) ở Hình 4 vì thế không do số channel (16 "
+            "và 32 channel cho cùng −26 % ở đây) mà do kích thước 7 × 7 và cách chia lượt.",
+        ])
+
+    doc.add_heading("Word 2 weight và trường hợp 1 phép nhân mỗi PE (27/11)", level=3)
+    pmd = {k: load(os.path.join(PERF, "parallel_macs_2026-11-27", f"{k}.json")) for k in
+           ("pm1_conv2_w0_a0_dense", "pm2_conv2_w0_a0_dense", "pm1_conv3_w0_a0_dense", "pm2_conv3_w0_a0_dense",
+            "pm1_fc_w0_a0_dense", "pm2_fc_w0_a0_dense")}
+    para(doc, "PE đọc weight theo word 2 weight vì PARALLEL_MACS = 2: mỗi chu kỳ một activation nhân với 2 weight trong cùng "
+              "một word. Trong một cột weight, các weight khác 0 được xếp liền nhau, nên k weight khác 0 tốn khoảng ⌈k / 2⌉ "
+              "chu kỳ; một weight bằng 0 chỉ bớt chu kỳ khi làm số word giảm (thí nghiệm 18/11: ở 5 % weight bằng 0, tiết kiệm "
+              "thật chỉ 0–10 % mức tỉ lệ).")
+    if all(pmd.values()):
+        rows = []
+        for shape, name in (("conv2", "Conv 14×14×16→32"), ("conv3", "Conv 7×7×32→32"), ("fc", "Dense 1568→32")):
+            a, b = pmd[f"pm1_{shape}_w0_a0_dense"], pmd[f"pm2_{shape}_w0_a0_dense"]
+            rows.append([name, f"{fmt(ph(a, 'load_wght'))} / {fmt(ph(b, 'load_wght'))}",
+                         f"{fmt(ph(a, 'compute'))} / {fmt(ph(b, 'compute'))}",
+                         f"{fmt(a['total_cycles'])} / {fmt(b['total_cycles'])}",
+                         num(a["total_cycles"] / b["total_cycles"], 2)])
+        table(doc, ["Layer (dense, chạy riêng)", "Nạp weight 1 / 2 phép nhân", "Tính toán 1 / 2", "Tổng 1 / 2",
+                    "Tỉ số tổng"], rows, widths=[3.6, 3.4, 3.4, 3.4, 2.2], align_right=(1, 2, 3, 4))
+        caption(doc, "Bảng 19. Phần cứng dense với 1 và 2 phép nhân mỗi PE (đo 27/11): tính toán ×1,95, nạp weight +33 % (hàng "
+                     "12 ô × 8 bit = 96 bit vẫn cần 2 word 64 bit).")
+    model = os.path.join(EXP, "2026-11-27_parallel_macs", "model_pm.txt")
+    if os.path.exists(model):
+        rat = {}
+        for line in open(model):
+            p_ = [x.strip() for x in line.split("|")]
+            if len(p_) == 6 and p_[0].isdigit():
+                rat[(int(p_[0]), p_[1])] = (p_[4], p_[5])
+        zs = ("0.00", "0.40", "0.80", "0.90", "0.95", "1.00")
+        rows = [[f"{m0} filter / cột"] + [rat[(m0, z)][0].replace(".", ",") for z in zs] for m0 in (16, 8, 4)]
+        rows.append(["16, cùng số bộ nhân (2 PE × 1)"] + [rat[(16, z)][1].replace(".", ",") for z in zs])
+        table(doc, ["Chu kỳ 1 / 2 phép nhân (sparse, mô hình)", "0 %", "40 %", "80 %", "90 %", "95 %", "100 %"], rows,
+              widths=[5.6, 1.7, 1.7, 1.7, 1.7, 1.7, 1.7], align_right=(1, 2, 3, 4, 5, 6))
+        caption(doc, "Bảng 20. Tỉ số chu kỳ đọc một cột weight, 1 so với 2 phép nhân mỗi PE, theo tỉ lệ weight bằng 0 (mô hình "
+                     "dùng bộ mã hoá cột thật column_entries, doc/experiments/2026-11-27_parallel_macs/model_pm.py).")
+    bullets(doc, [
+        "Ở sparse, 1 phép nhân mỗi PE không bao giờ ít chu kỳ hơn: tỉ số từ 2 ở 0 % weight bằng 0 giảm về 1 chỉ khi cả cột "
+        "bằng 0 (mỗi cột vẫn cần ít nhất một mục); với cùng số bộ nhân (2 PE × 1) thì bằng nhau ở 0 % và 100 %, ở giữa chậm "
+        "hơn 3–39 %. Mất mát do bỏ qua theo word 2 weight "
+        "là nhỏ so với việc mất một nửa số phép nhân mỗi chu kỳ.",
+        "Hiện không chạy được sparse với 1 phép nhân: bộ giải mã weight viết cứng word 24 bit gồm 2 weight "
+        "(data_pipeline_wght.v dòng 414), nên Python dừng trước (conv_wght_encoding, có từ lần sửa #22). Upstream 12340ab có "
+        "đúng dòng đó và đường sparse Conv của upstream đã sai cả ở 2 phép nhân, nên cũng không dùng được.",
+        "Hướng sửa triệt để (chỉ đề xuất, RTL cần đồng ý): tham số hoá bộ giải mã theo số làn, nới tổng overhead mỗi word, "
+        "và thay quy ước \"word toàn 0 = không có dữ liệu\" bằng đếm word theo độ dài khối (cũng là phần P1 cần). Không đáng "
+        "làm chỉ để có 1 phép nhân; nếu tham số hoá thì có thể thử 4 phép nhân (mô hình: 0,50–0,87 lần chu kỳ đọc cột của 2).",
     ])
     doc.add_picture(figs["luoi_sparse_dense"], width=Cm(16.5))
     caption(doc, "Hình 5. Tổng chu kỳ của layer, sparse / dense, trên lưới weight × input bằng 0. Dense 1568 trên sparse "
@@ -1120,6 +1246,62 @@ def sections(doc, d, figs):
               f"+{fmt(ph(m0s, 'load_wght') - ph(wz[('mnist', '0', 'dense')], 'load_wght'))}, mạng Bảng 2 "
               f"+{fmt(ph(t0s, 'load_wght') - ph(t0d, 'load_wght'))} chu kỳ). Trong một layer, nó từ 0,4 % (Conv1) đến 35 % "
               "(Dense 1568) so với layer chạy dense. Ở Conv, đủ số 0 thì tính toán tiết kiệm bù được; ở Dense thì không.")
+
+    # ---- 4.5 evaluation of the per-layer sparse / dense direction
+    doc.add_heading("4.5. Đánh giá: với số liệu hiện tại, chọn sparse / dense theo layer có đáng làm không", level=2)
+    wl = lambda act: load(os.path.join(PERF, "wght_layout_2026-11-18_mnist", f"trained_{act}_img0_sparse.json"))
+    t2w = {"none": load(os.path.join(PERF, "paper_table3_2026-11-18_wlayout", "paper_cr2_x4_y3.json")),
+           "relu": load(os.path.join(PERF, "paper_table3_2026-11-18_relu_wlayout", "paper_cr2_x4_y3.json"))}
+    cases = []
+    for act, lab in MN_ACTS:
+        cases.append((f"MNIST {lab}", d["mn"][(act, 0, "sparse")], d["mn"][(act, 0, "dense")], wl(act)))
+    if ("none", "sparse") in d["same"]:
+        cases.append(("MNIST không hàm (weight ReLU)", d["same"][("none", "sparse")], d["same"][("none", "dense")], None))
+    for act, lab in (("none", "không hàm"), ("relu", "ReLU")):
+        cases.append((f"Bảng 2 {lab}", t2[(act, "sparse")], t2[(act, "dense")], t2w[act]))
+    rows, gains_sd, gains_p1 = [], [], []
+    for name, s_, d_, w_ in cases:
+        S = [l["total_cycles"] for l in s_["layers"]]
+        D = [l["total_cycles"] for l in d_["layers"]]
+        best = min(sum(S), sum(D))
+        sd = sum(map(min, S, D))
+        cell = lambda v: f"{fmt(v)} ({pct(100.0 * (v - best) / best, 1)})"
+        row = [name, fmt(sum(S)), fmt(sum(D)), cell(sd)]
+        gains_sd.append(100.0 * (sd - best) / best)
+        if w_:
+            P = [wl_["total_cycles"] - (ph(sl, "load_wght") - ph(dl, "load_wght"))
+                 for wl_, sl, dl in zip(w_["layers"], s_["layers"], d_["layers"])]
+            sdp = sum(min(x, y, z) for x, y, z in zip(S, D, P))
+            row += [cell(sum(P)), cell(sdp)]
+            gains_p1.append(100.0 * (sum(P) - best) / best)
+        else:
+            row += ["–", "–"]
+        rows.append(row)
+    table(doc, ["Mạng (CR 2 X 4 Y 3)", "Sparse", "Dense", "Chọn S / D theo layer", "P1: weight 8 bit + activation "
+                "sparse", "Chọn S / D / P1 theo layer"], rows, widths=[3.6, 1.9, 1.9, 2.9, 2.9, 2.9],
+          align_right=(1, 2, 3, 4, 5))
+    caption(doc, "Bảng 21. Tổng chu kỳ cả mạng. Trong ngoặc: so với chế độ tốt hơn trong hai chế độ hiện có (âm = ít chu kỳ "
+                 "hơn). Chọn theo layer: mỗi layer lấy số đo nhỏ nhất, coi như đổi chế độ không tốn chu kỳ (giới hạn trên của "
+                 "lợi). P1: PE sparse nhận weight 8 bit dạng dense, vẫn bỏ qua activation bằng 0 (đo ở bước 2 ngày 18/11, chu "
+                 "kỳ nạp weight lấy của dense).")
+    bullets(doc, [
+        f"Chọn giữa hai chế độ hiện có theo từng layer lợi rất ít: {pct(min(gains_sd), 1)} (MNIST ReLU) đến 0 %. Sparse chỉ "
+        "thắng ở Conv giữa sau ReLU (input 44–87 % số 0); layer đầu (ảnh, không có số 0), layer Dense (weight bằng 0 không "
+        "được bỏ qua, nạp weight chiếm phần lớn) và mọi layer sau Leaky ReLU / SiLU / hard-swish / không hàm đều hợp dense.",
+        "Nguyên nhân nằm ở mục 4.2–4.4: sparse luôn nạp weight nhiều hơn 40 % (12 bit mỗi ô, bất kể số 0), còn tính toán "
+        "sparse chỉ giảm khi input có nhiều số 0 và giảm chậm hơn tỉ lệ số 0.",
+        f"Chi phí của việc đổi cả chế độ theo layer: mỗi PE cần cả FSM sparse và FSM dense, ước tính +4.800 đến +9.600 LUT "
+        f"(48 PE, báo cáo 6), cộng thanh ghi cấu hình theo layer, để lợi tối đa {pct(-min(gains_sd), 1, sign=False)}. Với số "
+        "liệu hiện tại thì không đáng.",
+        f"Phần đáng làm là tách cấu hình Weight / Activation (mục 1 của giai đoạn 3 trong kế hoạch 4 giai đoạn), cụ thể là P1: "
+        f"giữ PE sparse (bỏ qua activation bằng 0) nhưng nhận weight 8 bit. Lợi {pct(min(gains_p1), 1)} (MNIST ReLU) đến "
+        f"{pct(max(gains_p1), 1)}, ước tính +281 LUT (Yosys), đã chạy đúng từng bit khi ép raw_wght_i trong mô phỏng (bước 2). "
+        "Thêm chọn theo layer giữa S / D / P1 chỉ lợi thêm 0,1–0,4 điểm.",
+        "Kết luận: với số liệu hiện tại, hướng bật sparse / dense theo layer theo nghĩa đổi cả chế độ của PE chưa ổn: lợi nhỏ "
+        "hơn nhiều so với chi phí phần cứng. Nên làm trước bước tách Weight / Activation (P1, bước 3a, RTL cần bạn đồng ý). Chọn "
+        "chế độ theo layer chỉ đáng xem lại khi mô hình có nhiều số 0 hơn ở cả weight lẫn activation (mô hình lớn có ReLU, "
+        "weight đã prune) hoặc khi bộ nhớ thật làm pha nạp nặng hơn.",
+    ])
 
     # ---------------------------------------------------------------- 5
     doc.add_heading("5. Kiểm tra lại bản sửa test_dense_output và đối chiếu upstream", level=1)
@@ -1140,7 +1322,7 @@ def sections(doc, d, figs):
         ["Test RTL test_dense_readout (15 ca: nhiều lượt, CR 1 / 4, NUM_GLB_IACT 3, NUM_GLB_PSUM 2, dense, GEMM)",
          f"{dc.get('dense_readout_rtl', {}).get('passed', '?')}/15 PASS (chạy lại 23/11)", "không có"],
     ], widths=[5.6, 4.6, 5.8])
-    caption(doc, "Bảng 18. Kết quả kiểm tra. P = số output mỗi cột trong một lượt, CX = số cột cluster.")
+    caption(doc, "Bảng 22. Kết quả kiểm tra. P = số output mỗi cột trong một lượt, CX = số cột cluster.")
     bullets(doc, [
         "11 test hỏng không do RTL: fixture (SimpleNamespace) thiếu hai trường output_cycles và needed_psum_transmissions mà "
         "upstream 23be043 (01/10, trước khi fork) bắt đầu đọc. Thêm hai trường là đủ; test mới (31) còn phủ 2–3 lượt, "
@@ -1199,7 +1381,7 @@ def sections_6_8(doc, d, figs):
             rows.append([f"{names[kind]}, {mode}", f"{min(v)}–{max(v)}",
                          "; ".join(f"{label[k]}: {compact(ns)}" for k, ns in by.items())])
     table(doc, ["Vị trí, chế độ", "Số channel", "Kết quả"], rows, widths=[3.4, 2.0, 10.6])
-    caption(doc, "Bảng 19. Tóm tắt phép quét số channel.")
+    caption(doc, "Bảng 23. Tóm tắt phép quét số channel.")
     # 6.2
     doc.add_heading("6.2. Tại sao các số channel này sai", level=2)
     first_s, first_d = verdicts("first", "sparse"), verdicts("first", "dense")
@@ -1232,7 +1414,7 @@ def sections_6_8(doc, d, figs):
         rows.append([str(c), str(used), str(slots), str(last), pred, f"{meas[0]} / {meas[1]}"])
     table(doc, ["C", "used_channels", "Ô RTL đọc mỗi pixel", "Giá trị mỗi pixel ở nhóm cuối", "Dự đoán",
                 "Đo: sparse / dense"], rows, widths=[1.0, 2.4, 2.8, 3.4, 3.2, 3.2], align_right=(0, 1, 2, 3))
-    caption(doc, "Bảng 20. Layer đầu, C = 1 … 12: quy tắc gói / đọc và kết quả đo. Mẫu lặp lại với chu kỳ 4 đến C = 34.")
+    caption(doc, "Bảng 24. Layer đầu, C = 1 … 12: quy tắc gói / đọc và kết quả đo. Mẫu lặp lại với chu kỳ 4 đến C = 34.")
     mid_s = verdicts("mid", "sparse")
     bullets(doc, [
         "Layer giữa đọc kết quả ghi ngược của layer trước. Bộ ghi ngược của RTL ghi theo nhóm 4 channel mỗi pixel (#25). Với "
@@ -1287,7 +1469,7 @@ def sections_7_8(doc, d):
     doc.add_heading("7. Việc đã làm trong tuần", level=1)
     table(doc, ["Commit", "Ngày", "Nội dung"], [[c, day, text] for c, day, text in COMMITS],
           widths=[2.0, 1.6, 12.4])
-    caption(doc, "Bảng 21. Các commit trong tuần (nhánh dev, đã đẩy lên origin).")
+    caption(doc, "Bảng 25. Các commit trong tuần (nhánh dev, đã đẩy lên origin).")
     bullets(doc, [
         "19/11: đo chi phí hàm kích hoạt trên MNIST đã huấn luyện, 4 hàm × 3 ảnh × sparse / dense "
         "(doc/experiments/2026-11-19_activation_cost.md).",
@@ -1304,15 +1486,20 @@ def sections_7_8(doc, d):
         "(pha chạy song song) và 3.2 (pha ghi ngược, bảng LUTRAM) vào báo cáo; đổi ngày báo cáo sang 27/11; kiểm chứng pha "
         "ghi ngược: làn mang output nào (15 lần chạy, doc/experiments/2026-11-26_writeback_lanes.md), mỗi tầng 1 chu kỳ "
         "(mô phỏng) và timing từng tầng (Vivado, doc/experiments/2026-11-26_requant_timing.md).",
+        "27/11: mục 3.3 dùng số chu kỳ thật, mục 4.5 đánh giá sparse / dense theo layer; quét số channel 1–64 × input bằng 0 "
+        "(28 lần chạy, doc/experiments/2026-11-27_channels_zero_skip/); đo và mô hình 1 phép nhân mỗi PE, đề xuất sửa bộ "
+        "giải mã (doc/experiments/2026-11-27_parallel_macs.md, chưa sửa RTL / Python); giải thích thêm ở 3.3 (pooling) và "
+        "4.4 (nạp weight độ dài cố định, Dense chạy raw).",
     ])
     doc.add_heading("8. Bước tiếp theo", level=1)
     bullets(doc, [
         "Số channel (cần bạn đồng ý, chỉ Python): (1) đệm layer đầu có C chia 4 dư 2 lên bội của 4 như đã làm cho C lẻ; "
         "(2) thêm kiểm tra chặn layer giữa và layer Dense có số channel không chia hết cho 4 (đang sai lặng lẽ hoặc dừng với "
         "lỗi khó hiểu), hoặc đệm filter 0 ở layer trước; (3) thông báo rõ cho số filter lẻ thay cho lỗi của bộ mã hoá.",
-        "Kiểm chứng giả thuyết Conv1 (input bằng 0 đến 40 % gần như không bớt chu kỳ) bằng trace của PE.",
-        "Adaptive OpenEye, giai đoạn 3 (RTL, cần bạn đồng ý): tách SPARSITY_EN thành Weight / Activation, bắt đầu từ bước 3a; "
-        "kết quả tuần này thêm lý do: layer Dense không được lợi gì từ weight bằng 0 trên phần cứng sparse.",
+        "Conv1 (input bằng 0 đến 40 % gần như không bớt chu kỳ): quét số channel cho thấy đây là hiện tượng của layer 1 "
+        "channel (Bảng 18); còn cần trace của PE để chỉ ra đúng phần cố định trong mỗi lượt.",
+        "Adaptive OpenEye, giai đoạn 3 (RTL, cần bạn đồng ý): làm trước bước tách SPARSITY_EN thành Weight / Activation (P1, "
+        "bước 3a); đổi cả chế độ PE theo layer để sau, vì với số liệu hiện tại lợi ≤ 1,4 % (mục 4.5).",
         "Chạy lại các phép đo chính với mô hình bộ nhớ (OPENEYE_MEM=typical) để xem các pha nạp trên board thật.",
         "Profiler (Python, không sửa RTL): thêm bảng đếm theo cặp trạng thái FSM chính × FSM psum, để thấy trong mỗi pha "
         "phần nào là tính, ghi hay chờ khối khác (mục 2.3).",
@@ -1331,7 +1518,7 @@ def build():
     sl = {x["title"].split(" (")[0].strip(): x["slack"] for x in reversed(st["stages"])}
     slacks = [sl.get("S1"), sl.get("S2"), sl.get("S3 = R4"), st.get("r5_slack")] if st["stages"] else None
     figure_writeback(figs["ghi_nguoc"], slacks if slacks and all(v is not None for v in slacks) else None)
-    figure_act(d, figs["ham_kich_hoat"])
+    figure_act_totals(d, figs["ham_kich_hoat"])
     figure_compute_lines(d, figs["tinh_toan_theo_so_0"])
     figure_grid(d, figs["luoi_sparse_dense"])
     figure_wz(d, figs["weight_0_ca_mang"])
@@ -1403,6 +1590,9 @@ def build():
         "Mức độ thưa: số 0 chỉ làm thay đổi pha tính toán trên phần cứng sparse. Nạp weight, nạp / chuyển activation, ghi "
         "ngược, pooling và toàn bộ chu kỳ dense giống hệt ở mọi mức số 0 (đo 25 mức weight × activation trên 4 layer). "
         "Tính toán sparse giảm ít hơn tỉ lệ số 0 (phần cố định 60–64 %), layer Dense không bỏ qua weight bằng 0.",
+        "Đánh giá hướng chọn sparse / dense theo layer (mục 4.5): đổi cả chế độ theo layer chỉ lợi 0 đến −1,4 % (MNIST ReLU) "
+        "trong khi cần thêm khoảng 4.800–9.600 LUT: với số liệu hiện tại chưa đáng. Phần đáng làm là tách Weight / Activation "
+        "(P1: weight 8 bit, vẫn bỏ qua activation bằng 0): 0 đến −7,9 %, khoảng +281 LUT.",
         "test_dense_output: bản sửa của phiên khác (6a7a323) đúng: 31/31 test qua, bộ giải mã Dense khứ hồi đúng 600/600 "
         f"kích thước layer. Upstream {dc.get('upstream_commit', '?')} vẫn hỏng 11/11 test và giải mã sai "
         f"{dc.get('upstream_formula', {}).get('wrong', '?')}/600 kích thước (mọi Dense có hơn 16 × CX output khi CX ≥ 2).",
